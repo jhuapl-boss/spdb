@@ -1,4 +1,4 @@
-# Copyright 2014 NeuroData (http://neurodata.io)
+# Original Copyright 2014 NeuroData (http://neurodata.io)
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,17 +24,15 @@ import blosc
 from contextlib import closing
 from operator import add, sub, div, mod, mul
 
-import annindex
 from cube import Cube
 import imagecube
-import anncube
+from kvio import KVIO
 
 import ndlib
 
 from ndtype import ANNOTATION_CHANNELS, TIMESERIES_CHANNELS, EXCEPTION_TRUE, PROPAGATED, MYSQL, CASSANDRA, RIAK, \
     DYNAMODB, REDIS
 
-import s3io
 import rediskvio
 
 
@@ -48,23 +46,33 @@ import rediskvio
 
 class SpatialDB:
     def __init__(self, proj):
-        """Connect with the brain databases"""
+        """
 
-        #TODO: Need to replace this with settings from our stuff.
-        self.datasetcfg = proj.datasetcfg
-        self.proj = proj
+        :param proj: Project information
+        :return: spdb.spatialdb.SpatialDB
+        """
+        # TODO: Need to replace this with settings from our stuff.
+
+        Look into potentially using the same design or extending ndproj.
+
+        If not make an abstract project class that has all the methods
+        then 1 for django, 1 for internal that uses mysql tabe, and 1 external that uses the API
+
+
+        # self.datasetcfg = proj.datasetcfg
+        # self.proj = proj
 
         # Set the S3 backend for the data
-        self.s3io = s3io.S3IO(self)
+        # self.s3io = s3io.S3IO(self)
 
-        #TODO: Need to replace this with settings from our stuff.
+        # TODO: Need to replace this with settings from our stuff.
+        # Query
         self.KVENGINE = self.proj.getKVEngine()
         self.NPZ = False
 
-        from kvio import KVIO
         self.kvio = KVIO.getIOEngine(self)
 
-        self.annoIdx = annindex.AnnotateIndex(self.kvio, self.proj)
+        #self.annoIdx = annindex.AnnotateIndex(self.kvio, self.proj)
 
     def close(self):
         """Close the connection"""
@@ -135,62 +143,6 @@ class SpatialDB:
             self.kvio.putCube(ch, zidx, resolution, cube.toNPZ(), not cube.fromZeros(), timestamp=timestamp)
         else:
             self.kvio.putCube(ch, zidx, resolution, cube.toBlosc(), not cube.fromZeros(), timestamp=timestamp)
-
-    def getExceptions(self, ch, zidx, resolution, annoid):
-        """Load a cube from the annotation database"""
-
-        excstr = self.kvio.getExceptions(ch, zidx, resolution, annoid)
-        if excstr:
-            if self.NPZ:
-                return np.load(io.StringIO(zlib.decompress(excstr)))
-            else:
-                return blosc.unpack_array(excstr)
-        else:
-            return []
-
-    def updateExceptions(self, ch, key, resolution, exid, exceptions, update=False):
-        """Merge new exceptions with existing exceptions"""
-
-        curexlist = self.getExceptions(ch, key, resolution, exid)
-
-        update = False
-
-        if curexlist != []:
-            oldexlist = [ndlib.XYZMorton(trpl) for trpl in curexlist]
-            newexlist = [ndlib.XYZMorton(trpl) for trpl in exceptions]
-            exlist = set(newexlist + oldexlist)
-            exlist = [ndlib.MortonXYZ(zidx) for zidx in exlist]
-            update = True
-        else:
-            exlist = exceptions
-
-        self.putExceptions(ch, key, resolution, exid, exlist, update)
-
-    def putExceptions(self, ch, key, resolution, exid, exceptions, update):
-        """Package the object and transact with kvio"""
-
-        exceptions = np.array(exceptions, dtype=np.uint32)
-
-        if self.NPZ:
-            fileobj = io.StringIO()
-            np.save(fileobj, exceptions)
-            excstr = fileobj.getvalue()
-            self.kvio.putExceptions(ch, key, resolution, exid, zlib.compress(excstr), update)
-        else:
-            self.kvio.putExceptions(ch, key, resolution, exid, blosc.pack_array(exceptions), update)
-
-    def removeExceptions(self, ch, key, resolution, entityid, exceptions):
-        """Remove a list of exceptions. Should be done in a transaction"""
-
-        curexlist = self.getExceptions(ch, key, resolution, entityid)
-
-        if curexlist != []:
-            oldexlist = set([ndlib.XYZMorton(trpl) for trpl in curexlist])
-            newexlist = set([ndlib.XYZMorton(trpl) for trpl in exceptions])
-            exlist = oldexlist - newexlist
-            exlist = [ndlib.MortonXYZ(zidx) for zidx in exlist]
-
-            self.putExceptions(ch, key, resolution, exid, exlist, True)
 
     def annotate(self, ch, entityid, resolution, locations, conflictopt='O'):
         """Label the voxel locations or add as exceptions is the are already labeled."""
