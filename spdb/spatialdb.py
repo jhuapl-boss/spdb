@@ -1,11 +1,11 @@
 # Original Copyright 2014 NeuroData (http://neurodata.io)
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -16,996 +16,582 @@
 # Copyright 2016 Johns Hopkins University Applied Physics Laboratory
 
 import numpy as np
-import io
-import zlib
-from collections import defaultdict
-import itertools
-import blosc
-from contextlib import closing
-from operator import add, sub, div, mod, mul
+from collections import namedtuple
 
-from cube import Cube
-import imagecube
-from kvio import KVIO
+from operator import mod, floordiv
 
-import ndlib
+import c_lib
+from c_lib.ndlib import MortonXYZ, XYZMorton
 
-from ndtype import ANNOTATION_CHANNELS, TIMESERIES_CHANNELS, EXCEPTION_TRUE, PROPAGATED, MYSQL, CASSANDRA, RIAK, \
-    DYNAMODB, REDIS
-
-import rediskvio
-
+from spdb import SpdbError, ErrorCode
+from spdb import KVIO
+from spdb import Cube
+from c_lib.ndtype import CUBOIDSIZE
 
 """
 .. module:: spatialdb
     :synopsis: Manipulate/create/read from the Morton-order cube store
 
-.. moduleauthor:: Kunal Lillaney <lillaney@jhu.edu>
+.. moduleauthor:: Kunal Lillaney <lillaney@jhu.edu> and Dean Kleissas <dean.kleissas@jhuapl.edu>
 """
+
+from bossutils.logger import BossLogger
+logger = BossLogger()
 
 
 class SpatialDB:
-    def __init__(self, proj):
-        """
+    """
+    Main interface class to the spatial database system/cache engine
 
-        :param proj: Project information
-        :return: spdb.spatialdb.SpatialDB
-        """
-        # TODO: Need to replace this with settings from our stuff.
+    Args:
+      resource (project.BossResource): Data model info based on the request or target resource
 
-        Look into potentially using the same design or extending ndproj.
+    Attributes:
+      resource (project.BossResource): Data model info based on the request or target resource
+      s3io ():
+      kvio (KVIO): A key-value store engine instance
+    """
 
-        If not make an abstract project class that has all the methods
-        then 1 for django, 1 for internal that uses mysql tabe, and 1 external that uses the API
+    def __init__(self, resource):
+        # Set the Boss Resource instance
+        self.resource = resource
 
-
-        # self.datasetcfg = proj.datasetcfg
-        # self.proj = proj
-
+        # TODO: DMK Add S3 instance or move elsewhere
         # Set the S3 backend for the data
         # self.s3io = s3io.S3IO(self)
-
-        # TODO: Need to replace this with settings from our stuff.
-        # Query
-        self.KVENGINE = self.proj.getKVEngine()
-        self.NPZ = False
+        self.s3io = None
 
         self.kvio = KVIO.getIOEngine(self)
 
-        #self.annoIdx = annindex.AnnotateIndex(self.kvio, self.proj)
+        # TODO: DMK Add annotation support
+        # self.annoIdx = annindex.AnnotateIndex(self.kvio, self.proj)
 
     def close(self):
-        """Close the connection"""
+        """
+        Close the cache key-value engine
+
+        Returns:
+            None
+
+        """
         self.kvio.close()
 
     # GET Method
-    def getCube(self, ch, zidx, resolution, timestamp=None, update=False):
-        """Load a cube from the database"""
+    def get_cube(self, resource, morton_idx, resolution, update=False):
+        """
+        Load a single cuboid from the cache key-value store
 
-        # get the size of the image and cube
-        [xcubedim, ycubedim, zcubedim] = cubedim = self.datasetcfg.cubedim[resolution]
-        # KL TODO add indexing here
-        cube = Cube.getCube(cubedim, ch.getChannelType(), ch.getDataType())
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource
+            morton_idx (int): the Morton ID of the cuboid
+            resolution (int): the resolution level
+            update (bool): True if this an update operation. False if the first time you are inserting the cuboid
+
+        Returns:
+            cube.Cube: The cuboid data
+        """
+        # TODO: DMK to add cuboid tracking indexing here
+        # This is referring to adding redis/s3 index call here like below in get_cubes.  occasionally get_cube is called
+        # directly so you need it here. Ultimately this might get replaced with a call to the cache manager?
+        cube = Cube.create_cube(CUBOIDSIZE[resolution], resource)
 
         # get the block from the database
-        cubestr = self.kvio.getCube(ch, zidx, resolution, update=update, timestamp=timestamp)
+        cube_bytes = self.kvio.get_cube(resource, morton_idx, resolution, update=update)
 
-        if not cubestr:
+        if not cube_bytes:
+            # There wasn't a cuboid so return zeros
             cube.zeros()
         else:
             # Handle the cube format here and decompress the cube
-            if self.NPZ:
-                cube.fromNPZ(cubestr)
-            else:
-                cube.fromBlosc(cubestr)
+            cube.from_blosc_numpy(cube_bytes)
 
         return cube
 
-    def getCubes(self, ch, listofidxs, resolution, listoftimestamps=None, neariso=False):
-        """Return a list of cubes"""
+    def get_cubes(self, resource, morton_idx_list, resolution):
+        """Load an array of cuboids from the cache key-value store
 
-        if listoftimestamps is None:
-            ids_to_fetch = self.kvio.getCubeIndex(ch, resolution, listofidxs)
-            # Checking if the index exists inside the database or not
-            if ids_to_fetch:
-                print(("Miss:", listofidxs))
-                super_cuboids = self.s3io.getCubes(ch, ids_to_fetch, resolution)
+        Args:
+            resource (spdb.project.BossResource): Data model info based on the request or target resource
+            morton_idx_list (list[int]): a list of Morton ID of the cuboids to get
+            resolution (int): the resolution level
 
-                # iterating over super_cuboids
-                for superlistofidxs, superlistofcubes in super_cuboids:
-                    # call putCubes and update index in the table before returning data
-                    self.putCubes(ch, superlistofidxs, resolution, superlistofcubes, update=True)
-                    # self.kvio.putCubeIndex(ch, resolution, superlistofidxs)
-            data = self.kvio.getCubes(ch, listofidxs, resolution, neariso)
-            return data
+        Returns:
+            list[numpy.ndarray]: The cuboid data
+        """
+        if len(resource.get_time_samples()) == 1:
+            if self.s3io:
+                # TODO: Update this block of code once S3 integration has occurred
+                # Get the ids of the cuboids you need - only gives ids to be fetched
+                ids_to_fetch = self.kvio.getCubeIndex(resource, resolution, morton_idx_list)
+
+                # Check if the index exists inside the cache database or if you must fetch from S3
+                if ids_to_fetch:
+                    logger.info("Cache miss on get_cubes. Loading from S3: {}".format(morton_idx_list))
+                    super_cuboids = self.s3io.get_cubes(resource, ids_to_fetch, resolution)
+
+                    # Iterating over super cuboids and load into the cache kv-stores
+                    for supercuboid_idx_list, supercuboid_list in super_cuboids:
+                        # call put_cubes and update index in the table before returning data
+                        self.put_cubes(resource, supercuboid_idx_list, resolution, supercuboid_list, update=True)
+
+            return self.kvio.get_cubes(resource, morton_idx_list, resolution)
         else:
-            return self.kvio.getTimeCubes(ch, listofidxs, listoftimestamps, resolution)
-
-    def putCubes(self, ch, listofidxs, resolution, listofcubes, update=False):
-        """Insert a list of cubes"""
-
-        self.kvio.putCubeIndex(ch, resolution, listofidxs)
-        return self.kvio.putCubes(ch, listofidxs, resolution, listofcubes, update)
-
-    # PUT Method
-    def putCube(self, ch, zidx, resolution, cube, timestamp=None, update=False):
-        """ Store a cube in the annotation database """
-
-        # Handle the cube format here
-        if ch.getChannelType() in TIMESERIES_CHANNELS and timestamp is not None:
-            self.kvio.putCubeIndex(ch, resolution, [zidx], [timestamp])
-        elif ch.getChannelType() not in TIMESERIES_CHANNELS and timestamp is None:
-            self.kvio.putCubeIndex(ch, resolution, [zidx])
-        else:
-            raise
-
-        if self.NPZ:
-            self.kvio.putCube(ch, zidx, resolution, cube.toNPZ(), not cube.fromZeros(), timestamp=timestamp)
-        else:
-            self.kvio.putCube(ch, zidx, resolution, cube.toBlosc(), not cube.fromZeros(), timestamp=timestamp)
-
-    def annotate(self, ch, entityid, resolution, locations, conflictopt='O'):
-        """Label the voxel locations or add as exceptions is the are already labeled."""
-
-        [xcubedim, ycubedim, zcubedim] = cubedim = self.datasetcfg.cubedim[resolution]
-
-        #  An item may exist across several cubes
-        #  Convert the locations into Morton order
-
-        # dictionary with the index
-        cubeidx = defaultdict(set)
-        cubelocs = ndlib.locate_ctype(np.array(locations, dtype=np.uint32), cubedim)
-
-        # sort the arrary, by cubeloc
-        cubelocs = ndlib.quicksort(cubelocs)
-        # cubelocs2.view('u4,u4,u4,u4').sort(order=['f0'], axis=0)
-
-        # get the nonzero element offsets
-        nzdiff = np.r_[np.nonzero(np.diff(cubelocs[:, 0]))]
-        # then turn into a set of ranges of the same element
-        listoffsets = np.r_[0, nzdiff + 1, len(cubelocs)]
-
-        # start a transaction if supported
-        self.kvio.startTxn()
-        for i in range(len(listoffsets) - 1):
-
-            # grab the list of voxels for the first cube
-            voxlist = cubelocs[listoffsets[i]:listoffsets[i + 1], :][:, 1:4]
-            #  and the morton key
-            key = cubelocs[listoffsets[i], 0]
-
-            cube = self.getCube(ch, key, resolution, update=True)
-
-            # get a voxel offset for the cube
-            cubeoff = ndlib.MortonXYZ(key)
-            # cubeoff = zindex.MortonXYZ(key)
-            offset = np.asarray([cubeoff[0] * cubedim[0], cubeoff[1] * cubedim[1], cubeoff[2] * cubedim[2]],
-                                dtype=np.uint32)
-
-            # add the items
-            exceptions = np.array(cube.annotate(entityid, offset, voxlist, conflictopt), dtype=np.uint8)
-            # exceptions = np.array(cube.annotate(entityid, offset, voxlist, conflictopt), dtype=np.uint8)
-
-            # update the sparse list of exceptions
-            if ch.getExceptions() == EXCEPTION_TRUE:
-                if len(exceptions) != 0:
-                    self.updateExceptions(ch, key, resolution, entityid, exceptions)
-
-            self.putCube(ch, key, resolution, cube)
-
-            # add this cube to the index
-            cubeidx[entityid].add(key)
-
-        # write it to the database
-        self.annoIdx.updateIndexDense(ch, cubeidx, resolution)
-        # commit cubes.  not commit controlled with metadata
-        self.kvio.commit()
-
-    def shave(self, ch, entityid, resolution, locations):
-        """Label the voxel locations or add as exceptions is the are already labeled."""
-
-        [xcubedim, ycubedim, zcubedim] = cubedim = self.datasetcfg.cubedim[resolution]
-
-        # dictionary with the index
-        cubeidx = defaultdict(set)
-
-        # convert voxels z coordinate
-        cubelocs = ndlib.locate_ctype(np.array(locations, dtype=np.uint32), cubedim)
-
-        # sort the arrary, by cubeloc
-        cubelocs = ndlib.quicksort(cubelocs)
-        # cubelocs.view('u4,u4,u4,u4').sort(order=['f0'], axis=0)
-
-        # get the nonzero element offsets
-        nzdiff = np.r_[np.nonzero(np.diff(cubelocs[:, 0]))]
-        # then turn into a set of ranges of the same element
-        listoffsets = np.r_[0, nzdiff + 1, len(cubelocs)]
-
-        self.kvio.startTxn()
-
-        try:
-
-            for i in range(len(listoffsets) - 1):
-
-                # grab the list of voxels for the first cube
-                voxlist = cubelocs[listoffsets[i]:listoffsets[i + 1], :][:, 1:4]
-                #  and the morton key
-                key = cubelocs[listoffsets[i], 0]
-
-                cube = self.getCube(ch, key, resolution, update=True)
-
-                # get a voxel offset for the cube
-                cubeoff = ndlib.MortonXYZ(key)
-                # cubeoff2 = zindex.MortonXYZ(key)
-                offset = np.asarray([cubeoff[0] * cubedim[0], cubeoff[1] * cubedim[1], cubeoff[2] * cubedim[2]],
-                                    dtype=np.uint32)
-
-                # remove the items
-                exlist, zeroed = cube.shave(entityid, offset, voxlist)
-                # make sure that exceptions are stored as 8 bits
-                exceptions = np.array(exlist, dtype=np.uint8)
-
-                # update the sparse list of exceptions
-                if ch.getExceptions == EXCEPTION_TRUE:
-                    if len(exceptions) != 0:
-                        self.removeExceptions(ch, key, resolution, entityid, exceptions)
-
-                self.putCube(ch, key, resolution, cube)
-
-                # For now do no index processing when shaving.  Assume there are still some
-                #  voxels in the cube???
-
-        except:
-            self.kvio.rollback()
-            raise
-
-        self.kvio.commit()
-
-    def annotateDense(self, ch, corner, resolution, annodata, conflictopt):
-        """Process all the annotations in the dense volume"""
-
-        index_dict = defaultdict(set)
-
-        # dim is in xyz, data is in zyxj
-        dim = annodata.shape[::-1]
-
-        # get the size of the image and cube
-        [xcubedim, ycubedim, zcubedim] = cubedim = self.datasetcfg.cubedim[resolution]
-
-        # Round to the nearest larger cube in all dimensions
-        start = [xstart, ystart, zstart] = list(map(div, corner, cubedim))
-
-        znumcubes = (corner[2] + dim[2] + zcubedim - 1) / zcubedim - zstart
-        ynumcubes = (corner[1] + dim[1] + ycubedim - 1) / ycubedim - ystart
-        xnumcubes = (corner[0] + dim[0] + xcubedim - 1) / xcubedim - xstart
-
-        offset = [xoffset, yoffset, zoffset] = list(map(mod, corner, cubedim))
-
-        databuffer = np.zeros([znumcubes * zcubedim, ynumcubes * ycubedim, xnumcubes * xcubedim], dtype=np.uint32)
-        databuffer[zoffset:zoffset + dim[2], yoffset:yoffset + dim[1], xoffset:xoffset + dim[0]] = annodata
-
-        # start a transaction if supported
-        self.kvio.startTxn()
-
-        try:
-
-            for z in range(znumcubes):
-                for y in range(ynumcubes):
-                    for x in range(xnumcubes):
-
-                        key = ndlib.XYZMorton([x + xstart, y + ystart, z + zstart])
-                        cube = self.getCube(ch, key, resolution, update=True)
-
-                        if conflictopt == 'O':
-                            cube.overwrite(databuffer[z * zcubedim:(z + 1) * zcubedim, y * ycubedim:(y + 1) * ycubedim,
-                                           x * xcubedim:(x + 1) * xcubedim])
-                        elif conflictopt == 'P':
-                            cube.preserve(databuffer[z * zcubedim:(z + 1) * zcubedim, y * ycubedim:(y + 1) * ycubedim,
-                                          x * xcubedim:(x + 1) * xcubedim])
-                        elif conflictopt == 'E':
-                            if ch.getExceptions() == EXCEPTION_TRUE:
-                                exdata = cube.exception(
-                                    databuffer[z * zcubedim:(z + 1) * zcubedim, y * ycubedim:(y + 1) * ycubedim,
-                                    x * xcubedim:(x + 1) * xcubedim])
-                                for exid in np.unique(exdata):
-                                    if exid != 0:
-                                        # get the offsets
-                                        exoffsets = np.nonzero(exdata == exid)
-                                        # assemble into 3-tuples zyx->xyz
-                                        exceptions = np.array(list(zip(exoffsets[2], exoffsets[1], exoffsets[0])),
-                                                              dtype=np.uint32)
-                                        # update the exceptions
-                                        self.updateExceptions(ch, key, resolution, exid, exceptions)
-                                        # add to the index
-                                        index_dict[exid].add(key)
-                            else:
-                                logger.error("No exceptions for this project.")
-                                raise SpatialDBError("No exceptions for this project.")
-                        else:
-                            logger.error("Unsupported conflict option %s" % conflictopt)
-                            raise SpatialDBError("Unsupported conflict option %s" % conflictopt)
-
-                        self.putCube(ch, key, resolution, cube)
-
-                        # update the index for the cube
-                        # get the unique elements that are being added to the data
-                        uniqueels = np.unique(
-                            databuffer[z * zcubedim:(z + 1) * zcubedim, y * ycubedim:(y + 1) * ycubedim,
-                            x * xcubedim:(x + 1) * xcubedim])
-                        for el in uniqueels:
-                            index_dict[el].add(key)
-
-                            # remove 0 no reason to index that
-                        if 0 in index_dict:
-                            del (index_dict[0])
-
-            # Update all indexes
-            self.annoIdx.updateIndexDense(ch, index_dict, resolution)
-            # commit cubes.  not commit controlled with metadata
-
-        except:
-            self.kvio.rollback()
-            raise
-
-        self.kvio.commit()
-
-    def annotateEntityDense(self, ch, entityid, corner, resolution, annodata, conflictopt):
-        """Relabel all nonzero pixels to annotation id and call annotateDense"""
-
-        # vec_func = np.vectorize ( lambda x: 0 if x == 0 else entityid )
-        # annodata = vec_func ( annodata )
-        annodata = ndlib.annotateEntityDense_ctype(annodata, entityid)
-
-        return self.annotateDense(ch, corner, resolution, annodata, conflictopt)
-
-    def shaveDense(self, ch, entityid, corner, resolution, annodata):
-        """Process all the annotations in the dense volume"""
-
-        index_dict = defaultdict(set)
-
-        # dim is in xyz, data is in zyxj
-        dim = [annodata.shape[2], annodata.shape[1], annodata.shape[0]]
-
-        # get the size of the image and cube
-        [xcubedim, ycubedim, zcubedim] = cubedim = self.datasetcfg.cubedim[resolution]
-
-        # Round to the nearest larger cube in all dimensions
-        zstart = corner[2] / zcubedim
-        ystart = corner[1] / ycubedim
-        xstart = corner[0] / xcubedim
-
-        znumcubes = (corner[2] + dim[2] + zcubedim - 1) / zcubedim - zstart
-        ynumcubes = (corner[1] + dim[1] + ycubedim - 1) / ycubedim - ystart
-        xnumcubes = (corner[0] + dim[0] + xcubedim - 1) / xcubedim - xstart
-
-        zoffset = corner[2] % zcubedim
-        yoffset = corner[1] % ycubedim
-        xoffset = corner[0] % xcubedim
-
-        databuffer = np.zeros([znumcubes * zcubedim, ynumcubes * ycubedim, xnumcubes * xcubedim], dtype=np.uint32)
-        databuffer[zoffset:zoffset + dim[2], yoffset:yoffset + dim[1], xoffset:xoffset + dim[0]] = annodata
-
-        # start a transaction if supported
-        self.kvio.startTxn()
-
-        try:
-
-            for z in range(znumcubes):
-                for y in range(ynumcubes):
-                    for x in range(xnumcubes):
-
-                        key = ndlib.XYZMorton([x + xstart, y + ystart, z + zstart])
-                        cube = self.getCube(ch, key, resolution, update=True)
-
-                        exdata = cube.shaveDense(
-                            databuffer[z * zcubedim:(z + 1) * zcubedim, y * ycubedim:(y + 1) * ycubedim,
-                            x * xcubedim:(x + 1) * xcubedim])
-                        for exid in np.unique(exdata):
-                            if exid != 0:
-                                # get the offsets
-                                exoffsets = np.nonzero(exdata == exid)
-                                # assemble into 3-tuples zyx->xyz
-                                exceptions = np.array(list(zip(exoffsets[2], exoffsets[1], exoffsets[0])),
-                                                      dtype=np.uint32)
-                                # update the exceptions
-                                self.removeExceptions(key, resolution, exid, exceptions)
-                                # add to the index
-                                index_dict[exid].add(key)
-
-                        self.putCube(ch, key, resolution, cube)
-
-                        # update the index for the cube
-                        # get the unique elements that are being added to the data
-                        uniqueels = np.unique(
-                            databuffer[z * zcubedim:(z + 1) * zcubedim, y * ycubedim:(y + 1) * ycubedim,
-                            x * xcubedim:(x + 1) * xcubedim])
-                        for el in uniqueels:
-                            index_dict[el].add(key)
-
-                            # remove 0 no reason to index that
-                        del (index_dict[0])
-
-            # Update all indexes
-            self.annoIdx.updateIndexDense(ch, index_dict, resolution)
-
-        except:
-            self.kvio.rollback()
-            raise
-
-        # commit cubes.  not commit controlled with metadata
-        self.kvio.commit()
-
-    def shaveEntityDense(self, ch, entityid, corner, resolution, annodata):
-        """Takes a bitmap for an entity and calls denseShave. Renumber the annotations to match the entity id"""
-
-        # Make shaving a per entity operation
-        vec_func = np.vectorize(lambda x: 0 if x == 0 else entityid)
-        annodata = vec_func(annodata)
-
-        self.shaveDense(ch, entityid, corner, resolution, annodata)
-
-    def _zoominCutout(self, ch, corner, dim, resolution):
-        """Scale to a smaller cutout that will be zoomed"""
+            raise SpdbError('Not Supported', 'Time Series data not yet supported', ErrorCode.DATATYPE_NOT_SUPPORTED)
+            # return self.kvio.getTimeCubes(resource, morton_idx_list, timestamp_list, resolution)
+
+    # PUT Methods
+    def put_cube(self, resource, zidx, resolution, cube):
+        """Insert a cuboid into the cache key-value store
+
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource
+            zidx (int): a list of Morton ID of the cuboids to get
+            resolution (int): the resolution level
+            cube (cube.Cube): list of cuboids to store in the cache key-value store
+
+        Returns:
+            list[numpy.ndarray]: The cuboid data
+        """
+        # If using S3, update index of cuboids that exist in the cache key-value store
+        if self.s3io:
+            # TODO: Update after S3 integration. Move index IO into new class
+            self.kvio.putCubeIndex(resource, resolution, [zidx])
+
+        self.kvio.put_cube(resource, zidx, resolution, cube.to_blosc_numpy(), not cube.from_zeros())
+
+    def put_cubes(self, resource, morton_idx_list, resolution, cube_list, update=False):
+        """Insert a list of cubes into the cache key-value store
+
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource
+            morton_idx_list (list[int]): a list of Morton ID of the cuboids to get
+            resolution (int): the resolution level
+            cube_list (list[cube.Cube]): list of cuboids to store in the cache key-value store
+            update (bool): True if this an update operation. False if the first time you are inserting the cuboid
+
+        Returns:
+            list[numpy.ndarray]: The cuboid data
+        """
+
+        if self.s3io:
+            self.kvio.putCubeIndex(resource, resolution, morton_idx_list)
+
+        return self.kvio.put_cubes(resource, morton_idx_list, resolution, cube_list, update)
+
+    def _up_sample_cutout(self, resource, corner, extent, resolution):
+        """Transform coordinates of a base resolution cutout to a lower res level by up-sampling.
+
+        Only applicable to Layers.
+
+        When you make an annotation cutout and request a zoom level that is LOWER (higher resolution) than your base
+        resolution (the resolution annotations should be written to by default) you must take a base resolution cutout
+        and up-sample the data, creating a physically large image.
+
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource:
+            corner ((int, int, int)): the XYZ corner point of the cutout
+            extent: ((int, int, int)): the XYZ extent of the cutout
+            resolution: the requested resolution level
+
+        Returns:
+            collection.namedtuple: A named tuple that stores 4 values:
+
+                corner - the new XYZ corner of the up-sampled cuboid
+                extent - new XYZ extent of the up-sampled cuboid
+                x_pixel_offset - new XYZ extent of the up-sampled cuboid
+                y_pixel_offset - new XYZ extent of the up-sampled cuboid
+
+        """
+        # TODO: This currently only works with slice based resolution hierarchies.  Update to handle all cases.
+        if resource.get_experiment().hierarchy_method.lower() != "slice":
+            raise SpdbError('Not Implemented',
+                            'Dynamic up-sampling of only slice based resolution hierarchies is currently supported',
+                            ErrorCode.FUTURE)
+
+        # Create namedtuple so you can return multiple things
+        result_tuple = namedtuple('ResampleCoords',
+                                  ['corner', 'extent', 'x_pixel_offset', 'y_pixel_offset'])
+
+        # Get base resolution for the layer
+        base_res = resource.get_layer().base_resolution
 
         # scale the corner to lower resolution
-        effcorner = corner[0] / (2 ** (ch.getResolution() - resolution)), corner[1] / (
-            2 ** (ch.getResolution() - resolution)), corner[2]
+        effcorner = (corner[0] / (2 ** (base_res - resolution)),
+                     corner[1] / (2 ** (base_res - resolution)),
+                     corner[2])
 
         # pixels offset within big range
-        xpixeloffset = corner[0] % (2 ** (ch.getResolution() - resolution))
-        ypixeloffset = corner[1] % (2 ** (ch.getResolution() - resolution))
+        xpixeloffset = corner[0] % (2 ** (base_res - resolution))
+        ypixeloffset = corner[1] % (2 ** (base_res - resolution))
 
         # get the new dimension, snap up to power of 2
-        outcorner = (corner[0] + dim[0], corner[1] + dim[1], corner[2] + dim[2])
+        outcorner = (corner[0] + extent[0], corner[1] + extent[1], corner[2] + extent[2])
 
-        newoutcorner = (outcorner[0] - 1) / (2 ** (ch.getResolution() - resolution)) + 1, (outcorner[1] - 1) / (
-            2 ** (ch.getResolution() - resolution)) + 1, outcorner[2]
+        newoutcorner = ((outcorner[0] - 1) / (2 ** (base_res - resolution)) + 1,
+                        (outcorner[1] - 1) / (2 ** (base_res - resolution)) + 1,
+                        outcorner[2])
+
         effdim = (newoutcorner[0] - effcorner[0], newoutcorner[1] - effcorner[1], newoutcorner[2] - effcorner[2])
 
-        return effcorner, effdim, (xpixeloffset, ypixeloffset)
+        return result_tuple(effcorner, effdim, xpixeloffset, ypixeloffset)
 
-    def _zoomoutCutout(self, ch, corner, dim, resolution):
-        """Scale to a larger cutout that will be shrunk"""
+    def _down_sample_cutout(self, resource, corner, dim, resolution):
+        """Transform coordinates of a base resolution cutout to a higher res level by down-sampling.
+
+        Only applicable to Layers.
+
+        When you make an annotation cutout and request a zoom level that is HIGHER (lower resolution) than your base
+        resolution (the resolution annotations should be written to by default) you must take a base resolution cutout
+        and down-sample the data, creating a physically smaller image.
+
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource:
+            corner ((int, int, int)): the XYZ corner point of the cutout
+            extent: ((int, int, int)): the XYZ extent of the cutout
+            resolution: the requested resolution level
+
+        Returns:
+            collection.namedtuple: A named tuple that stores 4 values:
+
+                corner - the new XYZ corner of the up-sampled cuboid
+                extent - new XYZ extent of the up-sampled cuboid
+
+        """
+
+        # Create namedtuple so you can return multiple things
+        result_tuple = namedtuple('ResampleCoords',
+                                  ['corner', 'extent', 'x_pixel_offset', 'y_pixel_offset'])
+
+        # Get base resolution for the layer
+        base_res = resource.get_layer().base_resolution
 
         # scale the corner to higher resolution
-        effcorner = corner[0] * (2 ** (resolution - ch.getResolution())), corner[1] * (
-            2 ** (resolution - ch.getResolution())), corner[2]
+        effcorner = (corner[0] * (2 ** (resolution - base_res)),
+                     corner[1] * (2 ** (resolution - base_res)),
+                     corner[2])
 
-        effdim = dim[0] * (2 ** (resolution - ch.getResolution())), dim[1] * (2 ** (resolution - ch.getResolution())), \
-                 dim[2]
+        effdim = (dim[0] * (2 ** (resolution - base_res)),
+                  dim[1] * (2 ** (resolution - base_res)),
+                  dim[2])
 
-        return effcorner, effdim
+        return result_tuple(effcorner, effdim, None, None)
 
-    def cutout(self, ch, corner, dim, resolution, timerange=None, zscaling=None, annoids=None):
-        """Extract a cube of arbitrary size. Need not be aligned."""
+    def cutout(self, resource, corner, extent, resolution):
+        """Extract a cube of arbitrary size. Need not be aligned to cuboid boundaries.
+
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource
+            corner ((int, int, int)): a list of Morton ID of the cuboids to get
+            extent ((int, int, int)): a list of Morton ID of the cuboids to get
+            resolution (int): the resolution level
+
+        Returns:
+            cube.Cube: The cutout data stored in a Cube instance
+        """
 
         # if cutout is below resolution, get a smaller cube and scaleup
-        if ch.getChannelType() in ANNOTATION_CHANNELS and ch.getResolution() > resolution:
+        # ONLY FOR ANNO CHANNELS - if data is missing on the current resolution but exists else where...extrapolate
+        # TODO: ask kunal what below resolution means? what is the getResolution method doing?
+        # ch.getResolution is the "base" resolution and you assume data exists there.
+        # If propagated you don't have to worry about this. -> currently they don't upsample annotations when hardening
+        # the database, so don't need to check for propagated.
 
-            # find the effective dimensions of the cutout (where the data is)
-            effcorner, effdim, (xpixeloffset, ypixeloffset) = self._zoominCutout(ch, corner, dim, resolution)
-            [xcubedim, ycubedim, zcubedim] = cubedim = self.datasetcfg.cubedim[ch.getResolution()]
-            effresolution = ch.getResolution()
+        # Check if you need to scale a cutout due to off-base resolution cutouts/propagation state
+        if not resource.is_channel():
+            # Get base resolution for the layer
+            base_res = resource.get_layer().base_resolution
 
-        # if cutout is above resolution, get a large cube and scaledown
-        elif ch.getChannelType() in ANNOTATION_CHANNELS and ch.getResolution() < resolution and ch.getPropagate() not in [
-            PROPAGATED]:
+            if base_res > resolution:
+                # Must up-sample cutout dynamically find the effective dimensions of the up-sampled cutout
+                cutout_coords = self._up_sample_cutout(resource, corner, extent, resolution)
 
-            [xcubedim, ycubedim, zcubedim] = cubedim = self.datasetcfg.cubedim[ch.getResolution()]
-            effcorner, effdim = self._zoomoutCutout(ch, corner, dim, resolution)
-            effresolution = ch.getResolution()
+                [x_cube_dim, y_cube_dim, z_cube_dim] = cube_dim = CUBOIDSIZE[base_res]
+                cutout_resolution = base_res
 
-        # this is the default path when not scaling up the resolution
+            elif not resource.is_channel() and base_res < resolution and not resource.is_propagated():
+                # If cutout is a layer, above base resolution (lower res), and NOT propagated, down-sample
+                #TODO: DMK move CUBOIDSIZE into Resource
+
+                cutout_coords = self._down_sample_cutout(resource, corner, extent, resolution)
+
+                [x_cube_dim, y_cube_dim, z_cube_dim] = cube_dim = CUBOIDSIZE[base_res]
+                cutout_resolution = base_res
+            else:
+                # this is the default path when not DYNAMICALLY scaling the resolution
+
+                # get the size of the image and cube
+                [x_cube_dim, y_cube_dim, z_cube_dim] = cube_dim = CUBOIDSIZE[resolution]
+                cutout_resolution = resolution
+
+                # Create namedtuple for consistency with re-sampling paths through the code
+                result_tuple = namedtuple('ResampleCoords',
+                                          ['corner', 'extent', 'x_pixel_offset', 'y_pixel_offset'])
+                cutout_coords = result_tuple(corner, extent, None, None)
         else:
+            # Resouce is a channel, so no re-sampling
 
             # get the size of the image and cube
-            [xcubedim, ycubedim, zcubedim] = cubedim = self.datasetcfg.cubedim[resolution]
-            effcorner = corner
-            effdim = dim
-            effresolution = resolution
+            [x_cube_dim, y_cube_dim, z_cube_dim] = cube_dim = CUBOIDSIZE[resolution]
+            cutout_resolution = resolution
 
-            # Round to the nearest larger cube in all dimensions
-        zstart = effcorner[2] / zcubedim
-        ystart = effcorner[1] / ycubedim
-        xstart = effcorner[0] / xcubedim
+            # Create namedtuple for consistency with re-sampling paths through the code
+            result_tuple = namedtuple('ResampleCoords',
+                                      ['corner', 'extent', 'x_pixel_offset', 'y_pixel_offset'])
+            cutout_coords = result_tuple(corner, extent, None, None)
 
-        znumcubes = (effcorner[2] + effdim[2] + zcubedim - 1) / zcubedim - zstart
-        ynumcubes = (effcorner[1] + effdim[1] + ycubedim - 1) / ycubedim - ystart
-        xnumcubes = (effcorner[0] + effdim[0] + xcubedim - 1) / xcubedim - xstart
+        # Round to the nearest larger cube in all dimensions
+        z_start = cutout_coords.corner[2] / z_cube_dim
+        y_start = cutout_coords.corner[1] / y_cube_dim
+        x_start = cutout_coords.corner[0] / x_cube_dim
 
-        # use the requested resolution
-        if zscaling == 'nearisotropic' and self.datasetcfg.nearisoscaledown[resolution] > 1:
-            dbname = ch.getNearIsoTable(resolution)
-        else:
-            dbname = ch.getTable(effresolution)
+        z_num_cubes = (cutout_coords.corner[2] + cutout_coords.extent[2] + z_cube_dim - 1) / z_cube_dim - z_start
+        y_num_cubes = (cutout_coords.corner[1] + cutout_coords.extent[1] + y_cube_dim - 1) / y_cube_dim - y_start
+        x_num_cubes = (cutout_coords.corner[0] + cutout_coords.extent[0] + x_cube_dim - 1) / x_cube_dim - x_start
 
-        import cube
-        incube = Cube.getCube(cubedim, ch.getChannelType(), ch.getDataType())
-        outcube = Cube.getCube([xnumcubes * xcubedim, ynumcubes * ycubedim, znumcubes * zcubedim], ch.getChannelType(),
-                               ch.getDataType(), timerange=timerange)
+        in_cube = Cube.create_cube(resource, cube_dim)
+        out_cube = Cube.create_cube(resource,
+                                    [x_num_cubes * x_cube_dim, y_num_cubes * y_cube_dim, z_num_cubes * z_cube_dim])
 
         # Build a list of indexes to access
-        listofidxs = []
-        for z in range(znumcubes):
-            for y in range(ynumcubes):
-                for x in range(xnumcubes):
-                    mortonidx = ndlib.XYZMorton([x + xstart, y + ystart, z + zstart])
-                    listofidxs.append(mortonidx)
+        list_of_idxs = []
+        for z in range(z_num_cubes):
+            for y in range(y_num_cubes):
+                for x in range(x_num_cubes):
+                    morton_idx = c_lib.XYZMorton([x + x_start, y + y_start, z + z_start])
+                    list_of_idxs.append(morton_idx)
 
         # Sort the indexes in Morton order
-        listofidxs.sort()
+        list_of_idxs.sort()
 
         # xyz offset stored for later use
-        lowxyz = ndlib.MortonXYZ(listofidxs[0])
+        lowxyz = c_lib.MortonXYZ(list_of_idxs[0])
 
-        self.kvio.startTxn()
-
-        try:
-
-            # checking for timeseries data and doing an optimized cutout here in timeseries column
-            if ch.getChannelType() in TIMESERIES_CHANNELS:
-                for idx in listofidxs:
-                    cuboids = self.getCubes(ch, idx, resolution, list(range(timerange[0], timerange[1])))
-
-                    # use the batch generator interface
-                    for idx, timestamp, datastring in cuboids:
-
-                        # add the query result cube to the bigger cube
-                        curxyz = ndlib.MortonXYZ(int(idx))
-                        offset = [curxyz[0] - lowxyz[0], curxyz[1] - lowxyz[1], curxyz[2] - lowxyz[2]]
-
-                        if self.NPZ:
-                            incube.fromNPZ(datastring[:])
-                        else:
-                            incube.fromBlosc(datastring[:])
-
-                        # add it to the output cube
-                        outcube.addData(incube, offset, timestamp)
-
-            else:
-                if zscaling == 'nearisotropic' and self.datasetcfg.nearisoscaledown[resolution] > 1:
-                    cuboids = self.getCubes(ch, listofidxs, effresolution, True)
-                else:
-                    cuboids = self.getCubes(ch, listofidxs, effresolution)
+        #TODO: We may not need time-series optimized cutouts. Consider removing.
+        # checking for timeseries data and doing an optimized cutout here in timeseries column
+        if len(resource.get_time_samples()) > 1:
+            for idx in list_of_idxs:
+                cuboids = self.get_cubes(resource, idx, resolution)
 
                 # use the batch generator interface
-                for idx, datastring in cuboids:
+                for idx, timestamp, data_string in cuboids:
 
                     # add the query result cube to the bigger cube
-                    curxyz = ndlib.MortonXYZ(int(idx))
+                    curxyz = c_lib.MortonXYZ(int(idx))
                     offset = [curxyz[0] - lowxyz[0], curxyz[1] - lowxyz[1], curxyz[2] - lowxyz[2]]
 
-                    if self.NPZ:
-                        incube.fromNPZ(datastring[:])
-                    else:
-                        incube.fromBlosc(datastring[:])
-
-                    # apply exceptions if it's an annotation project
-                    if annoids != None and ch.getChannelType() in ANNOTATION_CHANNELS:
-                        incube.data = ndlib.filter_ctype_OMP(incube.data, annoids)
-                        if ch.getExceptions() == EXCEPTION_TRUE:
-                            self.applyCubeExceptions(ch, annoids, effresolution, idx, incube)
+                    in_cube.from_blosc_numpy(data_string[:])
 
                     # add it to the output cube
-                    outcube.addData(incube, offset)
+                    out_cube.add_data(in_cube, offset, timestamp)
 
-        except:
-            self.kvio.rollback()
-            raise
+        else:
+            cuboids = self.get_cubes(resource, list_of_idxs, cutout_resolution)
 
-        self.kvio.commit()
+            # use the batch generator interface
+            for idx, data_string in cuboids:
 
-        # if we fetched a smaller cube to zoom, correct the result
-        if ch.getChannelType() in ANNOTATION_CHANNELS and ch.getResolution() > resolution:
+                # add the query result cube to the bigger cube
+                curxyz = c_lib.MortonXYZ(int(idx))
+                offset = [curxyz[0] - lowxyz[0], curxyz[1] - lowxyz[1], curxyz[2] - lowxyz[2]]
 
-            outcube.zoomData(ch.getResolution() - resolution)
+                in_cube.from_blosc_numpy(data_string[:])
 
-            # need to trim based on the cube cutout at resolution()
-            outcube.trim(corner[0] % (xcubedim * (2 ** (ch.getResolution() - resolution))) + xpixeloffset, dim[0],
-                         corner[1] % (ycubedim * (2 ** (ch.getResolution() - resolution))) + ypixeloffset, dim[1],
-                         corner[2] % zcubedim, dim[2])
+                # TODO: DMK commented out exception code since exceptions are not yet implemented.
+                # apply exceptions if it's an annotation project
+                #if annoids != None and ch.getChannelType() in ANNOTATION_CHANNELS:
+                #    in_cube.data = c_lib.filter_ctype_OMP(in_cube.data, annoids)
+                #    if ch.getExceptions() == EXCEPTION_TRUE:
+                #        self.applyCubeExceptions(ch, annoids, cutout_resolution, idx, in_cube)
 
-        # if we fetch a larger cube, downscale it and correct
-        elif ch.getChannelType() in ANNOTATION_CHANNELS and ch.getResolution() < resolution and ch.getPropagate() not in [
-            PROPAGATED]:
+                # add it to the output cube
+                out_cube.add_data(in_cube, offset)
 
-            outcube.downScale(resolution - ch.getResolution())
+        # Get the base resolution if channel or layer for logic below
+        if not resource.is_channel():
+            # Get base resolution for the layer
+            base_res = resource.get_layer().base_resolution
+        else:
+            base_res = resource.get_channel().base_resolution
 
-            # need to trime based on the cube cutout at resolution
-            outcube.trim(corner[0] % (xcubedim * (2 ** (ch.getResolution() - resolution))), dim[0],
-                         corner[1] % (ycubedim * (2 ** (ch.getResolution() - resolution))), dim[1],
-                         corner[2] % zcubedim, dim[2])
+        # A smaller cube was cutout due to off-base resolution query: up-sample and trim
+        if not resource.is_channel() and base_res > resolution:
+            # TODO: look into optimizing zoomData and rename
+            out_cube.zoomData(base_res - resolution)
 
-        # need to trim down the array to size only if the dimensions are not the same
-        elif dim[0] % xcubedim == 0 and dim[1] % ycubedim == 0 and dim[2] % zcubedim == 0 and corner[
-            0] % xcubedim == 0 and corner[1] % ycubedim == 0 and corner[2] % zcubedim == 0:
+            # need to trim based on the cube cutout at new resolution
+            out_cube.trim(corner[0] % (x_cube_dim * (2 ** (base_res - resolution))) + cutout_coords.x_pixel_offset,
+                          extent[0],
+                          corner[1] % (y_cube_dim * (2 ** (base_res - resolution))) + cutout_coords.y_pixel_offset,
+                          extent[1],
+                          corner[2] % z_cube_dim,
+                          extent[2])
+
+        # A larger cube was cutout due to off-base resolution query: down-sample and trim
+        elif not resource.is_channel() and base_res < resolution and not resource.is_propagated():
+            # TODO: look into optimizing zoomData and rename
+            out_cube.downScale(resolution - base_res)
+
+            # need to trim based on the cube cutout at new resolution
+            out_cube.trim(corner[0] % (x_cube_dim * (2 ** (base_res - resolution))),
+                          extent[0],
+                          corner[1] % (y_cube_dim * (2 ** (base_res - resolution))),
+                          extent[1],
+                          corner[2] % z_cube_dim,
+                          extent[2])
+
+        # Trim cube since cutout was not cuboid aligned
+        elif extent[0] % x_cube_dim == 0 and \
+             extent[1] % y_cube_dim == 0 and \
+             extent[2] % z_cube_dim == 0 and \
+             corner[0] % x_cube_dim == 0 and \
+             corner[1] % y_cube_dim == 0 and \
+             corner[2] % z_cube_dim == 0:
+            # Cube is already the correct dimensions
             pass
         else:
-            outcube.trim(corner[0] % xcubedim, dim[0], corner[1] % ycubedim, dim[1], corner[2] % zcubedim, dim[2])
+            out_cube.trim(corner[0] % x_cube_dim,
+                          extent[0],
+                          corner[1] % y_cube_dim,
+                          extent[1],
+                          corner[2] % z_cube_dim,
+                          extent[2])
 
-        return outcube
+        return out_cube
 
-    # Alternate to getVolume that returns a annocube
-    def annoCutout(self, ch, annoids, resolution, corner, dim, remapid=None):
-        """Fetch a volume cutout with only the specified annotation"""
+    def write_cuboids(self, resource, corner, resolution, cuboid_data):
+        """ Write an arbitary size data to the database
 
-        # cutout is zoom aware
-        cube = self.cutout(ch, corner, dim, resolution, annoids=annoids)
+        Main use is in OCP Blaze/cache in inconsistent mode since it reconciles writes in memory asynchronously
 
-        # KL TODO
-        if remapid:
-            vec_func = np.vectorize(lambda x: np.uint32(remapid) if x != 0 else np.uint32(0))
-            cube.data = vec_func(cube.data)
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource
+            corner ((int, int, int)): a list of Morton ID of the cuboids to get
+            resolution (int): the resolution level
+            cuboid_data (cube.Cube): arbitrary sized matrix of data to write to cuboids in the cache db
 
-        return cube
 
-    def getVoxel(self, ch, resolution, voxel):
-        """Return the identifier at a voxel"""
-
-        # check propagate status, if not propagated then change voxel co-ordinates accordinig to base resolution
-        if ch.getPropagate() in [NOT_PROPAGATED, UNDER_PROPAGATION]:
-            chres = ch.getResolution()
-            if resolution > ch.getResolution():
-                # upsample the x and y coordinates
-                for i in range(2):
-                    voxel[i] = voxel[i] * (2 ** (resolution - ch.getResolution()))
-            elif resolution < ch.getResolution():
-                # downsample the x and y coordinates
-                for i in range(2):
-                    voxel[i] = voxel[i] / (2 ** (ch.getResolution() - resolution))
-            resolution = ch.getResolution()
-
-        # get the size of the image and cube
-        [xcubedim, ycubedim, zcubedim] = cubedim = self.datasetcfg.cubedim[resolution]
-        [xoffset, yoffset, zoffset] = offset = self.datasetcfg.offset[resolution]
-
-        # convert the voxel into zindex and offsets. Round to the nearest larger cube in all dimensions
-        voxel = list(map(sub, voxel, offset))
-        xyzcube = list(map(div, voxel, cubedim))
-        xyzoffset = list(map(mod, voxel, cubedim))
-        # xyzcube = [ voxel[0]/xcubedim, voxel[1]/ycubedim, voxel[2]/zcubedim ]
-        # xyzoffset =[ voxel[0]%xcubedim, voxel[1]%ycubedim, voxel[2]%zcubedim ]
-        key = ndlib.XYZMorton(xyzcube)
-
-        cube = self.getCube(ch, key, resolution)
-
-        if cube is None:
-            return 0
-        else:
-            return cube.getVoxel(xyzoffset)
-
-    def applyCubeExceptions(self, ch, annoids, resolution, idx, cube):
-        """Apply the expcetions to a specified cube and resolution"""
-
-        # get the size of the image and cube
-        [xcubedim, ycubedim, zcubedim] = cubedim = self.datasetcfg.cubedim[resolution]
-
-        (x, y, z) = ndlib.MortonXYZ(idx)
-
-        # for the target ids
-        for annoid in annoids:
-            # apply exceptions
-            exceptions = self.getExceptions(ch, idx, resolution, annoid)
-            for e in exceptions:
-                cube.data[e[2], e[1], e[0]] = annoid
-
-    def zoomVoxels(self, voxels, resgap):
-        """Convert voxels from one resolution to another based
-           on a positive number of hierarcy levels.
-           This is used by both exception and the voxels data argument."""
-
-        # correct for zoomed resolution
-        newvoxels = []
-        scaling = 2 ** (resgap)
-        for vox in voxels:
-            for numy in range(scaling):
-                for numx in range(scaling):
-                    newvoxels.append((vox[0] * scaling + numx, vox[1] * scaling + numy, vox[2]))
-        return newvoxels
-
-    def getLocations(self, ch, entityid, res):
-        """Return the list of locations associated with an identifier"""
-
-        # get the size of the image and cube
-        resolution = int(res)
-
-        # scale to project resolution
-        if ch.getResolution() > resolution:
-            effectiveres = ch.getResolution()
-        else:
-            effectiveres = resolution
-
-        voxlist = []
-
-        zidxs = self.annoIdx.getIndex(ch, entityid, resolution)
-
-        for zidx in zidxs:
-
-            cb = self.getCube(ch, zidx, effectiveres)
-
-            # mask out the entries that do not match the annotation id
-            # KL TODO
-            vec_func = np.vectorize(lambda x: entityid if x == entityid else 0)
-            annodata = vec_func(cb.data)
-
-            # where are the entries
-            offsets = np.nonzero(annodata)
-            voxels = np.array(list(zip(offsets[2], offsets[1], offsets[0])), dtype=np.uint32)
-
-            # Get cube offset information
-            [x, y, z] = ndlib.MortonXYZ(zidx)
-            xoffset = x * self.datasetcfg.cubedim[resolution][0] + self.datasetcfg.offset[resolution][0]
-            yoffset = y * self.datasetcfg.cubedim[resolution][1] + self.datasetcfg.offset[resolution][1]
-            zoffset = z * self.datasetcfg.cubedim[resolution][2] + self.datasetcfg.offset[resolution][2]
-
-            # Now add the exception voxels
-            if ch.getExceptions() == EXCEPTION_TRUE:
-                exceptions = self.getExceptions(ch, zidx, resolution, entityid)
-                if exceptions != []:
-                    voxels = np.append(voxels.flatten(), exceptions.flatten())
-                    voxels = voxels.reshape(len(voxels) / 3, 3)
-
-            # Change the voxels back to image address space
-            [voxlist.append([a + xoffset, b + yoffset, c + zoffset]) for (a, b, c) in voxels]
-
-            # zoom out the voxels if necessary
-        if effectiveres > resolution:
-            voxlist = self.zoomVoxels(voxlist, effectiveres - resolution)
-
-        return voxlist
-
-    def getBoundingBox(self, ch, annids, res):
-        """Return a corner and dimension of the bounding box for an annotation using the index"""
-
-        # get the size of the image and cube
-        resolution = int(res)
-
-        # determine the resolution for project information
-        if ch.getResolution() > resolution:
-            effectiveres = ch.getResolution()
-            scaling = 2 ** (effectiveres - resolution)
-        else:
-            effectiveres = resolution
-            scaling = 1
-
-        # all boxes in the indexes
-        zidxs = []
-        for annid in annids:
-            zidxs = itertools.chain(zidxs, self.annoIdx.getIndex(ch, annid, effectiveres))
-
-        # convert to xyz coordinates
-        try:
-            xyzvals = np.array([ndlib.MortonXYZ(zidx) for zidx in zidxs], dtype=np.uint32)
-        # if there's nothing in the chain, the array creation will fail
-        except:
-            return None, None
-
-        cubedim = self.datasetcfg.cubedim[resolution]
-
-        # find the corners
-        xmin = min(xyzvals[:, 0]) * cubedim[0] * scaling
-        xmax = (max(xyzvals[:, 0]) + 1) * cubedim[0] * scaling
-        ymin = min(xyzvals[:, 1]) * cubedim[1] * scaling
-        ymax = (max(xyzvals[:, 1]) + 1) * cubedim[1] * scaling
-        zmin = min(xyzvals[:, 2]) * cubedim[2]
-        zmax = (max(xyzvals[:, 2]) + 1) * cubedim[2]
-
-        corner = [xmin, ymin, zmin]
-        dim = [xmax - xmin, ymax - ymin, zmax - zmin]
-
-        return (corner, dim)
-
-    def annoCubeOffsets(self, ch, dataids, resolution, remapid=False):
-        """an iterable on the offsets and cubes for an annotation"""
-
-        [xcubedim, ycubedim, zcubedim] = cubedim = self.datasetcfg.cubedim[resolution]
-
-        # if cutout is below resolution, get a smaller cube and scaleup
-        if ch.getResolution() > resolution:
-            effectiveres = ch.getResolution()
-        else:
-            effectiveres = resolution
-
-        zidxs = set()
-        for did in dataids:
-            zidxs |= set(self.annoIdx.getIndex(ch, did, effectiveres))
-
-        for zidx in zidxs:
-
-            # get the cube and mask out the non annoid values
-            cb = self.getCube(ch, zidx, effectiveres)
-            if not remapid:
-                cb.data = ndlib.filter_ctype_OMP(cb.data, dataids)
-            else:
-                cb.data = ndlib.filter_ctype_OMP(cb.data, dataids)
-                # KL TODO
-                vec_func = np.vectorize(lambda x: np.uint32(remapid) if x != 0 else np.uint32(0))
-                cb.data = vec_func(cb.data)
-
-            # zoom the data if not at the right resolution and translate the zindex to the upper resolution
-            (xoff, yoff, zoff) = ndlib.MortonXYZ(zidx)
-            offset = (xoff * xcubedim, yoff * ycubedim, zoff * zcubedim)
-
-            # if we're zooming, so be it
-            if resolution < effectiveres:
-                cb.zoomData(effectiveres - resolution)
-                offset = (
-                    offset[0] * (2 ** (effectiveres - resolution)), offset[1] * (2 ** (effectiveres - resolution)),
-                    offset[2])
-
-            # add any exceptions
-            # Get exceptions if this DB supports it
-            if ch.getExceptions() == EXCEPTION_TRUE:
-                for exid in dataids:
-                    exceptions = self.getExceptions(ch, zidx, effectiveres, exid)
-                    if exceptions != []:
-                        if resolution < effectiveres:
-                            exceptions = self.zoomVoxels(exceptions, effectiveres - resolution)
-                        # write as a loop first, then figure out how to optimize
-                        # exceptions are stored relative to cube offset
-                        for e in exceptions:
-                            if not remapid:
-                                cb.data[e[2], e[1], e[0]] = exid
-                            else:
-                                cb.data[e[2], e[1], e[0]] = remapid
-
-            yield (offset, cb.data)
-
-    def deleteAnnoData(self, ch, annoid):
-        """Delete the voxel data from the database for Annotation Id"""
-
-        resolutions = self.datasetcfg.resolutions
-
-        self.kvio.startTxn()
-
-        try:
-
-            for res in resolutions:
-
-                # get the cubes that contain the annotation
-                zidxs = self.annoIdx.getIndex(ch, annoid, res, True)
-
-                # Delete annotation data
-                for key in zidxs:
-                    cube = self.getCube(ch, key, res, update=True)
-                    # KL TODO
-                    vec_func = np.vectorize(lambda x: np.uint32(0) if x == annoid else x)
-                    cube.data = vec_func(cube.data)
-                    # remove the expcetions
-                    if ch.getExceptions == EXCEPTION_TRUE:
-                        self.kvio.deleteExceptions(ch, key, res, annoid)
-                    self.putCube(ch, key, res, cube)
-
-            # delete Index
-            self.annoIdx.deleteIndex(ch, annoid, resolutions)
-
-        except:
-            self.kvio.rollback()
-            raise
-
-        self.kvio.commit()
-
-    def writeCuboids(self, ch, corner, resolution, cuboiddata, timerange=None):
-        """Write an arbitary size data to the database"""
-
+        Returns:
+            None
+        """
         # dim is in xyz, data is in zyx order
-        dim = cuboiddata.shape[::-1]
+        # TODO: Confirm if data should continue to be stored in zyx
+        dim = cuboid_data.shape[::-1]
 
         # get the size of the image and cube
-        [xcubedim, ycubedim, zcubedim] = cubedim = self.datasetcfg.cubedim[resolution]
+        [x_cube_dim, y_cube_dim, z_cube_dim] = cube_dim = CUBOIDSIZE[resolution]
+
+        # TODO: DMK Double check that the div operation in python2 should be ported to the floordiv operation
+        # Round to the nearest larger cube in all dimensions
+        [x_start, y_start, z_start] = list(map(floordiv, corner, cube_dim))
+
+        z_num_cubes = (corner[2] + dim[2] + z_cube_dim - 1) / z_cube_dim - z_start
+        y_num_cubes = (corner[1] + dim[1] + y_cube_dim - 1) / y_cube_dim - y_start
+        x_num_cubes = (corner[0] + dim[0] + x_cube_dim - 1) / x_cube_dim - x_start
+
+        [x_offset, y_offset, z_offset] = list(map(mod, corner, cube_dim))
+
+        # TODO: Double check this...inserting data into a specific spot?
+        data_buffer = np.zeros([z_num_cubes * z_cube_dim, y_num_cubes * y_cube_dim, x_num_cubes * x_cube_dim],
+                               dtype=cuboid_data.dtype)
+        data_buffer[z_offset:z_offset + dim[2], y_offset:y_offset + dim[1], x_offset:x_offset + dim[0]] = cuboid_data
+
+        # TODO: What is this line?
+        incube = Cube.create_cube(cube_dim, resource)
+
+        list_of_idxs = []
+        list_of_cubes = []
+        for z in range(z_num_cubes):
+            for y in range(y_num_cubes):
+                for x in range(x_num_cubes):
+                    list_of_idxs.append(XYZMorton([x + x_start, y + y_start, z + z_start]))
+                    incube.data = data_buffer[z * z_cube_dim:(z + 1) * z_cube_dim,
+                                              y * y_cube_dim:(y + 1) * y_cube_dim,
+                                              x * x_cube_dim:(x + 1) * x_cube_dim]
+                    list_of_cubes.append(incube.to_blosc_numpy())
+
+        self.put_cubes(resource, list_of_idxs, resolution, list_of_cubes, update=False)
+
+    def write_cuboid(self, resource, corner, resolution, cuboid_data):
+        """ Write a 3D/4D volume to the key-value store. Used by API/cache in consistent mode as it reconciles writes
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource
+            corner ((int, int, int)): a list of Morton ID of the cuboids to get
+            resolution (int): the resolution level
+            cuboid_data (numpy.ndarray): Matrix of data to write as cuboids
+
+        Returns:
+            None
+        """
+        # TODO: Look into data ordering when storing time series data and if it needs to be different
+        # dim is in xyz, data is in zyx order
+        if len(resource.get_time_samples()) == 1:
+            # Single time point
+            dim = cuboid_data.shape[::-1]
+        else:
+            # Reshape based on optimizing cuboid organization for time access
+            dim = cuboid_data.shape[::-1][:-1]
+
+        # get the size of the image and cube
+        [x_cube_dim, y_cube_dim, z_cube_dim] = cube_dim = CUBOIDSIZE[resolution]
 
         # Round to the nearest larger cube in all dimensions
-        start = [xstart, ystart, zstart] = list(map(div, corner, cubedim))
+        [x_start, y_start, z_start] = list(map(floordiv, corner, cube_dim))
 
-        znumcubes = (corner[2] + dim[2] + zcubedim - 1) / zcubedim - zstart
-        ynumcubes = (corner[1] + dim[1] + ycubedim - 1) / ycubedim - ystart
-        xnumcubes = (corner[0] + dim[0] + xcubedim - 1) / xcubedim - xstart
+        z_num_cubes = (corner[2] + dim[2] + z_cube_dim - 1) / z_cube_dim - z_start
+        y_num_cubes = (corner[1] + dim[1] + y_cube_dim - 1) / y_cube_dim - y_start
+        x_num_cubes = (corner[0] + dim[0] + x_cube_dim - 1) / x_cube_dim - x_start
 
-        offset = [xoffset, yoffset, zoffset] = list(map(mod, corner, cubedim))
+        [x_offset, y_offset, z_offset] = list(map(mod, corner, cube_dim))
 
-        databuffer = np.zeros([znumcubes * zcubedim, ynumcubes * ycubedim, xnumcubes * xcubedim],
-                              dtype=cuboiddata.dtype)
-        databuffer[zoffset:zoffset + dim[2], yoffset:yoffset + dim[1], xoffset:xoffset + dim[0]] = cuboiddata
+        if len(resource.get_time_samples()) == 1:
+            # Single time point
+            data_buffer = np.zeros([z_num_cubes * z_cube_dim, y_num_cubes * y_cube_dim, x_num_cubes * x_cube_dim],
+                                   dtype=cuboid_data.dtype)
 
-        incube = Cube.getCube(cubedim, ch.getChannelType(), ch.getDataType())
-
-        self.kvio.startTxn()
-
-        listofidxs = []
-        listofcubes = []
-
-        try:
-            for z in range(znumcubes):
-                for y in range(ynumcubes):
-                    for x in range(xnumcubes):
-                        listofidxs.append(ndlib.XYZMorton([x + xstart, y + ystart, z + zstart]))
-                        incube.data = databuffer[z * zcubedim:(z + 1) * zcubedim, y * ycubedim:(y + 1) * ycubedim,
-                                      x * xcubedim:(x + 1) * xcubedim]
-                        listofcubes.append(incube.toBlosc())
-
-            self.putCubes(ch, listofidxs, resolution, listofcubes, update=False)
-
-        except:
-            self.kvio.rollback()
-            raise
-
-        self.kvio.commit()
-
-    def writeCuboid(self, ch, corner, resolution, cuboiddata, timerange=[0, 0]):
-        """
-        Write a 3D/4D volume to the key-value store.
-
-        :param ch: Channel to write data to
-        :type ch: Class Channel
-        :param corner: Starting corner to write to
-        :type corner: array-like or one-dimensional list of int
-        :param resolution: Resolution to write at
-        :type resolution: int
-        :param cuboiddata: Data to be written
-        :type cuboiddata: Multi-dimensional numpy array
-        :type timerange: one-dimensional list of int
-        :param timerange: Range of time. Defaults to None
-
-        :returns: None
-        """
-
-        # dim is in xyz, data is in zyx order
-        if timerange == [0, 0]:
-            dim = cuboiddata.shape[::-1]
+            data_buffer[z_offset:z_offset + dim[2],
+                        y_offset:y_offset + dim[1],
+                        x_offset:x_offset + dim[0]] = cuboid_data
         else:
-            dim = cuboiddata.shape[::-1][:-1]
+            data_buffer = np.zeros([resource.get_time_samples()[-1] -
+                                   resource.get_time_samples()[0]] +
+                                   [z_num_cubes * z_cube_dim, y_num_cubes * y_cube_dim, x_num_cubes * x_cube_dim],
+                                   dtype=cuboid_data.dtype)
 
-        # get the size of the image and cube
-        [xcubedim, ycubedim, zcubedim] = cubedim = self.datasetcfg.cubedim[resolution]
+            data_buffer[:, z_offset:z_offset + dim[2],
+                           y_offset:y_offset + dim[1],
+                           x_offset:x_offset + dim[0]] = cuboid_data
 
-        # Round to the nearest larger cube in all dimensions
-        start = [xstart, ystart, zstart] = list(map(div, corner, cubedim))
+        # Get current cube from db, merge with new cube, write to db
+        if len(resource.get_time_samples()) == 1:
+            # Single time point
+            for z in range(z_num_cubes):
+                for y in range(y_num_cubes):
+                    for x in range(x_num_cubes):
+                        morton_idx = XYZMorton([x + x_start, y + y_start, z + z_start])
+                        cube = self.get_cube(resource, morton_idx, resolution, update=True)
 
-        znumcubes = (corner[2] + dim[2] + zcubedim - 1) / zcubedim - zstart
-        ynumcubes = (corner[1] + dim[1] + ycubedim - 1) / ycubedim - ystart
-        xnumcubes = (corner[0] + dim[0] + xcubedim - 1) / xcubedim - xstart
+                        # overwrite the cube
+                        cube.overwrite(data_buffer[z * z_cube_dim:(z + 1) * z_cube_dim,
+                                                   y * y_cube_dim:(y + 1) * y_cube_dim,
+                                                   x * x_cube_dim:(x + 1) * x_cube_dim])
 
-        offset = [xoffset, yoffset, zoffset] = list(map(mod, corner, cubedim))
-
-        if timerange == [0, 0]:
-            databuffer = np.zeros([znumcubes * zcubedim, ynumcubes * ycubedim, xnumcubes * xcubedim],
-                                  dtype=cuboiddata.dtype)
-            databuffer[zoffset:zoffset + dim[2], yoffset:yoffset + dim[1], xoffset:xoffset + dim[0]] = cuboiddata
+                        # update in the database
+                        self.put_cube(resource, morton_idx, resolution, cube)
         else:
-            databuffer = np.zeros(
-                [timerange[1] - timerange[0]] + [znumcubes * zcubedim, ynumcubes * ycubedim, xnumcubes * xcubedim],
-                dtype=cuboiddata.dtype)
-            databuffer[:, zoffset:zoffset + dim[2], yoffset:yoffset + dim[1], xoffset:xoffset + dim[0]] = cuboiddata
+            for z in range(z_num_cubes):
+                for y in range(y_num_cubes):
+                    for x in range(x_num_cubes):
+                        for time_sample in resource.get_time_samples():
+                            morton_idx = XYZMorton([x + x_start, y + y_start, z + z_start])
 
-        self.kvio.startTxn()
+                            cube = self.get_cube(resource, morton_idx, resolution, update=True)
 
-        try:
-            if timerange == [0, 0]:
-                for z in range(znumcubes):
-                    for y in range(ynumcubes):
-                        for x in range(xnumcubes):
-                            key = ndlib.XYZMorton([x + xstart, y + ystart, z + zstart])
-                            cube = self.getCube(ch, key, resolution, update=True)
                             # overwrite the cube
-                            cube.overwrite(databuffer[z * zcubedim:(z + 1) * zcubedim, y * ycubedim:(y + 1) * ycubedim,
-                                           x * xcubedim:(x + 1) * xcubedim])
+                            cube.overwrite(data_buffer[time_sample - resource.get_time_samples()[0],
+                                                       z * z_cube_dim:(z + 1) * z_cube_dim,
+                                                       y * y_cube_dim:(y + 1) * y_cube_dim,
+                                                       x * x_cube_dim:(x + 1) * x_cube_dim])
+
                             # update in the database
-                            self.putCube(ch, key, resolution, cube)
-            else:
-                for z in range(znumcubes):
-                    for y in range(ynumcubes):
-                        for x in range(xnumcubes):
-                            for timestamp in range(timerange[0], timerange[1], 1):
-                                zidx = ndlib.XYZMorton([x + xstart, y + ystart, z + zstart])
-                                cube = self.getCube(ch, zidx, resolution, timestamp, update=True)
-                                # overwrite the cube
-                                cube.overwrite(databuffer[timestamp - timerange[0], z * zcubedim:(z + 1) * zcubedim,
-                                               y * ycubedim:(y + 1) * ycubedim, x * xcubedim:(x + 1) * xcubedim])
-                                # update in the database
-                                self.putCube(ch, zidx, resolution, cube, timestamp)
+                            self.put_cube(resource, morton_idx, resolution, cube)
 
-        except:
-            self.kvio.rollback()
-            raise
-
-        self.kvio.commit()

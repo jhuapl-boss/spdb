@@ -1,4 +1,16 @@
 from bossutils.logger import BossLogger
+from enum import Enum
+
+
+class ErrorCode(Enum):
+    """
+    Enumeration of error codes for the SPDB library.
+    SPDB errors start at 1000
+    """
+    SPDB_ERROR = 1000
+    DATATYPE_NOT_SUPPORTED = 1001
+    FUTURE = 1002
+    IO_ERROR = 1002
 
 
 class SpdbError(Exception):

@@ -10,3 +10,4 @@ Engines Support:
 | Key-value Store   | Spatial Database  
 | ----------------- | -----------------      
 | Redis             | Yes               
+| DynamoDB          | No (future)            
