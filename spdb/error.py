@@ -10,7 +10,8 @@ class ErrorCode(Enum):
     SPDB_ERROR = 1000
     DATATYPE_NOT_SUPPORTED = 1001
     FUTURE = 1002
-    IO_ERROR = 1002
+    IO_ERROR = 1003
+    REDIS_ERROR = 1004
 
 
 class SpdbError(Exception):

@@ -1,150 +1,229 @@
-# Copyright 2014 NeuroData (http://neurodata.io)
-# 
+# Original Copyright 2014 NeuroData (http://neurodata.io)
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+# Modified from original source by Johns Hopkins University Applied Physics Laboratory
+# Copyright 2016 Johns Hopkins University Applied Physics Laboratory
 
-import types
-
-from kvio import KVIO
+from spdb.kvio import KVIO
 import redis
 
-from spatialdberror import SpatialDBError
-import logging
-
-logger = logging.getLogger("neurodata")
+from spdb import SpdbError, ErrorCode
 
 
 class RedisKVIO(KVIO):
-    def __init__(self, db):
+    def __init__(self, testing=False):
         """Connect to the Redis backend"""
 
-        self.db = db
-        self.client = redis.StrictRedis(host=self.db.proj.getDBHost(), port=6379, db=0)
-        self.pipe = self.client.pipeline(transaction=False)
+        # call the base class constructor
+        KVIO.__init__(self)
 
-    def getIndexStore(self, ch, resolution):
-        """Generate the name of the Index Store"""
-        return '{}_{}_{}'.format(self.db.proj.getProjectName(), ch.getChannelName(), resolution)
-
-    def generateKeys(self, ch, resolution, zidx_list, timestamp):
-        """Generate a key for Redis"""
-
-        key_list = []
-        if isinstance(timestamp, list):
-            for tvalue in timestamp:
-                key_list.append(
-                    '{}_{}_{}_{}_{}'.format(self.db.proj.getProjectName(), ch.getChannelName(), resolution, tvalue,
-                                            zidx_list[0]))
+        if testing:
+            pass
         else:
-            for zidx in zidx_list:
-                if timestamp == None:
-                    key_list.append(
-                        '{}_{}_{}_{}'.format(self.db.proj.getProjectName(), ch.getChannelName(), resolution, zidx))
-                else:
-                    key_list.append(
-                        '{}_{}_{}_{}_{}'.format(self.db.proj.getProjectName(), ch.getChannelName(), resolution,
-                                                timestamp, zidx))
+            # TODO: Ask derek where the connection info is for redis
+            self.cache_client = redis.StrictRedis(host=self.db.proj.getDBHost(), port=6379, db=0)
+            self.status_client = redis.StrictRedis(host=self.db.proj.getDBHost(), port=6379, db=0)
+
+        self.cache_pipe = self.cache_client.pipeline(transaction=False)
+        self.status_pipe = self.status_client.pipeline(transaction=False)
+
+    def close(self):
+        """Close the connection to the KV engine"""
+        pass
+
+    def start_txn(self):
+        """Start a transaction. Ensure database is in multi-statement mode."""
+        pass
+
+    def commit(self):
+        """Commit the transaction. Moved out of __del__ to make explicit."""
+        pass
+
+    def rollback(self):
+        """Rollback the transaction. To be called on exceptions."""
+        pass
+
+    def get_cache_index_base_key(self, resource, resolution):
+        """Generate the base name of the key used to store status about cuboids in the cache"""
+        return 'CUBOID_IDX&{}_{}'.format(resource.get_lookup_key(), resolution)
+
+    def generate_keys(self, resource, resolution, morton_idx_list):
+        """Generate Keys for storing data in the redis cache db
+
+        Args:
+            resource (spdb.project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            morton_idx_list (list[int]): a list of Morton ID of the cuboids to get
+
+        Returns:
+            list[str]: A list of keys for each item
+
+        """
+        key_list = []
+        for sample in resource.get_time_samples():
+            for z_idx in morton_idx_list:
+                key_list.append(
+                    '{}&{}&Z{}&T{}'.format(resource.get_lookup_key(), resolution, z_idx, sample))
 
         return key_list
 
-    def getCubeIndex(self, ch, resolution, listofidxs, listoftimestamps=None):
-        """Retrieve the indexes of inserted cubes"""
+    def get_missing_cube_index(self, resource, resolution, morton_idx_list):
+        """Retrieve the indexes of missing cubes in the cache db
 
-        index_store = self.getIndexStore(ch, resolution)
+        Args:
+            resource (spdb.project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            morton_idx_list (list[int]): a list of Morton ID of the cuboids to get
+
+        Returns:
+            list[str]: A list of cuboid keys to query
+        """
+
+        index_store = self.get_cache_index_base_key(resource, resolution)
         index_store_temp = index_store + '_temp'
 
         try:
-            if listoftimestamps:
-                self.client.sadd(index_store_temp, *list(zip(listoftimestamps, listofidxs)))
-            else:
-                self.client.sadd(index_store_temp, *listofidxs)
+            self.client.sadd(index_store_temp, *list(zip(resource.get_time_samples(), morton_idx_list)))
+
             ids_to_fetch = self.client.sdiff(index_store_temp, index_store)
+
             self.client.delete(index_store_temp)
         except Exception as e:
-            logger.error("Error retrieving cube indexes into the database. {}".format(e))
-            raise SpatialDBError("Error retrieving cube indexes into the database. {}".format(e))
+            raise SpdbError("Redis Error", "Error retrieving cube indexes into the database. {}".format(e),
+                            ErrorCode.REDIS_ERROR)
 
         return list(ids_to_fetch)
 
-    def putCubeIndex(self, ch, resolution, listofidxs, listoftimestamps=None):
-        """Add the listofidxs to the store"""
+    def put_cube_index(self, resource, resolution, morton_idx_list):
+        """Add cuboid indicies that are loaded into the cache db
+
+        Args:
+            resource (spdb.project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            morton_idx_list (list[int]): a list of Morton ID of the cuboids to get
+
+        Returns:
+            None
+        """
 
         try:
-            if listoftimestamps:
-                self.client.sadd(self.getIndexStore(ch, resolution), *list(zip(listoftimestamps, listofidxs)))
-            else:
-                self.client.sadd(self.getIndexStore(ch, resolution), *listofidxs)
+            self.client.sadd(self.get_cache_index_base_key(resource, resolution),
+                             *list(zip(resource.get_time_samples(), morton_idx_list)))
         except Exception as e:
-            logger.error("Error inserting cube indexes into the database. {}".format(e))
-            raise SpatialDBError("Error inserting cube indexes into the database. {}".format(e))
+            raise SpdbError("Redis Error", "Error inserting cube indexes into the database. {}".format(e),
+                            ErrorCode.REDIS_ERROR)
 
-    def getCube(self, ch, zidx, resolution, update=False, timestamp=None):
-        """Retrieve a single cube from the database"""
+    def get_cube(self, resource, resolution, morton_idx, update=False):
+        """Retrieve a single cuboid from the cache database
+
+        Args:
+            resource (spdb.project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            morton_idx (int): the Morton ID of the cuboid to get
+            update:
+
+        Returns:
+
+        """
+        # TODO: Add tracking of access time for LRU eviction
 
         try:
-            rows = self.client.mget(self.generateKeys(ch, resolution, [zidx], timestamp))
+            rows = self.client.mget(self.generate_keys(resource, resolution, [morton_idx]))
         except Exception as e:
-            logger.error("Error retrieving cubes into the database. {}".format(e))
-            raise SpatialDBError("Error retrieving cubes into the database. {}".format(e))
+            raise SpdbError("Redis Error", "Error retrieving cubes from the cache database. {}".format(e),
+                            ErrorCode.REDIS_ERROR)
 
         if rows[0]:
             return rows[0]
         else:
             return None
 
-    def getCubes(self, ch, listofidxs, resolution, neariso=False, timestamp=None):
-        """Retrieve multiple cubes from the database"""
+    def get_cubes(self, resource, resolution, morton_idx_list):
+        """Retrieve multiple cubes from the cache database
+
+        Args:s
+            resource (spdb.project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            morton_idx (int): the Morton ID of the cuboid to get
+
+        Returns:
+            (int, bytes): A tuple of the morton index and the blosc compressed byte array using the numpy interface
+        """
 
         try:
-            rows = self.client.mget(self.generateKeys(ch, resolution, listofidxs, timestamp))
+            rows = self.client.mget(self.generate_keys(resource, resolution, morton_idx_list))
         except Exception as e:
-            logger.error("Error retrieving cubes into the database. {}".format(e))
-            raise SpatialDBError("Error retrieving cubes into the database. {}".format(e))
+            raise SpdbError("Redis Error", "Error retrieving cubes from the cache database. {}".format(e),
+                            ErrorCode.REDIS_ERROR)
 
-        for idx, row in zip(listofidxs, rows):
+        for idx, row in zip(morton_idx_list, rows):
             yield (idx, row)
 
-    def getTimeCubes(self, ch, idx, listoftimestamps, resolution):
-        """Retrieve multiple cubes from the database"""
+    #ef getTimeCubes(self, ch, idx, listoftimestamps, resolution):
+    #   """Retrieve multiple cubes from the database"""
 
-        try:
-            rows = self.client.mget(self.generateKeys(ch, resolution, [idx], listoftimestamps))
-        except Exception as e:
-            logger.error("Error inserting cubes into the database. {}".format(e))
-            raise SpatialDBError("Error inserting cubes into the database. {}".format(e))
+    #   try:
+    #       rows = self.client.mget(self.generate_keys(ch, resolution, [idx], listoftimestamps))
+    #   except Exception as e:
+    #       logger.error("Error inserting cubes into the database. {}".format(e))
+    #       raise SpatialDBError("Error inserting cubes into the database. {}".format(e))
 
-        for idx, timestamp, row in zip([idx] * len(listoftimestamps), listoftimestamps, rows):
-            yield (idx, timestamp, row)
+    #   for idx, timestamp, row in zip([idx] * len(listoftimestamps), listoftimestamps, rows):
+    #       yield (idx, timestamp, row)
 
-    def putCube(self, ch, zidx, resolution, cubestr, update=False, timestamp=None):
-        """Store a single cube into the database"""
+    def put_cube(self, resource, resolution, morton_idx, cube_bytes, update=False):
+        """Store a single cube into the database
+
+        Args:
+            resource (spdb.project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            morton_idx (int): the Morton ID of the cuboid to get
+            cube_bytes (bytes): a cube in a blosc compressed byte array using the numpy interface
+            update:
+
+        Returns:
+            None
+        """
 
         # generating the key
-        key_list = self.generateKeys(ch, resolution, [zidx], timestamp=timestamp)
+        key_list = self.generate_keys(resource, resolution, [morton_idx])
 
         try:
-            self.client.mset(dict(list(zip(key_list, [cubestr]))))
+            self.client.mset(dict(list(zip(key_list, [cube_bytes]))))
         except Exception as e:
-            logger.error("Error inserting cube into the database. {}".format(e))
-            raise SpatialDBError("Error inserting cube into the database. {}".format(e))
+            raise SpdbError("Redis Error", "Error inserting cube into the cache database. {}".format(e),
+                            ErrorCode.REDIS_ERROR)
 
-    def putCubes(self, ch, listofidxs, resolution, listofcubes, update=False, timestamp=None):
-        """Store multiple cubes into the database"""
+    def put_cubes(self, resource, resolution, morton_idx_list, cube_list, update=False):
+        """Store multiple cubes into the database
+
+        Args:
+            resource (spdb.project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            morton_idx_list (list[int]): a list of Morton ID of the cuboids to get
+            cube_list: list of cubes in a blosc compressed byte arrays using the numpy interface
+            update: ???
+
+        Returns:
+
+        """
 
         # generating the list of keys
-        key_list = self.generateKeys(ch, resolution, listofidxs, timestamp=timestamp)
+        key_list = self.generate_keys(resource, resolution, morton_idx_list)
 
         try:
-            self.client.mset(dict(list(zip(key_list, listofcubes))))
+            self.client.mset(dict(list(zip(key_list, cube_list))))
         except Exception as e:
-            logger.error("Error inserting cubes into the database. {}".format(e))
-            raise SpatialDBError("Error inserting cubes into the database. {}".format(e))
+            raise SpdbError("Redis Error", "Error inserting cubes into the cache database. {}".format(e),
+                            ErrorCode.REDIS_ERROR)

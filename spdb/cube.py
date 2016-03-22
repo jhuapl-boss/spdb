@@ -170,7 +170,7 @@ class Cube(metaclass=ABCMeta):
         Returns:
             None
         """
-        pass
+        return NotImplemented
 
     @abstractmethod
     def xy_image(self, z_index=0):
@@ -186,7 +186,7 @@ class Cube(metaclass=ABCMeta):
         Returns:
             Image
         """
-        pass
+        return NotImplemented
 
     @abstractmethod
     def xz_image(self, z_scale=1, y_index=0):
@@ -195,7 +195,6 @@ class Cube(metaclass=ABCMeta):
         Example for uin8 based cube:
             zdim, ydim, xdim = self.data.shape
             out_image = Image.frombuffer('L', (xdim, zdim), self.data[:, y_index, :].flatten(), 'raw', 'L', 0, 1)
-            # if the image scales to 0 pixels it don't work
             return out_image.resize([xdim, int(zdim*z_scale)])
 
         Args:
@@ -205,7 +204,7 @@ class Cube(metaclass=ABCMeta):
         Returns:
             Image
         """
-        pass
+        return NotImplemented
 
     @abstractmethod
     def yz_image(self, z_scale=1, x_index=0):
@@ -214,7 +213,6 @@ class Cube(metaclass=ABCMeta):
         Example for uin8 based cube:
             zdim, ydim, xdim = self.data.shape
             out_image = Image.frombuffer('L', (ydim, zdim), self.data[:, :, 0].flatten(), 'raw', 'L', 0, 1)
-            #if the image scales to 0 pixels it don't work
             return out_image.resize([ydim, int(zdim*z_scale)])
 
         Args:
@@ -224,7 +222,7 @@ class Cube(metaclass=ABCMeta):
         Returns:
             Image
         """
-        pass
+        return NotImplemented
 
     @staticmethod
     def create_cube(resource, cube_size):

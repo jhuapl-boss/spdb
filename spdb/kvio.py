@@ -1,103 +1,90 @@
-# Copyright 2014 NeuroData (http://neurodata.io)
-# 
+# Original Copyright 2014 NeuroData (http://neurodata.io)
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+# Modified from original source by Johns Hopkins University Applied Physics Laboratory
+# Copyright 2016 Johns Hopkins University Applied Physics Laboratory
 
 from abc import ABCMeta, abstractmethod
 
-from ndtype import MYSQL, RIAK, CASSANDRA, DYNAMODB, REDIS
 
-import logging
+class KVIO(metaclass=ABCMeta):
+    """An abstract base class for Key-Value engines that act as a cache DB or work with OCP blaze
+    """
 
-logger = logging.getLogger("neurodata")
-
-
-class KVIO:
-    # __metaclass__ = ABCMeta
-
-    def __init__(self, db):
-        """Connect to the S3 backend"""
-        self.db = db
-
-    def close(self):
-        """Close the connection"""
-        pass
-
-    def startTxn(self):
-        """Start a transaction. Ensure database is in multi-statement mode."""
-        pass
-
-    def commit(self):
-        """Commit the transaction. Moved out of __del__ to make explicit."""
-        pass
-
-    def rollback(self):
-        """Rollback the transaction. To be called on exceptions."""
+    def __init__(self):
         pass
 
     @abstractmethod
-    def getCubeIndex(self, ch, resolution, listofidxs):
-        """Return the index list of inserted cubes"""
+    def close(self):
+        """Close the connection to the KV engine"""
         return NotImplemented
 
     @abstractmethod
-    def putCubeIndex(self, ch, resolution, listofidxs):
+    def start_txn(self):
+        """Start a transaction. Ensure database is in multi-statement mode."""
+        return NotImplemented
+
+    @abstractmethod
+    def commit(self):
+        """Commit the transaction. Moved out of __del__ to make explicit."""
+        return NotImplemented
+
+    @abstractmethod
+    def rollback(self):
+        """Rollback the transaction. To be called on exceptions."""
+        return NotImplemented
+
+    @abstractmethod
+    def get_missing_cube_index(self, resource, resolution, idx_list):
+        """Return the cuboid index list of inserted cubes in the cache DB"""
+        return NotImplemented
+
+    @abstractmethod
+    def put_cube_index(self, resource, resolution, idx_list):
         """Insert the index list of fetched cubes"""
         return NotImplemented
 
     @abstractmethod
-    def getCube(self, ch, zidx, resolution, update=False, timestamp=None):
+    def get_cube(self, resource, resolution, morton_idx, update=False):
         """Retrieve a single cube from the database"""
         return NotImplemented
 
     @abstractmethod
-    def getCubes(self, ch, listofidxs, resolution, neariso=False, timestamp=None):
+    def get_cubes(self, resource, resolution, morton_idx_list):
         """Retrieve multiple cubes from the database"""
         return NotImplemented
 
-    @abstractmethod
-    def getTimeCubes(self, ch, idx, listoftimestamps, resolution):
-        """Retrieve multiple cubes from the database"""
-        return NotImplemented
+    # @abstractmethod
+    # def getTimeCubes(self, ch, idx, listoftimestamps, resolution):
+    #     """Retrieve multiple cubes from the database"""
+    #     return NotImplemented
 
     @abstractmethod
-    def putCube(self, ch, zidx, resolution, cubestr, update=False, timestamp=None):
+    def put_cube(self, resource, resolution, morton_idx, cube_bytes, update=False):
         """Store a single cube into the database"""
         return NotImplemented
 
     @abstractmethod
-    def putCubes(self, ch, listofidxs, resolution, listofcubes, update=False, timestamp=None):
+    def put_cubes(self, resource, resolution, morton_idx_list, cube_list, update=False):
         """Store multiple cubes into the database"""
         return NotImplemented
 
     # Factory method for KVIO Engine
     @staticmethod
-    def getIOEngine(db):
-
-        if db.KVENGINE == MYSQL:
-            from mysqlkvio import MySQLKVIO
-            db.NPZ = True
-            return MySQLKVIO(db)
-        elif db.KVENGINE == CASSANDRA:
-            from casskvio import CassandraKVIO
-            db.NPZ = True
-            return CassandraKVIO(db)
-        elif db.KVENGINE == RIAK:
-            from riakkvio import RiakKVIO
-            db.NPZ = True
-            return RiakKVIO(db)
-        elif db.KVENGINE == REDIS:
-            from rediskvio import RedisKVIO
-            db.NPZ = False
-            return RedisKVIO(db)
+    def get_kv_engine(engine):
+        if engine == "redis":
+            from spdb.rediskvio import RedisKVIO
+            return RedisKVIO()
         else:
-            return KVIO(db)
+            return KVIO()

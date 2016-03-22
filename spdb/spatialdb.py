@@ -61,7 +61,7 @@ class SpatialDB:
         # self.s3io = s3io.S3IO(self)
         self.s3io = None
 
-        self.kvio = KVIO.getIOEngine(self)
+        self.kvio = KVIO.get_kv_engine(self)
 
         # TODO: DMK Add annotation support
         # self.annoIdx = annindex.AnnotateIndex(self.kvio, self.proj)
@@ -122,7 +122,7 @@ class SpatialDB:
             if self.s3io:
                 # TODO: Update this block of code once S3 integration has occurred
                 # Get the ids of the cuboids you need - only gives ids to be fetched
-                ids_to_fetch = self.kvio.getCubeIndex(resource, resolution, morton_idx_list)
+                ids_to_fetch = self.kvio.get_cube_index(resource, resolution, morton_idx_list)
 
                 # Check if the index exists inside the cache database or if you must fetch from S3
                 if ids_to_fetch:
@@ -155,7 +155,7 @@ class SpatialDB:
         # If using S3, update index of cuboids that exist in the cache key-value store
         if self.s3io:
             # TODO: Update after S3 integration. Move index IO into new class
-            self.kvio.putCubeIndex(resource, resolution, [zidx])
+            self.kvio.put_cube_index(resource, resolution, [zidx])
 
         self.kvio.put_cube(resource, zidx, resolution, cube.to_blosc_numpy(), not cube.from_zeros())
 
@@ -174,7 +174,7 @@ class SpatialDB:
         """
 
         if self.s3io:
-            self.kvio.putCubeIndex(resource, resolution, morton_idx_list)
+            self.kvio.put_cube_index(resource, resolution, morton_idx_list)
 
         return self.kvio.put_cubes(resource, morton_idx_list, resolution, cube_list, update)
 
@@ -523,6 +523,8 @@ class SpatialDB:
             None
         """
         # TODO: Look into data ordering when storing time series data and if it needs to be different
+        # TODO: Look into if the cuboid index needs to get updated to reflect writes to the cache
+
         # dim is in xyz, data is in zyx order
         if len(resource.get_time_samples()) == 1:
             # Single time point
