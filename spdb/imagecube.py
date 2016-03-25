@@ -18,7 +18,7 @@
 import numpy as np
 from PIL import Image
 
-from spdb import Cube
+from spdb.cube import Cube
 
 
 class ImageCube8(Cube):

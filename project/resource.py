@@ -37,7 +37,7 @@ class Experiment:
       Valid values are 'near_iso', 'iso', and 'slice'.
     """
     def __init__(self, name, description, num_hierarchy_levels, hierarchy_method):
-        self.name = name,
+        self.name = name
         self.description = description
         self.num_hierarchy_levels = num_hierarchy_levels
         self.hierarchy_method = hierarchy_method
@@ -119,7 +119,7 @@ class Channel:
       max_time_step (int): The maximum supported time sample
     """
     def __init__(self, name, description, datatype, max_time_step):
-        self.name = name,
+        self.name = name
         self.description = description
         self.datatype = datatype
         self.max_time_step = max_time_step
@@ -144,7 +144,7 @@ class Layer:
       parent_channels (list): The names of the parent channel(s) to which the Layer is linked
     """
     def __init__(self, name, description, datatype, max_time_step, parent_channels):
-        self.name = name,
+        self.name = name
         self.description = description
         self.datatype = datatype
         self.max_time_step = max_time_step
@@ -156,73 +156,73 @@ class BossResource(metaclass=ABCMeta):
     Parent class to represent a Boss data model resource.
 
     Attributes:
-      __collection (spdb.project.resource.Collection): A Collection instance for the resource
-      __coord_frame (spdb.project.resource.CoordinateFrame): A coordinate frame instance for the resource
-      __experiment (spdb.project.resource.Experiment): A experiment instance for the resource
-      __channel (spdb.project.resource.Channel): A channel instance for the resource (if a channel)
-      __layer (spdb.project.resource.Layer): A layer instance for the resource (if a layer)
-      __time_samples (list): The time sample index for the resource
-      __boss_key (str): The unique, plain text key identifying the resource - used to query for the lookup key
-      __lookup_key (str): The unique key identifying the resource that enables renaming resources and physically used to
+      _collection (spdb.project.resource.Collection): A Collection instance for the resource
+      _coord_frame (spdb.project.resource.CoordinateFrame): A coordinate frame instance for the resource
+      _experiment (spdb.project.resource.Experiment): A experiment instance for the resource
+      _channel (spdb.project.resource.Channel): A channel instance for the resource (if a channel)
+      _layer (spdb.project.resource.Layer): A layer instance for the resource (if a layer)
+      _time_samples (list): The time sample index for the resource
+      _boss_key (str): The unique, plain text key identifying the resource - used to query for the lookup key
+      _lookup_key (str): The unique key identifying the resource that enables renaming resources and physically used to
       ID data in databases
     """
     def __init__(self):
-        self.__collection = None
-        self.__coord_frame = None
-        self.__experiment = None
-        self.__channel = None
-        self.__layer = None
-        self.__time_samples = []
-        self.__boss_key = None
-        self.__lookup_key = None
+        self._collection = None
+        self._coord_frame = None
+        self._experiment = None
+        self._channel = None
+        self._layer = None
+        self._time_samples = []
+        self._boss_key = None
+        self._lookup_key = None
 
     # Methods to populate class properties
     @abstractmethod
     def populate_collection(self):
         """
-        Method to create a Collection instance and set self.__collection.  Should be overridden.
+        Method to create a Collection instance and set self._collection.  Should be overridden.
         """
         pass
 
     @abstractmethod
     def populate_coord_frame(self):
         """
-        Method to create a CoordinateFrame instance and set self.__coord_frame.  Should be overridden.
+        Method to create a CoordinateFrame instance and set self._coord_frame.  Should be overridden.
         """
         pass
 
     @abstractmethod
     def populate_experiment(self):
         """
-        Method to create a Experiment instance and set self.__experiment.  Should be overridden.
+        Method to create a Experiment instance and set self._experiment.  Should be overridden.
         """
         pass
 
     @abstractmethod
     def populate_channel_or_layer(self):
         """
-        Method to create a Channel or Layer instance and set self.__channel or self.__layer.  Should be overridden.
+        Method to create a Channel or Layer instance and set self._channel or self._layer.  Should be overridden.
         """
         pass
 
     @abstractmethod
     def populate_time_samples(self):
         """
-        Method to set self.__time_samples.  Should be overridden.
+        Method to set self._time_samples.  Should be overridden.
         """
         pass
 
     @abstractmethod
     def populate_boss_key(self):
         """
-        Method to set self.__boss_key.  Should be overridden.
+        Method to set self._boss_key.  Should be overridden.
         """
         pass
 
     @abstractmethod
     def populate_lookup_key(self):
         """
-        Method to set self.__lookup_key.  Should be overridden.
+        Method to set self._lookup_key.  Should be overridden.
         """
         pass
 
@@ -231,11 +231,11 @@ class BossResource(metaclass=ABCMeta):
         """Method to get the current Collection instance.  Lazily populated.
 
         :returns A Collection instance for the given resource
-        :rtype spdb.project.resource.Collection
+        :rtype spdb.project.Collection
         """
-        if not self.__collection:
+        if not self._collection:
             self.populate_collection()
-        return self.__collection
+        return self._collection
 
     def get_experiment(self):
         """Method to get the current Experiment instance.  Lazily populated.
@@ -243,9 +243,9 @@ class BossResource(metaclass=ABCMeta):
         :returns A Experiment instance for the given resource
         :rtype spdb.project.resource.Experiment
         """
-        if not self.__experiment:
+        if not self._experiment:
             self.populate_experiment()
-        return self.__experiment
+        return self._experiment
 
     def get_coord_frame(self):
         """Method to get the current Coordinate Frame instance.  Lazily populated.
@@ -253,29 +253,29 @@ class BossResource(metaclass=ABCMeta):
         :returns A Coordinate Frame instance for the given resource
         :rtype spdb.project.resource.CoordinateFrame
         """
-        if not self.__coord_frame:
+        if not self._coord_frame:
             self.populate_coord_frame()
-        return self.__coord_frame
+        return self._coord_frame
 
     def get_channel(self):
         """Method to get the current Channel instance.  Lazily populated. None if current resource is a layer
 
         :returns A Channel instance for the given resource
-        :rtype spdb.project.resource.Channel
+        :rtype spdb.project.Channel
         """
-        if not self.__channel and not self.__layer:
+        if not self._channel and not self._layer:
             self.populate_channel_or_layer()
-        return self.__channel
+        return self._channel
 
     def get_layer(self):
         """Method to get the current Layer instance.  Lazily populated. None if current resource is a channel
 
         :returns A Layer instance for the given resource
-        :rtype spdb.project.resource.Layer
+        :rtype spdb.project.Layer
         """
-        if not self.__channel and not self.__layer:
+        if not self._channel and not self._layer:
             self.populate_channel_or_layer()
-        return self.__layer
+        return self._layer
 
     def is_channel(self):
         """Method to check if the resource is a channel or a layer
@@ -283,9 +283,20 @@ class BossResource(metaclass=ABCMeta):
         :returns True if resource is a channel. False if a layer
         :rtype bool
         """
-        if not self.__channel and not self.__layer:
+        if not self._channel and not self._layer:
             self.populate_channel_or_layer()
-        return (self.__layer == None)
+        return self._layer == None
+
+    def set_time_samples(self, idx):
+        """Method to set the current time sample index or indices if needed and can't be done lazily
+
+        :returns The index or indices for the current resource.
+        :rtype list[int]
+        """
+        if isinstance(idx, list):
+            self._time_samples = idx
+        else:
+            self._time_samples = [idx]
 
     def get_time_samples(self):
         """Method to get the current time sample index or indicies.  Lazily populated.
@@ -293,9 +304,9 @@ class BossResource(metaclass=ABCMeta):
         :returns The index or indicies for the current resource.
         :rtype list[int]
         """
-        if not self.__time_samples:
+        if not self._time_samples:
             self.populate_time_samples()
-        return self.__time_samples
+        return self._time_samples
 
     def get_boss_key(self):
         """Method to get the current boss key.  Lazily populated.
@@ -303,9 +314,9 @@ class BossResource(metaclass=ABCMeta):
         :returns The boss key
         :rtype str
         """
-        if not self.__boss_key:
+        if not self._boss_key:
             self.populate_boss_key()
-        return self.__boss_key
+        return self._boss_key
 
     def get_lookup_key(self):
         """Method to get the current lookup key.  Lazily populated.
@@ -313,9 +324,9 @@ class BossResource(metaclass=ABCMeta):
         :returns The lookup key
         :rtype str
         """
-        if not self.__lookup_key:
+        if not self._lookup_key:
             self.populate_lookup_key()
-        return self.__lookup_key
+        return self._lookup_key
 
     # TODO: Look into putting kv-engine in django model and support different engines?
     def get_kv_engine(self):
@@ -344,37 +355,57 @@ class BossResource(metaclass=ABCMeta):
         :returns A string identifying the data type for the channel or layer
         :rtype str
         """
-        if not self.__channel and not self.__layer:
+        if not self._channel and not self._layer:
             self.populate_channel_or_layer()
 
         data_type = None
         if self.is_channel():
-            if self.__channel:
+            if self._channel:
                 # You have a channel
-                data_type = self.__channel.datatype
+                data_type = self._channel.datatype
         else:
-            if self.__layer():
+            if self._layer():
                 # You have a layer
-                data_type = self.__layer.datatype
+                data_type = self._layer.datatype
 
         return data_type
 
     # Methods to delete the entry from the data model tables
     @abstractmethod
-    def __delete_collection_model(self):
-        pass
+    def delete_collection_model(self):
+        """Method to delete a collection from the data model. Should not be called directly; Use delete_collection.
+
+        Returns:
+            None
+        """
+        return NotImplemented
 
     @abstractmethod
-    def __delete_experiment_model(self):
-        pass
+    def delete_experiment_model(self):
+        """Method to delete a experiment from the data model. Should not be called directly; Use delete_experiment.
+
+        Returns:
+            None
+        """
+        return NotImplemented
 
     @abstractmethod
-    def __delete_coord_frame_model(self):
-        pass
+    def delete_coord_frame_model(self):
+        """Method to delete a coord_frame from the data model. Should not be called directly; Use delete_coord_frame.
+
+        Returns:
+            None
+        """
+        return NotImplemented
 
     @abstractmethod
-    def __delete_channel_layer_model(self):
-        pass
+    def delete_channel_layer_model(self):
+        """Method to delete a channel_layer from the data model. Should not be called directly; Use delete_channel_layer.
+
+        Returns:
+            None
+        """
+        return NotImplemented
 
     # Methods to delete Boss data model resources
     # TODO: Add S3 support on deletes.

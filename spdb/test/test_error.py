@@ -1,7 +1,22 @@
 import unittest
-from error import SpdbError
+from spdb import SpdbError
+import bossutils
+import tempfile
+import os
+from bossutils.logger import BossLogger
+from unittest.mock import patch
 
 
+class MockBossLogger(BossLogger):
+    """Basic mock for BossConfig to contain the properties needed for this test"""
+    LOG_FILE = os.path.join(tempfile.TemporaryDirectory().name, 'test_logfile.log')
+
+    def __init__(self):
+        BossLogger.__init__(self)
+        self.LOG_FILE = os.path.join(tempfile.TemporaryDirectory().name, 'test_logfile.log')
+
+
+@patch('bossutils.logger.BossLogger', MockBossLogger)
 class SpdbErrorTests(unittest.TestCase):
 
     def test_creation(self):

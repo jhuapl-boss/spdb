@@ -62,3 +62,6 @@ target/
 .ipynb_checkpoints
 .idea
 .DS_Store
+addData.o
+c_lib/c_version/*.o
+c_lib/c_version/makefile

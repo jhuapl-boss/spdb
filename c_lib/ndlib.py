@@ -24,9 +24,7 @@ import c_lib.rgbColor
 
 # Load the shared C library using ctype mechanism and the directory path is always local
 BASE_PATH = os.path.dirname(__file__)
-ndlib = npct.load_library("ndlib", BASE_PATH + "/c_version")
-# Load the shared CPP library using ctype mechanism and the directory path is always local
-#ndlib = npct.load_library("ndlib", "cpp_version")
+ndlib = npct.load_library("ndlib.so", BASE_PATH + "/c_version")
 
 # Defining numpy array times for C
 array_1d_uint8 = npct.ndpointer(dtype=np.uint8, ndim=1, flags='C_CONTIGUOUS')
@@ -41,19 +39,20 @@ array_1d_uint64 = npct.ndpointer(dtype=np.uint64, ndim=1, flags='C_CONTIGUOUS')
 array_2d_uint64 = npct.ndpointer(dtype=np.uint64, ndim=2, flags='C_CONTIGUOUS')
 array_2d_float32 = npct.ndpointer(dtype=np.float32, ndim=2, flags='C_CONTIGUOUS')
 
-
 # defining the parameter types of the functions in C
 # FORMAT: <library_name>,<functiona_name>.argtypes = [ ctype.<argtype> , ctype.<argtype> ....]
 
 ndlib.filterCutout.argtypes = [array_1d_uint32, cp.c_int, array_1d_uint32, cp.c_int]
 ndlib.filterCutoutOMP.argtypes = [array_1d_uint32, cp.c_int, array_1d_uint32, cp.c_int]
 ndlib.locateCube.argtypes = [array_2d_uint64, cp.c_int, array_2d_uint32, cp.c_int, cp.POINTER(cp.c_int)]
-ndlib.annotateCube.argtypes = [array_1d_uint32, cp.c_int, cp.POINTER(cp.c_int), cp.c_int, array_1d_uint32, array_2d_uint32, cp.c_int, cp.c_char, array_2d_uint32]
+ndlib.annotateCube.argtypes = [array_1d_uint32, cp.c_int, cp.POINTER(cp.c_int), cp.c_int, array_1d_uint32,
+                               array_2d_uint32, cp.c_int, cp.c_char, array_2d_uint32]
 ndlib.XYZMorton.argtypes = [array_1d_uint64]
-ndlib.MortonXYZ.argtypes = [npct.ctypes.c_int64 , array_1d_uint64]
+ndlib.MortonXYZ.argtypes = [npct.ctypes.c_int64, array_1d_uint64]
 ndlib.recolorCubeOMP.argtypes = [array_2d_uint32, cp.c_int, cp.c_int, array_2d_uint32, array_1d_uint32]
 ndlib.quicksort.argtypes = [array_2d_uint64, cp.c_int]
-ndlib.shaveCube.argtypes = [array_1d_uint32, cp.c_int, cp.POINTER(cp.c_int), cp.c_int, array_1d_uint32, array_2d_uint32, cp.c_int, array_2d_uint32, cp.c_int, array_2d_uint32]
+ndlib.shaveCube.argtypes = [array_1d_uint32, cp.c_int, cp.POINTER(cp.c_int), cp.c_int, array_1d_uint32, array_2d_uint32,
+                            cp.c_int, array_2d_uint32, cp.c_int, array_2d_uint32]
 ndlib.annotateEntityDense.argtypes = [array_3d_uint32, cp.POINTER(cp.c_int), cp.c_int]
 ndlib.shaveDense.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int)]
 ndlib.exceptionDense.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int)]
@@ -102,279 +101,297 @@ ndlib.addDataZSlice.restype = None
 ndlib.addDataIsotropic.restype = None
 ndlib.unique.restype = cp.c_int
 
-def filter_ctype_OMP ( cutout, filterlist ):
-  """Remove all annotations in a cutout that do not match the filterlist using OpenMP"""
-  
-  # get a copy of the iterator as a 1-D array
-  cutout_shape = cutout.shape
-  # Temp Fix
-  cutout = np.asarray(cutout, dtype=np.uint32)
-  cutout = cutout.ravel()
-  filterlist = np.asarray(filterlist, dtype=np.uint32)
-  
-  #Calling the C openmp funtion 
-  c_lib.filterCutoutOMP (cutout, cp.c_int(len(cutout)), np.sort(filterlist), cp.c_int(len(filterlist)))
-  
-  return cutout.reshape( cutout_shape )
-           
 
-def filter_ctype ( cutout, filterlist ):
-  """Remove all annotations in a cutout that do not match the filterlist"""
-                
-  # get a copy of the iterator as a 1-D array
-  flatcutout = cutout.flat.copy()
-  
-  # Calling the C naive function
-  c_lib.filterCutout(flatcutout, cp.c_int(len(flatcutout)), filterlist, cp.c_int(len(filterlist)))
+def filter_ctype_OMP(cutout, filterlist):
+    """Remove all annotations in a cutout that do not match the filterlist using OpenMP"""
 
-  return flatcutout.reshape(cutout.shape[0],cutout.shape[1],cutout.shape[2])
+    # get a copy of the iterator as a 1-D array
+    cutout_shape = cutout.shape
+    # Temp Fix
+    cutout = np.asarray(cutout, dtype=np.uint32)
+    cutout = cutout.ravel()
+    filterlist = np.asarray(filterlist, dtype=np.uint32)
+
+    # Calling the C openmp funtion
+    ndlib.filterCutoutOMP(cutout, cp.c_int(len(cutout)), np.sort(filterlist), cp.c_int(len(filterlist)))
+
+    return cutout.reshape(cutout_shape)
 
 
-def annotate_ctype ( data, annid, offset, locations, conflictopt ):
-  """ Remove all annotations in a cutout that do not match the filterlist """
+def filter_ctype(cutout, filterlist):
+    """Remove all annotations in a cutout that do not match the filterlist"""
 
-  # get a copy of the iterator as a 1-D array
-  datashape = data.shape
-  dims = [i for i in data.shape]
-  data = data.ravel()
+    # get a copy of the iterator as a 1-D array
+    flatcutout = cutout.flat.copy()
 
-  exceptions = np.zeros ( (len(locations),3), dtype=np.uint32 )
-          
-  # Calling the C native function
-  exceptionIndex = c_lib.annotateCube (data, cp.c_int(len(data)), (cp.c_int * len(dims))(*dims), cp.c_int(annid), offset, locations, cp.c_int(len(locations)), cp.c_char(conflictopt), exceptions)
+    # Calling the C naive function
+    ndlib.filterCutout(flatcutout, cp.c_int(len(flatcutout)), filterlist, cp.c_int(len(filterlist)))
 
-  if exceptionIndex > 0:
-    exceptions = exceptions[:(exceptionIndex+1)]
-  else:
-    exceptions = np.zeros ( (0), dtype=np.uint32 )
-
-  return ( data.reshape(datashape) , exceptions )
+    return flatcutout.reshape(cutout.shape[0], cutout.shape[1], cutout.shape[2])
 
 
-def locate_ctype ( locations, dims ):
-  """ Remove all annotations in a cutout that do not match the filterlist """
-  
-  # get a copy of the iterator as a 1-D array
-  cubeLocs = np.zeros ( [len(locations),4], dtype=np.uint64 )
-  
-  # Calling the C native function
-  c_lib.locateCube (cubeLocs, cp.c_int(len(cubeLocs)), locations, cp.c_int(len(locations)), (cp.c_int * len(dims))(*dims))
-  
-  return cubeLocs
+def annotate_ctype(data, annid, offset, locations, conflictopt):
+    """ Remove all annotations in a cutout that do not match the filterlist """
+
+    # get a copy of the iterator as a 1-D array
+    datashape = data.shape
+    dims = [i for i in data.shape]
+    data = data.ravel()
+
+    exceptions = np.zeros((len(locations), 3), dtype=np.uint32)
+
+    # Calling the C native function
+    exceptionIndex = ndlib.annotateCube(data, cp.c_int(len(data)), (cp.c_int * len(dims))(*dims), cp.c_int(annid),
+                                        offset, locations, cp.c_int(len(locations)), cp.c_char(conflictopt), exceptions)
+
+    if exceptionIndex > 0:
+        exceptions = exceptions[:(exceptionIndex + 1)]
+    else:
+        exceptions = np.zeros((0), dtype=np.uint32)
+
+    return (data.reshape(datashape), exceptions)
 
 
-def XYZMorton ( xyz ):
-  """ Get morton order from XYZ coordinates """
-  
-  # Calling the C native function
-  xyz = np.uint64( xyz )
-  morton = c_lib.XYZMorton (xyz)
-  
-  return morton
+def locate_ctype(locations, dims):
+    """ Remove all annotations in a cutout that do not match the filterlist """
+
+    # get a copy of the iterator as a 1-D array
+    cubeLocs = np.zeros([len(locations), 4], dtype=np.uint64)
+
+    # Calling the C native function
+    ndlib.locateCube(cubeLocs, cp.c_int(len(cubeLocs)), locations, cp.c_int(len(locations)),
+                     (cp.c_int * len(dims))(*dims))
+
+    return cubeLocs
 
 
-def MortonXYZ ( morton ):
-  """ Get morton order from XYZ coordinates """
-  
-  # Calling the C native function
-  morton = np.uint64(morton)
-  cubeoff = np.zeros((3), dtype=np.uint64)
-  c_lib.MortonXYZ (morton, cubeoff)
-  
-  cubeoff = np.uint32(cubeoff)
-  return [i for i in cubeoff]
+def XYZMorton(xyz):
+    """ Get morton order from XYZ coordinates """
 
-def recolor_ctype ( cutout, imagemap ):
-  """ Annotation recoloring function """
-  
-  xdim, ydim = cutout.shape
-  if not cutout.flags['C_CONTIGUOUS']:
-    cutout = np.ascontiguousarray(cutout,dtype=np.uint32)
-  # Calling the c native function
-  c_lib.recolorCubeOMP (cutout, cp.c_int(xdim), cp.c_int(ydim), imagemap, np.asarray(rgbColor.rgbcolor, dtype=np.uint32))
-  return imagemap
+    # Calling the C native function
+    xyz = np.uint64(xyz)
+    morton = ndlib.XYZMorton(xyz)
 
-def recolor64_ctype ( cutout, imagemap ):
-  """ Annotation recoloring function """
-  
-  xdim, ydim = cutout.shape
-  if not cutout.flags['C_CONTIGUOUS']:
-    cutout = np.ascontiguousarray(cutout,dtype=np.uint32)
-  # Calling the c native function
-  c_lib.recolor64CubeOMP (cutout, cp.c_int(xdim), cp.c_int(ydim), imagemap, np.asarray(rgbColor.rgbcolor, dtype=np.uint32))
-  return imagemap
-
-def quicksort ( locs ):
-  """ Sort the cube on Morton Id """
-
-  # Calling the C native language
-  c_lib.quicksort (locs, len(locs))
-  return locs
-
-def shave_ctype ( data, annid, offset, locations ):
-  """ Remove annotations by a list of locations """
-
-  # get a copy of the iterator as a 1-D array
-  datashape = data.shape
-  dims = [i for i in data.shape]
-  data = data.ravel()
-
-  exceptions = np.zeros ( (len(locations),3), dtype=np.uint32 )
-  zeroed = np.zeros ( (len(locations),3), dtype=np.uint32 )
-
-  exceptionIndex = -1
-  zeroedIndex = -1
-          
-  # Calling the C native function
-  c_lib.shaveCube (data, cp.c_int(len(data)), (cp.c_int * len(dims))(*dims), cp.c_int(annid), offset, locations, cp.c_int(len(locations)), exceptions, cp.c_int(exceptionIndex), zeroed, cp.c_int(zeroedIndex))
-
-  if exceptionIndex > 0:
-    exceptions = exceptions[:(exceptionIndex+1)]
-  else:
-    exceptions = np.zeros ( (0), dtype=np.uint32 )
-
-  if zeroedIndex > 0:
-    zeroed = zeroed[:(zeroedIndex+1)]
-  else:
-    zeroed = np.zeros ( (0), dtype=np.uint32 )
-  
-  return ( data.reshape(datashape) , exceptions, zeroed )
+    return morton
 
 
-def annotateEntityDense_ctype ( data, entityid ):
-  """ Relabel all non zero pixels to annotation id """
+def MortonXYZ(morton):
+    """ Get morton order from XYZ coordinates """
 
-  dims = [ i for i in data.shape ]
-  c_lib.annotateEntityDense (data, (cp.c_int * len(dims))(*dims), cp.c_int(entityid))
-  return ( data )
+    # Calling the C native function
+    morton = np.uint64(morton)
+    cubeoff = np.zeros((3), dtype=np.uint64)
+    ndlib.MortonXYZ(morton, cubeoff)
 
-
-def shaveDense_ctype ( data, shavedata ):
-  """ Remove the specified voxels from the annotation """
-
-  dims = [ i for i in data.shape ]
-  c_lib.shaveDense (data, shavedata, (cp.c_int * len(dims))(*dims))
-  return ( data )
+    cubeoff = np.uint32(cubeoff)
+    return [i for i in cubeoff]
 
 
-def exceptionDense_ctype ( data, annodata ):
-  """ Get a dense voxel region and overwrite all the non-zero values """
+def recolor_ctype(cutout, imagemap):
+    """ Annotation recoloring function """
 
-  data = np.uint32(data)
-  annodata = np.uint32(annodata)
-  if not annodata.flags['C_CONTIGUOUS']:
-    annodata = np.ascontiguousarray(annodata,np.uint32)
-  dims = [ i for i in data.shape ]
-  c_lib.exceptionDense (data, annodata, (cp.c_int * len(dims))(*dims))
-  return ( data )
-
-
-def overwriteDense_ctype ( data, annodata ):
-  """ Get a dense voxel region and overwrite all the non-zero values """
-
-  orginal_dtype = data.dtype
-  data = np.uint32(data)
-  annodata = np.uint32(annodata)
-  #data = np.ascontiguousarray(data,dtype=np.uint32)
-  if not annodata.flags['C_CONTIGUOUS']:
-    annodata = np.ascontiguousarray(annodata,dtype=np.uint32)
-  dims = [ i for i in data.shape ]
-  c_lib.overwriteDense (data, annodata, (cp.c_int * len(dims))(*dims))
-  return ( data.astype(orginal_dtype, copy=False) )
+    xdim, ydim = cutout.shape
+    if not cutout.flags['C_CONTIGUOUS']:
+        cutout = np.ascontiguousarray(cutout, dtype=np.uint32)
+    # Calling the c native function
+    ndlib.recolorCubeOMP(cutout, cp.c_int(xdim), cp.c_int(ydim), imagemap,
+                         np.asarray(rgbColor.rgbcolor, dtype=np.uint32))
+    return imagemap
 
 
-def zoomOutData_ctype ( olddata, newdata, factor ):
-  """ Add the contribution of the input data to the next level at the given offset in the output cube """
+def recolor64_ctype(cutout, imagemap):
+    """ Annotation recoloring function """
 
-  dims = [ i for i in newdata.shape ]
-  c_lib.zoomOutData (olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
-  return ( newdata )
-
-def zoomOutData64_ctype ( olddata, newdata, factor ):
-  """ Add the contribution of the input data to the next level at the given offset in the output cube """
-
-  dims = [ i for i in newdata.shape ]
-  c_lib.zoomOutData64 (olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
-  return ( newdata )
-
-def zoomOutData_ctype_OMP ( olddata, newdata, factor ):
-  """ Add the contribution of the input data to the next level at the given offset in the output cube """
-
-  dims = [ i for i in newdata.shape ]
-  c_lib.zoomOutDataOMP (olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
-  return ( newdata )
+    xdim, ydim = cutout.shape
+    if not cutout.flags['C_CONTIGUOUS']:
+        cutout = np.ascontiguousarray(cutout, dtype=np.uint32)
+    # Calling the c native function
+    ndlib.recolor64CubeOMP(cutout, cp.c_int(xdim), cp.c_int(ydim), imagemap,
+                           np.asarray(rgbColor.rgbcolor, dtype=np.uint32))
+    return imagemap
 
 
-def zoomInData_ctype ( olddata, newdata, factor ):
-  """ Add the contribution of the input data to the next level at the given offset in the output cube """
+def quicksort(locs):
+    """ Sort the cube on Morton Id """
 
-  dims = [ i for i in newdata.shape ]
-  c_lib.zoomInData (olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
-  return ( newdata )
+    # Calling the C native language
+    ndlib.quicksort(locs, len(locs))
+    return locs
 
-def zoomInData_ctype_OMP ( olddata, newdata, factor ):
-  """ Add the contribution of the input data to the next level at the given offset in the output cube """
 
-  dims = [ i for i in newdata.shape ]
-  if olddata.dtype == np.uint16:
-    c_lib.zoomInDataOMP16 (olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
-  else:
-    c_lib.zoomInDataOMP32 (olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
-  return ( newdata )
+def shave_ctype(data, annid, offset, locations):
+    """ Remove annotations by a list of locations """
 
-def mergeCube_ctype ( data, newid, oldid ):
-  """ Relabel voxels in cube from oldid to newid """
+    # get a copy of the iterator as a 1-D array
+    datashape = data.shape
+    dims = [i for i in data.shape]
+    data = data.ravel()
 
-  dims = [ i for i in data.shape ]
-  c_lib.mergeCube (data, (cp.c_int * len(dims))(*dims), cp.c_int(newid), cp.c_int(oldid))
-  return ( data )
+    exceptions = np.zeros((len(locations), 3), dtype=np.uint32)
+    zeroed = np.zeros((len(locations), 3), dtype=np.uint32)
 
-def isotropicBuild_ctype ( data1, data2 ):
-  """ Merging Data """
+    exceptionIndex = -1
+    zeroedIndex = -1
 
-  dims = [ i for i in data1.shape ]
-  newdata = np.zeros(data1.shape,dtype=data1.dtype)
-  if data1.dtype == np.uint32:
-    c_lib.isotropicBuild32 (data1, data2, newdata, (cp.c_int * len(dims))(*dims))
-  elif data1.dtype == np.uint8:
-    c_lib.isotropicBuild8 (data1, data2, newdata, (cp.c_int * len(dims))(*dims))
-  elif data1.dtype == np.uint16:
-    c_lib.isotropicBuild16 (data1, data2, newdata, (cp.c_int * len(dims))(*dims))
-  elif data1.dtype == np.float32:
-    c_lib.isotropicBuildF32 (data1, data2, newdata, (cp.c_int * len(dims))(*dims))
-  else:
-    raise 
-  return ( newdata )
+    # Calling the C native function
+    ndlib.shaveCube(data, cp.c_int(len(data)), (cp.c_int * len(dims))(*dims), cp.c_int(annid), offset, locations,
+                    cp.c_int(len(locations)), exceptions, cp.c_int(exceptionIndex), zeroed, cp.c_int(zeroedIndex))
 
-def addDataToIsotropicStack_ctype ( cube, output, offset ):
-  """Add the contribution of the input data to the next level at the given offset in the output cube"""
+    if exceptionIndex > 0:
+        exceptions = exceptions[:(exceptionIndex + 1)]
+    else:
+        exceptions = np.zeros((0), dtype=np.uint32)
 
-  dims = [ i for i in cube.data.shape ]
-  c_lib.addDataIsotropic (cube.data, output, (cp.c_int * len(offset))(*offset), (cp.c_int * len(dims))(*dims))
+    if zeroedIndex > 0:
+        zeroed = zeroed[:(zeroedIndex + 1)]
+    else:
+        zeroed = np.zeros((0), dtype=np.uint32)
 
-def addDataToZSliceStack_ctype ( cube, output, offset ):
-  """Add the contribution of the input data to the next level at the given offset in the output cube"""
+    return (data.reshape(datashape), exceptions, zeroed)
 
-  dims = [ i for i in cube.data.shape ]
-  c_lib.addDataZSlice (cube.data, output, (cp.c_int * len(offset))(*offset), (cp.c_int * len(dims))(*dims))
 
-def unique ( data ):
-  """Return the unqiue elements in the array"""
+def annotateEntityDense_ctype(data, entityid):
+    """ Relabel all non zero pixels to annotation id """
 
-  data = data.ravel()
-  unique_array = np.zeros(len(data), dtype=data.dtype)
-  unique_length = c_lib.unique (data, unique_array, cp.c_int(len(data)))
+    dims = [i for i in data.shape]
+    ndlib.annotateEntityDense(data, (cp.c_int * len(dims))(*dims), cp.c_int(entityid))
+    return (data)
 
-  return unique_array[:unique_length]
 
-#def annoidIntersect_ctype_OMP(cutout, annoid_list):
-  #"""Remove all annotations in a cutout that do not match the filterlist using OpenMP"""
-  
-  ## get a copy of the iterator as a 1-D array
-  #cutout = cutout.ravel()
-  #annoid_list = np.asarray(annoid_list, dtype=np.uint32)
-  
-  ## Calling the C openmp funtion 
-  #ndlib.annoidIntersectOMP(cutout, cp.c_int(len(cutout)), np.sort(annoid_list), cp.c_int(len(annoid_list)))
-  
-  #return cutout.reshape( cutout_shape )
+def shaveDense_ctype(data, shavedata):
+    """ Remove the specified voxels from the annotation """
+
+    dims = [i for i in data.shape]
+    ndlib.shaveDense(data, shavedata, (cp.c_int * len(dims))(*dims))
+    return (data)
+
+
+def exceptionDense_ctype(data, annodata):
+    """ Get a dense voxel region and overwrite all the non-zero values """
+
+    data = np.uint32(data)
+    annodata = np.uint32(annodata)
+    if not annodata.flags['C_CONTIGUOUS']:
+        annodata = np.ascontiguousarray(annodata, np.uint32)
+    dims = [i for i in data.shape]
+    ndlib.exceptionDense(data, annodata, (cp.c_int * len(dims))(*dims))
+    return (data)
+
+
+def overwriteDense_ctype(data, annodata):
+    """ Get a dense voxel region and overwrite all the non-zero values """
+
+    orginal_dtype = data.dtype
+    data = np.uint32(data)
+    annodata = np.uint32(annodata)
+    # data = np.ascontiguousarray(data,dtype=np.uint32)
+    if not annodata.flags['C_CONTIGUOUS']:
+        annodata = np.ascontiguousarray(annodata, dtype=np.uint32)
+    dims = [i for i in data.shape]
+    ndlib.overwriteDense(data, annodata, (cp.c_int * len(dims))(*dims))
+    return (data.astype(orginal_dtype, copy=False))
+
+
+def zoomOutData_ctype(olddata, newdata, factor):
+    """ Add the contribution of the input data to the next level at the given offset in the output cube """
+
+    dims = [i for i in newdata.shape]
+    ndlib.zoomOutData(olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
+    return (newdata)
+
+
+def zoomOutData64_ctype(olddata, newdata, factor):
+    """ Add the contribution of the input data to the next level at the given offset in the output cube """
+
+    dims = [i for i in newdata.shape]
+    ndlib.zoomOutData64(olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
+    return (newdata)
+
+
+def zoomOutData_ctype_OMP(olddata, newdata, factor):
+    """ Add the contribution of the input data to the next level at the given offset in the output cube """
+
+    dims = [i for i in newdata.shape]
+    ndlib.zoomOutDataOMP(olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
+    return (newdata)
+
+
+def zoomInData_ctype(olddata, newdata, factor):
+    """ Add the contribution of the input data to the next level at the given offset in the output cube """
+
+    dims = [i for i in newdata.shape]
+    ndlib.zoomInData(olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
+    return (newdata)
+
+
+def zoomInData_ctype_OMP(olddata, newdata, factor):
+    """ Add the contribution of the input data to the next level at the given offset in the output cube """
+
+    dims = [i for i in newdata.shape]
+    if olddata.dtype == np.uint16:
+        ndlib.zoomInDataOMP16(olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
+    else:
+        ndlib.zoomInDataOMP32(olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
+    return (newdata)
+
+
+def mergeCube_ctype(data, newid, oldid):
+    """ Relabel voxels in cube from oldid to newid """
+
+    dims = [i for i in data.shape]
+    ndlib.mergeCube(data, (cp.c_int * len(dims))(*dims), cp.c_int(newid), cp.c_int(oldid))
+    return (data)
+
+
+def isotropicBuild_ctype(data1, data2):
+    """ Merging Data """
+
+    dims = [i for i in data1.shape]
+    newdata = np.zeros(data1.shape, dtype=data1.dtype)
+    if data1.dtype == np.uint32:
+        ndlib.isotropicBuild32(data1, data2, newdata, (cp.c_int * len(dims))(*dims))
+    elif data1.dtype == np.uint8:
+        ndlib.isotropicBuild8(data1, data2, newdata, (cp.c_int * len(dims))(*dims))
+    elif data1.dtype == np.uint16:
+        ndlib.isotropicBuild16(data1, data2, newdata, (cp.c_int * len(dims))(*dims))
+    elif data1.dtype == np.float32:
+        ndlib.isotropicBuildF32(data1, data2, newdata, (cp.c_int * len(dims))(*dims))
+    else:
+        raise
+    return (newdata)
+
+
+def addDataToIsotropicStack_ctype(cube, output, offset):
+    """Add the contribution of the input data to the next level at the given offset in the output cube"""
+
+    dims = [i for i in cube.data.shape]
+    ndlib.addDataIsotropic(cube.data, output, (cp.c_int * len(offset))(*offset), (cp.c_int * len(dims))(*dims))
+
+
+def addDataToZSliceStack_ctype(cube, output, offset):
+    """Add the contribution of the input data to the next level at the given offset in the output cube"""
+
+    dims = [i for i in cube.data.shape]
+    ndlib.addDataZSlice(cube.data, output, (cp.c_int * len(offset))(*offset), (cp.c_int * len(dims))(*dims))
+
+
+def unique(data):
+    """Return the unqiue elements in the array"""
+
+    data = data.ravel()
+    unique_array = np.zeros(len(data), dtype=data.dtype)
+    unique_length = ndlib.unique(data, unique_array, cp.c_int(len(data)))
+
+    return unique_array[:unique_length]
+
+# def annoidIntersect_ctype_OMP(cutout, annoid_list):
+# """Remove all annotations in a cutout that do not match the filterlist using OpenMP"""
+
+## get a copy of the iterator as a 1-D array
+# cutout = cutout.ravel()
+# annoid_list = np.asarray(annoid_list, dtype=np.uint32)
+
+## Calling the C openmp funtion
+# ndlib.annoidIntersectOMP(cutout, cp.c_int(len(cutout)), np.sort(annoid_list), cp.c_int(len(annoid_list)))
+
+# return cutout.reshape( cutout_shape )

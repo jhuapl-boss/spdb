@@ -68,13 +68,13 @@ class Cube(metaclass=ABCMeta):
         Returns:
             None
         """
-        x_offset = index[0] * input_cube.xdim
-        y_offset = index[1] * input_cube.ydim
-        z_offset = index[2] * input_cube.zdim
+        x_offset = index[0] * input_cube.x_dim
+        y_offset = index[1] * input_cube.y_dim
+        z_offset = index[2] * input_cube.z_dim
 
-        np.copyto(self.data[z_offset:z_offset + input_cube.zdim,
-                  y_offset:y_offset + input_cube.ydim,
-                  x_offset:x_offset + input_cube.xdim], input_cube.data[:, :, :])
+        np.copyto(self.data[z_offset:z_offset + input_cube.z_dim,
+                  y_offset:y_offset + input_cube.y_dim,
+                  x_offset:x_offset + input_cube.x_dim], input_cube.data[:, :, :])
 
     def trim(self, x_offset, x_size, y_offset, y_size, z_offset, z_size):
         """Trim off the excess data
@@ -91,6 +91,8 @@ class Cube(metaclass=ABCMeta):
             None
         """
         self.data = self.data[z_offset:z_offset + z_size, y_offset:y_offset + y_size, x_offset:x_offset + x_size]
+
+        self.z_dim, self.y_dim, self.x_dim = self.cube_size = self.data.shape
 
     def to_blosc_numpy(self):
         """Pack the data in this Cube instance using Blosc using the numpy array specific interface.
@@ -119,7 +121,8 @@ class Cube(metaclass=ABCMeta):
         """
         try:
             self.data = blosc.unpack_array(byte_array[:])
-            self.z_dim, self.y_dim, self.x_dim = self.data.shape
+            self.x_dim, self.y_dim, self.z_dim = self.data.shape
+            self.cube_size = [self.z_dim, self.y_dim, self.x_dim]
         except:
             raise SpdbError("IO Error", "Failed to decompress database cube.  Data integrity concern.",
                             ErrorCode.IO_ERROR)
@@ -136,11 +139,13 @@ class Cube(metaclass=ABCMeta):
             None
 
         """
-        if self.data.dtype != input_data.dtype:
-            raise SpdbError("IO Error", "Conflicting data types for overwrite.",
-                            ErrorCode.IO_ERROR)
-
-        self.data = overwriteDense_ctype(self.data, input_data)
+        return NotImplemented
+        # This only works on annotation data. Specifically 32-bit annos it looks like.
+        #if self.data.dtype != input_data.dtype:
+        #    raise SpdbError("IO Error", "Conflicting data types for overwrite.",
+        #                    ErrorCode.IO_ERROR)
+#
+        #self.data = overwriteDense_ctype(self.data, input_data)
 
     def is_not_zeros(self):
         """Check if the data matrix is all zeros
@@ -259,11 +264,13 @@ class Cube(metaclass=ABCMeta):
 
         # Assume channels here
         elif data_type in DTYPE_uint8:
-            return imagecube.ImageCube8(cube_size)
+            from spdb import ImageCube8
+            return ImageCube8(cube_size)
         elif data_type in DTYPE_uint16:
-            return imagecube.ImageCube16(cube_size)
-        elif data_type in DTYPE_float32:
-            return imagecube.ImageCubeFloat32(cube_size)
+            from spdb import ImageCube16
+            return ImageCube16(cube_size)
+        # elif data_type in DTYPE_float32:
+        #     return imagecube.ImageCubeFloat32(cube_size)
         else:
             return Cube(cube_size)
 
@@ -271,6 +278,5 @@ class Cube(metaclass=ABCMeta):
 # end cube
 
 # These need to be at the bottom because of the factory method
-from spdb import imagecube
 # from spdb import  anncube
 # from spdb import timecube
