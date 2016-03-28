@@ -15,10 +15,10 @@
 # Modified from original source by Johns Hopkins University Applied Physics Laboratory
 # Copyright 2016 Johns Hopkins University Applied Physics Laboratory
 
-from spdb.kvio import KVIO
 import redis
 
-from spdb import SpdbError, ErrorCode
+from .error import SpdbError, ErrorCode
+from .kvio import KVIO
 
 from bossutils import configuration
 

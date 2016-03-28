@@ -1,3 +1,4 @@
-#import lib
-#import project
-#import spdb
+import .project
+import .c_lib
+import .spdb
+

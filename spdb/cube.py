@@ -21,10 +21,10 @@ from PIL import Image
 
 from abc import ABCMeta, abstractmethod
 
-from c_lib.ndlib import overwriteDense_ctype
-from c_lib.ndtype import DTYPE_uint8, DTYPE_uint16, DTYPE_uint32, DTYPE_uint64, DTYPE_float32
+from ..c_lib.ndlib import overwriteDense_ctype
+from ..c_lib.ndtype import DTYPE_uint8, DTYPE_uint16, DTYPE_uint32, DTYPE_uint64
 
-from spdb import SpdbError, ErrorCode
+from .error import SpdbError, ErrorCode
 
 """
 .. module:: Cube
@@ -264,10 +264,10 @@ class Cube(metaclass=ABCMeta):
 
         # Assume channels here
         elif data_type in DTYPE_uint8:
-            from spdb import ImageCube8
+            from .imagecube import ImageCube8
             return ImageCube8(cube_size)
         elif data_type in DTYPE_uint16:
-            from spdb import ImageCube16
+            from .imagecube import ImageCube16
             return ImageCube16(cube_size)
         # elif data_type in DTYPE_float32:
         #     return imagecube.ImageCubeFloat32(cube_size)

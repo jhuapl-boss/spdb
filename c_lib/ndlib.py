@@ -16,7 +16,7 @@ import os
 import ctypes as cp
 import numpy as np
 import numpy.ctypeslib as npct
-import c_lib.rgbColor
+# import c_lib.rgbColor
 
 #
 # Cube Locations using ctypes

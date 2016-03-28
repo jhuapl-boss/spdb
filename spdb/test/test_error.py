@@ -1,5 +1,5 @@
 import unittest
-from spdb import SpdbError
+from spdb.spdb.error import SpdbError
 import bossutils
 import tempfile
 import os

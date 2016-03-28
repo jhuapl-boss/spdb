@@ -1,4 +1,4 @@
-from project import BossResource, Collection, CoordinateFrame, Experiment, Channel, Layer
+from spdb.project import BossResource, Collection, CoordinateFrame, Experiment, Channel, Layer
 
 
 class BossResourceBasic(BossResource):

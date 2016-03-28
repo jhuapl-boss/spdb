@@ -2,8 +2,10 @@ import unittest
 from unittest.mock import patch
 from mockredis import mock_strict_redis_client
 
-from project import BossResourceBasic
-from spdb import RedisKVIO, ImageCube8
+from spdb.project import BossResourceBasic
+from spdb.spdb.rediskvio import RedisKVIO
+from spdb.spdb.imagecube import ImageCube8
+
 import redis
 
 import numpy as np

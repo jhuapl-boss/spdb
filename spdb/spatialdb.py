@@ -20,13 +20,13 @@ from collections import namedtuple
 
 from operator import mod, floordiv
 
-import c_lib
-from c_lib.ndlib import MortonXYZ, XYZMorton
+from ..c_lib.ndlib import MortonXYZ, XYZMorton
 
-from spdb import SpdbError, ErrorCode
-from spdb import KVIO
-from spdb import Cube
-from c_lib.ndtype import CUBOIDSIZE
+from .error import SpdbError, ErrorCode
+from .kvio import KVIO
+from .cube import Cube
+
+from ..c_lib.ndtype import CUBOIDSIZE
 
 """
 .. module:: spatialdb
