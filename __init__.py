@@ -1,4 +1,4 @@
-import .project
-import .c_lib
-import .spdb
+from . import project
+from . import c_lib
+from . import spdb
 
