@@ -1,6 +1,6 @@
 import unittest
 
-from spdb.project import BossResourceBasic
+from project import BossResourceBasic
 
 
 class TestBasicResource(unittest.TestCase):

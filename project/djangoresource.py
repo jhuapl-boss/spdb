@@ -1,4 +1,4 @@
-from spdb.project import BossResource, Collection, CoordinateFrame, Experiment, Channel, Layer
+from .resource import BossResource, Collection, CoordinateFrame, Experiment, Channel, Layer
 
 
 class BossResourceDjango(BossResource):
@@ -62,12 +62,14 @@ class BossResourceDjango(BossResource):
             self._channel = Channel(self.boss_request.channel_layer.name,
                                     self.boss_request.channel_layer.description,
                                     self.boss_request.channel_layer.datatype,
+                                    self.boss_request.channel_layer.base_resolution,
                                     self.boss_request.channel_layer.max_time_step)
         else:
             # You have a layer request
             self._layer = Layer(self.boss_request.channel_layer.name,
                                 self.boss_request.channel_layer.description,
                                 self.boss_request.channel_layer.datatype,
+                                self.boss_request.channel_layer.base_resolution,
                                 self.boss_request.channel_layer.max_time_step,
                                 self.boss_request.channel_layer.layer_map)
 

@@ -21,8 +21,8 @@ from PIL import Image
 
 from abc import ABCMeta, abstractmethod
 
-# from ..c_lib.ndlib import overwriteDense_ctype
-from ..c_lib.ndtype import DTYPE_uint8, DTYPE_uint16, DTYPE_uint32, DTYPE_uint64
+# from c_lib.ndlib import overwriteDense_ctype
+from c_lib.ndtype import DTYPE_uint8, DTYPE_uint16, DTYPE_uint32, DTYPE_uint64
 
 from .error import SpdbError, ErrorCode
 

@@ -1,8 +1,8 @@
 import unittest
 
-from spdb.spdb.imagecube import ImageCube8, ImageCube16
-from spdb.spdb.cube import Cube
-from spdb.project import BossResourceBasic
+from spatialdb import ImageCube8, ImageCube16
+from spatialdb import Cube
+from project import BossResourceBasic
 import numpy as np
 
 
