@@ -4,7 +4,7 @@ from spatialdb.error import SpdbError
 
 class SpdbErrorTests(unittest.TestCase):
 
-    def test_creation(self, mock_resource_filename):
+    def test_creation(self):
         with self.assertRaises(SpdbError):
             raise SpdbError('whoops', 'Something went wrong!', 2000)
 
