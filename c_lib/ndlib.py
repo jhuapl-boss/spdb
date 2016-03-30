@@ -24,7 +24,7 @@ import numpy.ctypeslib as npct
 
 # Load the shared C library using ctype mechanism and the directory path is always local
 BASE_PATH = os.path.dirname(__file__)
-ndlib = npct.load_library("ndlib.so", BASE_PATH + "/c_version")
+ndlib_ctypes = npct.load_library("ndlib.so", BASE_PATH + "/c_version")
 
 # Defining numpy array times for C
 array_1d_uint8 = npct.ndpointer(dtype=np.uint8, ndim=1, flags='C_CONTIGUOUS')
@@ -42,64 +42,64 @@ array_2d_float32 = npct.ndpointer(dtype=np.float32, ndim=2, flags='C_CONTIGUOUS'
 # defining the parameter types of the functions in C
 # FORMAT: <library_name>,<functiona_name>.argtypes = [ ctype.<argtype> , ctype.<argtype> ....]
 
-ndlib.filterCutout.argtypes = [array_1d_uint32, cp.c_int, array_1d_uint32, cp.c_int]
-ndlib.filterCutoutOMP.argtypes = [array_1d_uint32, cp.c_int, array_1d_uint32, cp.c_int]
-ndlib.locateCube.argtypes = [array_2d_uint64, cp.c_int, array_2d_uint32, cp.c_int, cp.POINTER(cp.c_int)]
-ndlib.annotateCube.argtypes = [array_1d_uint32, cp.c_int, cp.POINTER(cp.c_int), cp.c_int, array_1d_uint32,
-                               array_2d_uint32, cp.c_int, cp.c_char, array_2d_uint32]
-ndlib.XYZMorton.argtypes = [array_1d_uint64]
-ndlib.MortonXYZ.argtypes = [npct.ctypes.c_int64, array_1d_uint64]
-ndlib.recolorCubeOMP.argtypes = [array_2d_uint32, cp.c_int, cp.c_int, array_2d_uint32, array_1d_uint32]
-ndlib.quicksort.argtypes = [array_2d_uint64, cp.c_int]
-ndlib.shaveCube.argtypes = [array_1d_uint32, cp.c_int, cp.POINTER(cp.c_int), cp.c_int, array_1d_uint32, array_2d_uint32,
-                            cp.c_int, array_2d_uint32, cp.c_int, array_2d_uint32]
-ndlib.annotateEntityDense.argtypes = [array_3d_uint32, cp.POINTER(cp.c_int), cp.c_int]
-ndlib.shaveDense.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int)]
-ndlib.exceptionDense.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int)]
-ndlib.overwriteDense.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int)]
-ndlib.zoomOutData.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int), cp.c_int]
-ndlib.zoomOutDataOMP.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int), cp.c_int]
-ndlib.zoomInData.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int), cp.c_int]
-ndlib.zoomInDataOMP16.argtypes = [array_3d_uint16, array_3d_uint16, cp.POINTER(cp.c_int), cp.c_int]
-ndlib.zoomInDataOMP32.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int), cp.c_int]
-ndlib.mergeCube.argtypes = [array_3d_uint32, cp.POINTER(cp.c_int), cp.c_int, cp.c_int]
-ndlib.isotropicBuild8.argtypes = [array_2d_uint8, array_2d_uint8, array_2d_uint8, cp.POINTER(cp.c_int)]
-ndlib.isotropicBuild16.argtypes = [array_2d_uint16, array_2d_uint16, array_2d_uint16, cp.POINTER(cp.c_int)]
-ndlib.isotropicBuild32.argtypes = [array_2d_uint32, array_2d_uint32, array_2d_uint32, cp.POINTER(cp.c_int)]
-ndlib.isotropicBuildF32.argtypes = [array_2d_float32, array_2d_float32, array_2d_float32, cp.POINTER(cp.c_int)]
-ndlib.addDataZSlice.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int), cp.POINTER(cp.c_int)]
-ndlib.addDataIsotropic.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int), cp.POINTER(cp.c_int)]
-ndlib.unique.argtypes = [array_1d_uint32, array_1d_uint32, cp.c_int]
+ndlib_ctypes.filterCutout.argtypes = [array_1d_uint32, cp.c_int, array_1d_uint32, cp.c_int]
+ndlib_ctypes.filterCutoutOMP.argtypes = [array_1d_uint32, cp.c_int, array_1d_uint32, cp.c_int]
+ndlib_ctypes.locateCube.argtypes = [array_2d_uint64, cp.c_int, array_2d_uint32, cp.c_int, cp.POINTER(cp.c_int)]
+ndlib_ctypes.annotateCube.argtypes = [array_1d_uint32, cp.c_int, cp.POINTER(cp.c_int), cp.c_int, array_1d_uint32,
+                                      array_2d_uint32, cp.c_int, cp.c_char, array_2d_uint32]
+ndlib_ctypes.XYZMorton.argtypes = [array_1d_uint64]
+ndlib_ctypes.MortonXYZ.argtypes = [npct.ctypes.c_int64, array_1d_uint64]
+ndlib_ctypes.recolorCubeOMP.argtypes = [array_2d_uint32, cp.c_int, cp.c_int, array_2d_uint32, array_1d_uint32]
+ndlib_ctypes.quicksort.argtypes = [array_2d_uint64, cp.c_int]
+ndlib_ctypes.shaveCube.argtypes = [array_1d_uint32, cp.c_int, cp.POINTER(cp.c_int), cp.c_int, array_1d_uint32, array_2d_uint32,
+                                   cp.c_int, array_2d_uint32, cp.c_int, array_2d_uint32]
+ndlib_ctypes.annotateEntityDense.argtypes = [array_3d_uint32, cp.POINTER(cp.c_int), cp.c_int]
+ndlib_ctypes.shaveDense.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int)]
+ndlib_ctypes.exceptionDense.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int)]
+ndlib_ctypes.overwriteDense.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int)]
+ndlib_ctypes.zoomOutData.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int), cp.c_int]
+ndlib_ctypes.zoomOutDataOMP.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int), cp.c_int]
+ndlib_ctypes.zoomInData.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int), cp.c_int]
+ndlib_ctypes.zoomInDataOMP16.argtypes = [array_3d_uint16, array_3d_uint16, cp.POINTER(cp.c_int), cp.c_int]
+ndlib_ctypes.zoomInDataOMP32.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int), cp.c_int]
+ndlib_ctypes.mergeCube.argtypes = [array_3d_uint32, cp.POINTER(cp.c_int), cp.c_int, cp.c_int]
+ndlib_ctypes.isotropicBuild8.argtypes = [array_2d_uint8, array_2d_uint8, array_2d_uint8, cp.POINTER(cp.c_int)]
+ndlib_ctypes.isotropicBuild16.argtypes = [array_2d_uint16, array_2d_uint16, array_2d_uint16, cp.POINTER(cp.c_int)]
+ndlib_ctypes.isotropicBuild32.argtypes = [array_2d_uint32, array_2d_uint32, array_2d_uint32, cp.POINTER(cp.c_int)]
+ndlib_ctypes.isotropicBuildF32.argtypes = [array_2d_float32, array_2d_float32, array_2d_float32, cp.POINTER(cp.c_int)]
+ndlib_ctypes.addDataZSlice.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int), cp.POINTER(cp.c_int)]
+ndlib_ctypes.addDataIsotropic.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int), cp.POINTER(cp.c_int)]
+ndlib_ctypes.unique.argtypes = [array_1d_uint32, array_1d_uint32, cp.c_int]
 
 # setting the return type of the function in C
 # FORMAT: <library_name>.<function_name>.restype = [ ctype.<argtype> ]
 
-ndlib.filterCutout.restype = None
-ndlib.filterCutoutOMP.restype = None
-ndlib.locateCube.restype = None
-ndlib.annotateCube.restype = cp.c_int
-ndlib.XYZMorton.restype = npct.ctypes.c_uint64
-ndlib.MortonXYZ.restype = None
-ndlib.recolorCubeOMP.restype = None
-ndlib.quicksort.restype = None
-ndlib.shaveCube.restype = None
-ndlib.annotateEntityDense.restype = None
-ndlib.shaveDense.restype = None
-ndlib.exceptionDense.restype = None
-ndlib.overwriteDense.restype = None
-ndlib.zoomOutData.restype = None
-ndlib.zoomOutDataOMP.restype = None
-ndlib.zoomInData.restype = None
-ndlib.zoomInDataOMP16.restype = None
-ndlib.zoomInDataOMP32.restype = None
-ndlib.mergeCube.restype = None
-ndlib.isotropicBuild8.restype = None
-ndlib.isotropicBuild16.restype = None
-ndlib.isotropicBuild32.restype = None
-ndlib.isotropicBuildF32.restype = None
-ndlib.addDataZSlice.restype = None
-ndlib.addDataIsotropic.restype = None
-ndlib.unique.restype = cp.c_int
+ndlib_ctypes.filterCutout.restype = None
+ndlib_ctypes.filterCutoutOMP.restype = None
+ndlib_ctypes.locateCube.restype = None
+ndlib_ctypes.annotateCube.restype = cp.c_int
+ndlib_ctypes.XYZMorton.restype = npct.ctypes.c_uint64
+ndlib_ctypes.MortonXYZ.restype = None
+ndlib_ctypes.recolorCubeOMP.restype = None
+ndlib_ctypes.quicksort.restype = None
+ndlib_ctypes.shaveCube.restype = None
+ndlib_ctypes.annotateEntityDense.restype = None
+ndlib_ctypes.shaveDense.restype = None
+ndlib_ctypes.exceptionDense.restype = None
+ndlib_ctypes.overwriteDense.restype = None
+ndlib_ctypes.zoomOutData.restype = None
+ndlib_ctypes.zoomOutDataOMP.restype = None
+ndlib_ctypes.zoomInData.restype = None
+ndlib_ctypes.zoomInDataOMP16.restype = None
+ndlib_ctypes.zoomInDataOMP32.restype = None
+ndlib_ctypes.mergeCube.restype = None
+ndlib_ctypes.isotropicBuild8.restype = None
+ndlib_ctypes.isotropicBuild16.restype = None
+ndlib_ctypes.isotropicBuild32.restype = None
+ndlib_ctypes.isotropicBuildF32.restype = None
+ndlib_ctypes.addDataZSlice.restype = None
+ndlib_ctypes.addDataIsotropic.restype = None
+ndlib_ctypes.unique.restype = cp.c_int
 
 
 def filter_ctype_OMP(cutout, filterlist):
@@ -113,7 +113,7 @@ def filter_ctype_OMP(cutout, filterlist):
     filterlist = np.asarray(filterlist, dtype=np.uint32)
 
     # Calling the C openmp funtion
-    ndlib.filterCutoutOMP(cutout, cp.c_int(len(cutout)), np.sort(filterlist), cp.c_int(len(filterlist)))
+    ndlib_ctypes.filterCutoutOMP(cutout, cp.c_int(len(cutout)), np.sort(filterlist), cp.c_int(len(filterlist)))
 
     return cutout.reshape(cutout_shape)
 
@@ -125,7 +125,7 @@ def filter_ctype(cutout, filterlist):
     flatcutout = cutout.flat.copy()
 
     # Calling the C naive function
-    ndlib.filterCutout(flatcutout, cp.c_int(len(flatcutout)), filterlist, cp.c_int(len(filterlist)))
+    ndlib_ctypes.filterCutout(flatcutout, cp.c_int(len(flatcutout)), filterlist, cp.c_int(len(filterlist)))
 
     return flatcutout.reshape(cutout.shape[0], cutout.shape[1], cutout.shape[2])
 
@@ -141,8 +141,8 @@ def annotate_ctype(data, annid, offset, locations, conflictopt):
     exceptions = np.zeros((len(locations), 3), dtype=np.uint32)
 
     # Calling the C native function
-    exceptionIndex = ndlib.annotateCube(data, cp.c_int(len(data)), (cp.c_int * len(dims))(*dims), cp.c_int(annid),
-                                        offset, locations, cp.c_int(len(locations)), cp.c_char(conflictopt), exceptions)
+    exceptionIndex = ndlib_ctypes.annotateCube(data, cp.c_int(len(data)), (cp.c_int * len(dims))(*dims), cp.c_int(annid),
+                                               offset, locations, cp.c_int(len(locations)), cp.c_char(conflictopt), exceptions)
 
     if exceptionIndex > 0:
         exceptions = exceptions[:(exceptionIndex + 1)]
@@ -159,8 +159,8 @@ def locate_ctype(locations, dims):
     cubeLocs = np.zeros([len(locations), 4], dtype=np.uint64)
 
     # Calling the C native function
-    ndlib.locateCube(cubeLocs, cp.c_int(len(cubeLocs)), locations, cp.c_int(len(locations)),
-                     (cp.c_int * len(dims))(*dims))
+    ndlib_ctypes.locateCube(cubeLocs, cp.c_int(len(cubeLocs)), locations, cp.c_int(len(locations)),
+                            (cp.c_int * len(dims))(*dims))
 
     return cubeLocs
 
@@ -170,7 +170,7 @@ def XYZMorton(xyz):
 
     # Calling the C native function
     xyz = np.uint64(xyz)
-    morton = ndlib.XYZMorton(xyz)
+    morton = ndlib_ctypes.XYZMorton(xyz)
 
     return morton
 
@@ -181,7 +181,7 @@ def MortonXYZ(morton):
     # Calling the C native function
     morton = np.uint64(morton)
     cubeoff = np.zeros((3), dtype=np.uint64)
-    ndlib.MortonXYZ(morton, cubeoff)
+    ndlib_ctypes.MortonXYZ(morton, cubeoff)
 
     cubeoff = np.uint32(cubeoff)
     return [i for i in cubeoff]
@@ -194,8 +194,8 @@ def recolor_ctype(cutout, imagemap):
     if not cutout.flags['C_CONTIGUOUS']:
         cutout = np.ascontiguousarray(cutout, dtype=np.uint32)
     # Calling the c native function
-    ndlib.recolorCubeOMP(cutout, cp.c_int(xdim), cp.c_int(ydim), imagemap,
-                         np.asarray(rgbColor.rgbcolor, dtype=np.uint32))
+    ndlib_ctypes.recolorCubeOMP(cutout, cp.c_int(xdim), cp.c_int(ydim), imagemap,
+                                np.asarray(rgbColor.rgbcolor, dtype=np.uint32))
     return imagemap
 
 
@@ -206,8 +206,8 @@ def recolor64_ctype(cutout, imagemap):
     if not cutout.flags['C_CONTIGUOUS']:
         cutout = np.ascontiguousarray(cutout, dtype=np.uint32)
     # Calling the c native function
-    ndlib.recolor64CubeOMP(cutout, cp.c_int(xdim), cp.c_int(ydim), imagemap,
-                           np.asarray(rgbColor.rgbcolor, dtype=np.uint32))
+    ndlib_ctypes.recolor64CubeOMP(cutout, cp.c_int(xdim), cp.c_int(ydim), imagemap,
+                                  np.asarray(rgbColor.rgbcolor, dtype=np.uint32))
     return imagemap
 
 
@@ -215,7 +215,7 @@ def quicksort(locs):
     """ Sort the cube on Morton Id """
 
     # Calling the C native language
-    ndlib.quicksort(locs, len(locs))
+    ndlib_ctypes.quicksort(locs, len(locs))
     return locs
 
 
@@ -234,8 +234,8 @@ def shave_ctype(data, annid, offset, locations):
     zeroedIndex = -1
 
     # Calling the C native function
-    ndlib.shaveCube(data, cp.c_int(len(data)), (cp.c_int * len(dims))(*dims), cp.c_int(annid), offset, locations,
-                    cp.c_int(len(locations)), exceptions, cp.c_int(exceptionIndex), zeroed, cp.c_int(zeroedIndex))
+    ndlib_ctypes.shaveCube(data, cp.c_int(len(data)), (cp.c_int * len(dims))(*dims), cp.c_int(annid), offset, locations,
+                           cp.c_int(len(locations)), exceptions, cp.c_int(exceptionIndex), zeroed, cp.c_int(zeroedIndex))
 
     if exceptionIndex > 0:
         exceptions = exceptions[:(exceptionIndex + 1)]
@@ -254,7 +254,7 @@ def annotateEntityDense_ctype(data, entityid):
     """ Relabel all non zero pixels to annotation id """
 
     dims = [i for i in data.shape]
-    ndlib.annotateEntityDense(data, (cp.c_int * len(dims))(*dims), cp.c_int(entityid))
+    ndlib_ctypes.annotateEntityDense(data, (cp.c_int * len(dims))(*dims), cp.c_int(entityid))
     return (data)
 
 
@@ -262,7 +262,7 @@ def shaveDense_ctype(data, shavedata):
     """ Remove the specified voxels from the annotation """
 
     dims = [i for i in data.shape]
-    ndlib.shaveDense(data, shavedata, (cp.c_int * len(dims))(*dims))
+    ndlib_ctypes.shaveDense(data, shavedata, (cp.c_int * len(dims))(*dims))
     return (data)
 
 
@@ -274,7 +274,7 @@ def exceptionDense_ctype(data, annodata):
     if not annodata.flags['C_CONTIGUOUS']:
         annodata = np.ascontiguousarray(annodata, np.uint32)
     dims = [i for i in data.shape]
-    ndlib.exceptionDense(data, annodata, (cp.c_int * len(dims))(*dims))
+    ndlib_ctypes.exceptionDense(data, annodata, (cp.c_int * len(dims))(*dims))
     return (data)
 
 
@@ -288,7 +288,7 @@ def overwriteDense_ctype(data, annodata):
     if not annodata.flags['C_CONTIGUOUS']:
         annodata = np.ascontiguousarray(annodata, dtype=np.uint32)
     dims = [i for i in data.shape]
-    ndlib.overwriteDense(data, annodata, (cp.c_int * len(dims))(*dims))
+    ndlib_ctypes.overwriteDense(data, annodata, (cp.c_int * len(dims))(*dims))
     return (data.astype(orginal_dtype, copy=False))
 
 
@@ -296,7 +296,7 @@ def zoomOutData_ctype(olddata, newdata, factor):
     """ Add the contribution of the input data to the next level at the given offset in the output cube """
 
     dims = [i for i in newdata.shape]
-    ndlib.zoomOutData(olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
+    ndlib_ctypes.zoomOutData(olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
     return (newdata)
 
 
@@ -304,7 +304,7 @@ def zoomOutData64_ctype(olddata, newdata, factor):
     """ Add the contribution of the input data to the next level at the given offset in the output cube """
 
     dims = [i for i in newdata.shape]
-    ndlib.zoomOutData64(olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
+    ndlib_ctypes.zoomOutData64(olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
     return (newdata)
 
 
@@ -312,7 +312,7 @@ def zoomOutData_ctype_OMP(olddata, newdata, factor):
     """ Add the contribution of the input data to the next level at the given offset in the output cube """
 
     dims = [i for i in newdata.shape]
-    ndlib.zoomOutDataOMP(olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
+    ndlib_ctypes.zoomOutDataOMP(olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
     return (newdata)
 
 
@@ -320,7 +320,7 @@ def zoomInData_ctype(olddata, newdata, factor):
     """ Add the contribution of the input data to the next level at the given offset in the output cube """
 
     dims = [i for i in newdata.shape]
-    ndlib.zoomInData(olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
+    ndlib_ctypes.zoomInData(olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
     return (newdata)
 
 
@@ -329,9 +329,9 @@ def zoomInData_ctype_OMP(olddata, newdata, factor):
 
     dims = [i for i in newdata.shape]
     if olddata.dtype == np.uint16:
-        ndlib.zoomInDataOMP16(olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
+        ndlib_ctypes.zoomInDataOMP16(olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
     else:
-        ndlib.zoomInDataOMP32(olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
+        ndlib_ctypes.zoomInDataOMP32(olddata, newdata, (cp.c_int * len(dims))(*dims), cp.c_int(factor))
     return (newdata)
 
 
@@ -339,7 +339,7 @@ def mergeCube_ctype(data, newid, oldid):
     """ Relabel voxels in cube from oldid to newid """
 
     dims = [i for i in data.shape]
-    ndlib.mergeCube(data, (cp.c_int * len(dims))(*dims), cp.c_int(newid), cp.c_int(oldid))
+    ndlib_ctypes.mergeCube(data, (cp.c_int * len(dims))(*dims), cp.c_int(newid), cp.c_int(oldid))
     return (data)
 
 
@@ -349,13 +349,13 @@ def isotropicBuild_ctype(data1, data2):
     dims = [i for i in data1.shape]
     newdata = np.zeros(data1.shape, dtype=data1.dtype)
     if data1.dtype == np.uint32:
-        ndlib.isotropicBuild32(data1, data2, newdata, (cp.c_int * len(dims))(*dims))
+        ndlib_ctypes.isotropicBuild32(data1, data2, newdata, (cp.c_int * len(dims))(*dims))
     elif data1.dtype == np.uint8:
-        ndlib.isotropicBuild8(data1, data2, newdata, (cp.c_int * len(dims))(*dims))
+        ndlib_ctypes.isotropicBuild8(data1, data2, newdata, (cp.c_int * len(dims))(*dims))
     elif data1.dtype == np.uint16:
-        ndlib.isotropicBuild16(data1, data2, newdata, (cp.c_int * len(dims))(*dims))
+        ndlib_ctypes.isotropicBuild16(data1, data2, newdata, (cp.c_int * len(dims))(*dims))
     elif data1.dtype == np.float32:
-        ndlib.isotropicBuildF32(data1, data2, newdata, (cp.c_int * len(dims))(*dims))
+        ndlib_ctypes.isotropicBuildF32(data1, data2, newdata, (cp.c_int * len(dims))(*dims))
     else:
         raise
     return (newdata)
@@ -365,14 +365,14 @@ def addDataToIsotropicStack_ctype(cube, output, offset):
     """Add the contribution of the input data to the next level at the given offset in the output cube"""
 
     dims = [i for i in cube.data.shape]
-    ndlib.addDataIsotropic(cube.data, output, (cp.c_int * len(offset))(*offset), (cp.c_int * len(dims))(*dims))
+    ndlib_ctypes.addDataIsotropic(cube.data, output, (cp.c_int * len(offset))(*offset), (cp.c_int * len(dims))(*dims))
 
 
 def addDataToZSliceStack_ctype(cube, output, offset):
     """Add the contribution of the input data to the next level at the given offset in the output cube"""
 
     dims = [i for i in cube.data.shape]
-    ndlib.addDataZSlice(cube.data, output, (cp.c_int * len(offset))(*offset), (cp.c_int * len(dims))(*dims))
+    ndlib_ctypes.addDataZSlice(cube.data, output, (cp.c_int * len(offset))(*offset), (cp.c_int * len(dims))(*dims))
 
 
 def unique(data):
@@ -380,7 +380,7 @@ def unique(data):
 
     data = data.ravel()
     unique_array = np.zeros(len(data), dtype=data.dtype)
-    unique_length = ndlib.unique(data, unique_array, cp.c_int(len(data)))
+    unique_length = ndlib_ctypes.unique(data, unique_array, cp.c_int(len(data)))
 
     return unique_array[:unique_length]
 
@@ -392,6 +392,6 @@ def unique(data):
 # annoid_list = np.asarray(annoid_list, dtype=np.uint32)
 
 ## Calling the C openmp funtion
-# ndlib.annoidIntersectOMP(cutout, cp.c_int(len(cutout)), np.sort(annoid_list), cp.c_int(len(annoid_list)))
+# ndlib_ctypes.annoidIntersectOMP(cutout, cp.c_int(len(cutout)), np.sort(annoid_list), cp.c_int(len(annoid_list)))
 
 # return cutout.reshape( cutout_shape )

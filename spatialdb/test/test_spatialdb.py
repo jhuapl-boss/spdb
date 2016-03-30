@@ -2,9 +2,8 @@ import unittest
 from unittest.mock import patch
 from mockredis import mock_strict_redis_client
 
-from project import BossResourceBasic
-from spatialdb import spatialdb
-from spatialdb import Cube
+from spdb.project import BossResourceBasic
+from spdb.spatialdb import Cube, SpatialDB
 
 import numpy as np
 
@@ -81,7 +80,7 @@ class TestSpatialDBImageDataOneTimeSample(unittest.TestCase):
         cube1.data = np.random.randint(0, 254, (16, 128, 128))
         cube2.data = np.random.randint(0, 254, (16, 128, 128))
 
-        spdb = spatialdb.SpatialDB()
+        spdb = SpatialDB()
 
         spdb.put_cubes(self.resource, 0, [12, 13], [cube1, cube2])
 
@@ -100,7 +99,7 @@ class TestSpatialDBImageDataOneTimeSample(unittest.TestCase):
         cube2.data = np.random.randint(0, 254, (16, 128, 128))
         morton_ids = [12, 13]
 
-        spdb = spatialdb.SpatialDB()
+        spdb = SpatialDB()
 
         spdb.put_cubes(self.resource, 0, [12, 13], [cube1, cube2])
 
@@ -118,7 +117,7 @@ class TestSpatialDBImageDataOneTimeSample(unittest.TestCase):
             data = np.random.randint(0, 254, (16, 128, 128))
             data = data.astype(np.uint8)
 
-            spdb = spatialdb.SpatialDB()
+            spdb = SpatialDB()
 
             # Make sure no data is in the database
             assert len(spdb.kvio.cache_client.redis) == 0
@@ -132,7 +131,7 @@ class TestSpatialDBImageDataOneTimeSample(unittest.TestCase):
         data = np.random.randint(0, 254, (16, 256, 128))
         data = data.astype(np.uint8)
 
-        spdb = spatialdb.SpatialDB()
+        spdb = SpatialDB()
 
         # Make sure no data is in the database
         assert len(spdb.kvio.cache_client.redis) == 0
@@ -146,7 +145,7 @@ class TestSpatialDBImageDataOneTimeSample(unittest.TestCase):
         data = np.random.randint(0, 254, (30, 500, 300))
         data = data.astype(np.uint8)
 
-        spdb = spatialdb.SpatialDB()
+        spdb = SpatialDB()
 
         # Write an arbitrary chunk into the cache
         spdb.write_cuboid(self.resource, (0, 0, 0), 0, data)

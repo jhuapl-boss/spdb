@@ -1,11 +1,8 @@
 import unittest
 
-from spatialdb import ImageCube8, ImageCube16
-from spatialdb import Cube
-from project import BossResourceBasic
+from spdb.spatialdb import ImageCube8, ImageCube16, Cube, SpdbError
+from spdb.project import BossResourceBasic
 import numpy as np
-
-from spatialdb.error import SpdbError
 
 
 class TestImageCube8(unittest.TestCase):

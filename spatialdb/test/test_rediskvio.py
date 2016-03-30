@@ -2,9 +2,8 @@ import unittest
 from unittest.mock import patch
 from mockredis import mock_strict_redis_client
 
-from project import BossResourceBasic
-from spatialdb.rediskvio import RedisKVIO
-from spatialdb.imagecube import ImageCube8
+from spdb.project import BossResourceBasic
+from spdb.spatialdb import RedisKVIO
 
 import redis
 

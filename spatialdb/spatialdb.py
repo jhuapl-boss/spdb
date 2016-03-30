@@ -20,13 +20,12 @@ from collections import namedtuple
 
 from operator import mod, floordiv
 
-from c_lib.ndlib import MortonXYZ, XYZMorton
+from spdb.c_lib import ndlib
+from spdb.c_lib.ndtype import CUBOIDSIZE
 
 from .error import SpdbError, ErrorCode
 from .kvio import KVIO
 from .cube import Cube
-
-from c_lib.ndtype import CUBOIDSIZE
 
 """
 .. module:: spatialdb
@@ -356,14 +355,15 @@ class SpatialDB:
         for z in range(z_num_cubes):
             for y in range(y_num_cubes):
                 for x in range(x_num_cubes):
-                    morton_idx = XYZMorton([x + x_start, y + y_start, z + z_start])
+                    morton_idx = ndlib.XYZMorton(np.asarray([x + x_start, y + y_start, z + z_start],
+                                                                   dtype=np.uint64))
                     list_of_idxs.append(morton_idx)
 
         # Sort the indexes in Morton order
         list_of_idxs.sort()
 
         # xyz offset stored for later use
-        lowxyz = MortonXYZ(list_of_idxs[0])
+        lowxyz = ndlib.MortonXYZ(list_of_idxs[0])
 
         #TODO: We may not need time-series optimized cutouts. Consider removing.
         # checking for timeseries data and doing an optimized cutout here in timeseries column
@@ -375,7 +375,7 @@ class SpatialDB:
                 for idx, timestamp, data_string in cuboids:
 
                     # add the query result cube to the bigger cube
-                    curxyz = MortonXYZ(int(idx))
+                    curxyz = ndlib.MortonXYZ(int(idx))
                     offset = [curxyz[0] - lowxyz[0], curxyz[1] - lowxyz[1], curxyz[2] - lowxyz[2]]
 
                     in_cube.from_blosc_numpy(data_string[:])
@@ -390,7 +390,7 @@ class SpatialDB:
             for idx, data_string in cuboids:
 
                 # add the query result cube to the bigger cube
-                curxyz = MortonXYZ(int(idx))
+                curxyz = ndlib.MortonXYZ(int(idx))
                 offset = [curxyz[0] - lowxyz[0], curxyz[1] - lowxyz[1], curxyz[2] - lowxyz[2]]
 
                 in_cube.from_blosc_numpy(data_string[:])
@@ -501,7 +501,7 @@ class SpatialDB:
         for z in range(z_num_cubes):
             for y in range(y_num_cubes):
                 for x in range(x_num_cubes):
-                    list_of_idxs.append(XYZMorton([x + x_start, y + y_start, z + z_start]))
+                    list_of_idxs.append(ndlib.XYZMorton([x + x_start, y + y_start, z + z_start]))
                     incube.data = data_buffer[z * z_cube_dim:(z + 1) * z_cube_dim,
                                               y * y_cube_dim:(y + 1) * y_cube_dim,
                                               x * x_cube_dim:(x + 1) * x_cube_dim]
@@ -567,7 +567,8 @@ class SpatialDB:
             for z in range(z_num_cubes):
                 for y in range(y_num_cubes):
                     for x in range(x_num_cubes):
-                        morton_idx = XYZMorton([x + x_start, y + y_start, z + z_start])
+                        morton_idx = ndlib.XYZMorton(np.asarray([x + x_start, y + y_start, z + z_start],
+                                                                       dtype=np.uint64))
                         cube = self.get_cube(resource, resolution, morton_idx, update=True)
 
                         # overwrite the cube
@@ -582,7 +583,8 @@ class SpatialDB:
                 for y in range(y_num_cubes):
                     for x in range(x_num_cubes):
                         for time_sample in resource.get_time_samples():
-                            morton_idx = XYZMorton([x + x_start, y + y_start, z + z_start])
+                            morton_idx = ndlib.XYZMorton(np.asarray([x + x_start, y + y_start, z + z_start],
+                                                                           dtype=np.uint64))
 
                             cube = self.get_cube(resource, morton_idx, resolution, update=True)
 

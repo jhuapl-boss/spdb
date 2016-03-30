@@ -1,5 +1,5 @@
 import unittest
-from spatialdb.error import SpdbError
+from spdb.spatialdb import SpdbError
 
 
 class SpdbErrorTests(unittest.TestCase):

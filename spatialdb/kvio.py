@@ -88,7 +88,7 @@ class KVIO(metaclass=ABCMeta):
     @staticmethod
     def get_kv_engine(engine):
         if engine == "redis":
-            from spatialdb.rediskvio import RedisKVIO
+            from spdb.spatialdb import RedisKVIO
             return RedisKVIO()
         else:
             raise SpdbError("KVIO Error", "Failed to create key-value engine.",

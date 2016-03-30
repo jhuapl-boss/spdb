@@ -21,8 +21,8 @@ from PIL import Image
 
 from abc import ABCMeta, abstractmethod
 
-from c_lib.ndlib import overwriteDense_ctype
-from c_lib.ndtype import DTYPE_uint8, DTYPE_uint16, DTYPE_uint32, DTYPE_uint64
+import spdb.c_lib.ndtype as ndtype
+from spdb.c_lib import ndlib
 
 from .error import SpdbError, ErrorCode
 
@@ -149,7 +149,7 @@ class Cube(metaclass=ABCMeta):
                             ErrorCode.IO_ERROR)
 
         if self.data.dtype == np.uint32 or self.data.dtype == np.uint64:
-            self.data = overwriteDense_ctype(self.data, input_data)
+            self.data = ndlib.overwriteDense_ctype(self.data, input_data)
         else:
             self.data = input_data
 
@@ -250,11 +250,11 @@ class Cube(metaclass=ABCMeta):
         data_type = resource.get_data_type()
 
         # 32-Bit layer is an Annotation Cube
-        if not resource.is_channel() and data_type in DTYPE_uint32:
+        if not resource.is_channel() and data_type in ndtype.DTYPE_uint32:
             # return anncube.AnnotateCube32(cube_size)
             raise SpdbError("Proposed Capability", "Data type not yet supported",
                             ErrorCode.FUTURE)
-        elif not resource.is_channel() and data_type in DTYPE_uint64:
+        elif not resource.is_channel() and data_type in ndtype.DTYPE_uint64:
             # return anncube.AnnotateCube64(cube_size)
             raise SpdbError("Proposed Capability", "Data type not yet supported",
                             ErrorCode.FUTURE)
@@ -269,10 +269,10 @@ class Cube(metaclass=ABCMeta):
         #        return timecube.TimeCubeFloat32(cube_size, timerange)
 
         # Assume channels here
-        elif data_type in DTYPE_uint8:
+        elif data_type in ndtype.DTYPE_uint8:
             from .imagecube import ImageCube8
             return ImageCube8(cube_size)
-        elif data_type in DTYPE_uint16:
+        elif data_type in ndtype.DTYPE_uint16:
             from .imagecube import ImageCube16
             return ImageCube16(cube_size)
         # elif data_type in DTYPE_float32:
