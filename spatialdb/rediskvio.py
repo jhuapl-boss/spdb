@@ -159,31 +159,29 @@ class RedisKVIO(KVIO):
             raise SpdbError("Redis Error", "Error inserting cube indexes into the database. {}".format(e),
                             ErrorCode.REDIS_ERROR)
 
-    # TODO: Add if needed.  DMK pretty sure this was from OCPBlaze and not needed at the moment
-    #def get_cube(self, resource, resolution, morton_idx, update=False):
-    #    """Retrieve a single cuboid from the cache database
-#
-    #    Args:
-    #        resource (spdb.project.BossResource): Data model info based on the request or target resource
-    #        resolution (int): the resolution level
-    #        morton_idx (int): the Morton ID of the cuboid to get
-    #        update:
-#
-    #    Returns:
-#
-    #    """
-    #    # TODO: Add tracking of access time for LRU eviction
-#
-    #    try:
-    #        rows = self.status_client.mget(self.generate_cache_index_keys(resource, resolution, [morton_idx]))
-    #    except Exception as e:
-    #        raise SpdbError("Redis Error", "Error retrieving cubes from the cache database. {}".format(e),
-    #                        ErrorCode.REDIS_ERROR)
-#
-    #    if rows[0]:
-    #        return rows[0]
-    #    else:
-    #        return None
+    def get_cube(self, resource, resolution, morton_idx):
+        """Retrieve a single cuboid from the cache database
+
+        Args:
+            resource (spdb.project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            morton_idx (int): the Morton ID of the cuboid to get
+
+        Returns:
+
+        """
+        # TODO: Add tracking of access time for LRU eviction
+
+        try:
+            rows = self.cache_client.mget(self.generate_cuboid_keys(resource, resolution, [morton_idx]))
+        except Exception as e:
+            raise SpdbError("Redis Error", "Error retrieving cubes from the cache database. {}".format(e),
+                            ErrorCode.REDIS_ERROR)
+
+        if rows[0]:
+            return rows[0]
+        else:
+            return None
 
     def get_cubes(self, resource, resolution, morton_idx_list):
         """Retrieve multiple cubes from the cache database, yield one at a time via generator
@@ -198,7 +196,7 @@ class RedisKVIO(KVIO):
         """
 
         try:
-            rows = self.status_client.mget(self.generate_cuboid_keys(resource, resolution, morton_idx_list))
+            rows = self.cache_client.mget(self.generate_cuboid_keys(resource, resolution, morton_idx_list))
         except Exception as e:
             raise SpdbError("Redis Error", "Error retrieving cubes from the cache database. {}".format(e),
                             ErrorCode.REDIS_ERROR)
@@ -267,7 +265,7 @@ class RedisKVIO(KVIO):
         key_list = self.generate_cuboid_keys(resource, resolution, morton_idx_list)
 
         try:
-            self.status_client.mset(dict(list(zip(key_list, cube_list))))
+            self.cache_client.mset(dict(list(zip(key_list, cube_list))))
         except Exception as e:
             raise SpdbError("Redis Error", "Error inserting cubes into the cache database. {}".format(e),
                             ErrorCode.REDIS_ERROR)

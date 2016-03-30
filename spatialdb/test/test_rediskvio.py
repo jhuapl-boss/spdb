@@ -222,6 +222,27 @@ class TestRedisKVIOImageDataOneTimeSample(unittest.TestCase):
         keys = redis_client.keys("{}*".format(base_key))
         assert len(keys) == 3
 
+    def test_get_cube_single(self):
+        """Test adding cubes to the cache"""
+        redis_client = redis.StrictRedis(host=self.config["aws"]["cache-state"], port=6379, db=0,
+                                         decode_responses=True)
+        rkv = RedisKVIO(redis_client, redis_client)
+        resolution = 1
+        data = "A test string since just checking for key retrieval"
+
+        # Make sure there are no cuboids in the cache
+        base_key = rkv.get_cache_base_key(self.resource, resolution)
+        keys = redis_client.keys("{}*".format(base_key))
+        assert not keys
+
+        # Add items
+        morton_id = 53342
+        rkv.put_cubes(self.resource, resolution, [morton_id], [data])
+
+        # Get cube
+        cube = rkv.get_cube(self.resource, resolution, morton_id)
+        assert "A test string since just checking for key retrieval" == cube.decode()
+
     def test_get_cubes_single(self):
         """Test adding cubes to the cache"""
         redis_client = redis.StrictRedis(host=self.config["aws"]["cache-state"], port=6379, db=0,

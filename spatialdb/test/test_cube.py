@@ -114,7 +114,7 @@ class TestImageCube8(unittest.TestCase):
 
         c = ImageCube8([10, 20, 5])
         c2 = ImageCube8([10, 20, 5])
-        data = np.random.randint(50, size=[10, 20, 5])
+        data = np.random.randint(50, size=[5, 20, 10])
         c.data = data
 
         byte_array = c.to_blosc_numpy()
@@ -280,7 +280,7 @@ class TestImageCube16(unittest.TestCase):
 
         c = ImageCube16([10, 20, 5])
         c2 = ImageCube16([10, 20, 5])
-        data = np.random.randint(50, size=[10, 20, 5])
+        data = np.random.randint(50, size=[5, 20, 10])
         c.data = data
 
         byte_array = c.to_blosc_numpy()

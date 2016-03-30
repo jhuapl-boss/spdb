@@ -112,6 +112,8 @@ class Cube(metaclass=ABCMeta):
     def from_blosc_numpy(self, byte_array):
         """Uncompress and populate Cube data from a Blosc serialized and compressed byte array using the numpy interface
 
+        Assume stored zyx ordering.
+
         Args:
             byte_array:  Compressed, serialized byte array of Cube matrix data
 
@@ -121,7 +123,7 @@ class Cube(metaclass=ABCMeta):
         """
         try:
             self.data = blosc.unpack_array(byte_array[:])
-            self.x_dim, self.y_dim, self.z_dim = self.data.shape
+            self.z_dim, self.y_dim, self.x_dim = self.data.shape
             self.cube_size = [self.z_dim, self.y_dim, self.x_dim]
         except:
             raise SpdbError("IO Error", "Failed to decompress database cube.  Data integrity concern.",

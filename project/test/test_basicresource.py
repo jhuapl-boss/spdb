@@ -39,13 +39,13 @@ class TestBasicResource(unittest.TestCase):
         data['experiment']['description'] = "Test experiment 1"
         data['experiment']['num_hierarchy_levels'] = 7
         data['experiment']['hierarchy_method'] = 'slice'
+        data['experiment']['max_time_sample'] = 0
 
         data['channel_layer'] = {}
         data['channel_layer']['name'] = "ch1"
         data['channel_layer']['description'] = "Test channel 1"
         data['channel_layer']['is_channel'] = True
         data['channel_layer']['datatype'] = 'uint8'
-        data['channel_layer']['max_time_step'] = 0
 
         return data
 
@@ -107,6 +107,7 @@ class TestBasicResource(unittest.TestCase):
         assert exp.description == setup_data['experiment']['description']
         assert exp.num_hierarchy_levels == setup_data['experiment']['num_hierarchy_levels']
         assert exp.hierarchy_method == setup_data['experiment']['hierarchy_method']
+        assert exp.max_time_sample == setup_data['experiment']['max_time_sample']
 
     def test_basic_resource_channel_no_time(self):
         """Test basic get channel interface
@@ -126,7 +127,6 @@ class TestBasicResource(unittest.TestCase):
         assert channel.name == setup_data['channel_layer']['name']
         assert channel.description == setup_data['channel_layer']['description']
         assert channel.datatype == setup_data['channel_layer']['datatype']
-        assert channel.max_time_step == setup_data['channel_layer']['max_time_step']
 
     def test_basic_resource_layer_no_time(self):
         """Test basic get layer interface
@@ -140,6 +140,7 @@ class TestBasicResource(unittest.TestCase):
         setup_data['channel_layer']['description'] = "Test layer 1"
         setup_data['channel_layer']['is_channel'] = False
         setup_data['channel_layer']['layer_map'] = ['ch1']
+        setup_data['channel_layer']['base_resolution'] = 2
         resource = BossResourceBasic(setup_data)
 
         assert resource.is_channel() == False
@@ -150,8 +151,8 @@ class TestBasicResource(unittest.TestCase):
         assert channel.name == setup_data['channel_layer']['name']
         assert channel.description == setup_data['channel_layer']['description']
         assert channel.datatype == setup_data['channel_layer']['datatype']
-        assert channel.max_time_step == setup_data['channel_layer']['max_time_step']
         assert channel.parent_channels == setup_data['channel_layer']['layer_map']
+        assert channel.base_resolution == setup_data['channel_layer']['base_resolution']
 
     def test_basic_resource_time_samples(self):
         """Test basic get and set time samples interface

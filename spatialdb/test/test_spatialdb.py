@@ -1,0 +1,157 @@
+import unittest
+from unittest.mock import patch
+from mockredis import mock_strict_redis_client
+
+from project import BossResourceBasic
+from spatialdb import spatialdb
+from spatialdb import Cube
+
+import numpy as np
+
+
+class MockBossConfig:
+    """Basic mock for BossConfig to contain the properties needed for this test"""
+    def __init__(self):
+        self.config = {}
+        self.config["aws"] = {}
+        self.config["aws"]["cache"] = {"https://some.url.com"}
+        self.config["aws"]["cache-state"] = {"https://some.url2.com"}
+
+    def read(self, filename):
+        pass
+
+    def __getitem__(self, key):
+        return self.config[key]
+
+
+@patch('redis.StrictRedis', mock_strict_redis_client)
+@patch('configparser.ConfigParser', MockBossConfig)
+class TestSpatialDBImageDataOneTimeSample(unittest.TestCase):
+
+    def setUp(self):
+        """ Create a diction of configuration values for the test resource. """
+
+        self.data = {}
+        self.data['collection'] = {}
+        self.data['collection']['name'] = "col1"
+        self.data['collection']['description'] = "Test collection 1"
+
+        self.data['coord_frame'] = {}
+        self.data['coord_frame']['name'] = "coord_frame_1"
+        self.data['coord_frame']['description'] = "Test coordinate frame"
+        self.data['coord_frame']['x_start'] = 0
+        self.data['coord_frame']['x_stop'] = 2000
+        self.data['coord_frame']['y_start'] = 0
+        self.data['coord_frame']['y_stop'] = 5000
+        self.data['coord_frame']['z_start'] = 0
+        self.data['coord_frame']['z_stop'] = 200
+        self.data['coord_frame']['x_voxel_size'] = 4
+        self.data['coord_frame']['y_voxel_size'] = 4
+        self.data['coord_frame']['z_voxel_size'] = 35
+        self.data['coord_frame']['voxel_unit'] = "nanometers"
+        self.data['coord_frame']['time_step'] = 0
+        self.data['coord_frame']['time_step_unit'] = "na"
+
+        self.data['experiment'] = {}
+        self.data['experiment']['name'] = "exp1"
+        self.data['experiment']['description'] = "Test experiment 1"
+        self.data['experiment']['num_hierarchy_levels'] = 7
+        self.data['experiment']['hierarchy_method'] = 'slice'
+        self.data['experiment']['base_resolution'] = 0
+
+        self.data['channel_layer'] = {}
+        self.data['channel_layer']['name'] = "ch1"
+        self.data['channel_layer']['description'] = "Test channel 1"
+        self.data['channel_layer']['is_channel'] = True
+        self.data['channel_layer']['datatype'] = 'uint8'
+        self.data['channel_layer']['max_time_sample'] = 0
+
+        self.data['boss_key'] = 'col1&exp1&ch1'
+        self.data['lookup_key'] = '4&2&1'
+
+        self.resource = BossResourceBasic(self.data)
+
+        self.redis_client = None
+
+    def test_put_cubes_get_cube(self):
+        """Test the put_cubes and get_cube methods"""
+        # Generate random data
+        cube1 = Cube.create_cube(self.resource, [128, 128, 16])
+        cube2 = Cube.create_cube(self.resource, [128, 128, 16])
+        cube1.data = np.random.randint(0, 254, (16, 128, 128))
+        cube2.data = np.random.randint(0, 254, (16, 128, 128))
+
+        spdb = spatialdb.SpatialDB()
+
+        spdb.put_cubes(self.resource, 0, [12, 13], [cube1, cube2])
+
+        cubes1_test = spdb.get_cube(self.resource, 0, 12)
+        cubes2_test = spdb.get_cube(self.resource, 0, 13)
+
+        np.testing.assert_array_equal(cube1.data, cubes1_test.data)
+        np.testing.assert_array_equal(cube2.data, cubes2_test.data)
+
+    def test_put_cubes_get_cubes(self):
+        """Test the put_cubes and get_cube methods"""
+        # Generate random data
+        cube1 = Cube.create_cube(self.resource, [128, 128, 16])
+        cube2 = Cube.create_cube(self.resource, [128, 128, 16])
+        cube1.data = np.random.randint(0, 254, (16, 128, 128))
+        cube2.data = np.random.randint(0, 254, (16, 128, 128))
+        morton_ids = [12, 13]
+
+        spdb = spatialdb.SpatialDB()
+
+        spdb.put_cubes(self.resource, 0, [12, 13], [cube1, cube2])
+
+        cubes = spdb.get_cubes(self.resource, 0, [12, 13])
+
+        for c, t, m in zip(cubes, [cube1, cube2], morton_ids):
+            assert c[0] == m
+            loaded_cube = Cube.create_cube(self.resource, [16, 128, 128])
+            loaded_cube.from_blosc_numpy(c[1])
+            np.testing.assert_array_equal(t.data, loaded_cube.data)
+
+    def test_write_cuboid_aligned(self):
+            """Test the write_cuboid method"""
+            # At this point data should be in zyx
+            data = np.random.randint(0, 254, (16, 128, 128))
+
+            spdb = spatialdb.SpatialDB()
+
+            # Make sure no data is in the database
+            assert len(spdb.kvio.cache_client.redis) == 0
+            spdb.write_cuboid(self.resource, (0, 0, 0), 0, data)
+
+            # make sure data was written
+            assert len(spdb.kvio.cache_client.redis) == 1
+
+    def test_write_cuboid(self):
+        """Test the write_cuboid method"""
+        data = np.random.randint(0, 254, (240, 367, 128))
+
+        spdb = spatialdb.SpatialDB()
+
+        # Make sure no data is in the database
+        assert len(spdb.kvio.cache_client.redis) == 0
+        spdb.write_cuboid(self.resource, (20, 30, 34), 0, data)
+
+        # make sure data was written
+        assert len(spdb.kvio.cache_client.redis) == 128
+
+
+    def test_cutout(self):
+        """Test the cutout method"""
+        data = np.random.randint(0, 254, (240, 367, 128))
+
+        spdb = spatialdb.SpatialDB()
+
+        # Write an arbitrary chunk into the cache
+        spdb.write_cuboid(self.resource, (20, 30, 34), 0, data)
+
+        # Get it back out
+        cutout = spdb.cutout(self.resource, (20, 30, 34), (240, 367, 128), 0)
+
+
+    # TODO: Add up_sample and down_sample methods once annotation interfaces are integrated.
+

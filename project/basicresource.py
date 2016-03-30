@@ -52,7 +52,9 @@ class BossResourceBasic(BossResource):
         self._experiment = Experiment(self.data['experiment']['name'],
                                       self.data['experiment']['description'],
                                       self.data['experiment']['num_hierarchy_levels'],
-                                      self.data['experiment']['hierarchy_method'])
+                                      self.data['experiment']['hierarchy_method'],
+                                      self.data['experiment']['max_time_sample'],
+                                      )
 
     def populate_channel_or_layer(self):
         """
@@ -62,14 +64,13 @@ class BossResourceBasic(BossResource):
             # You have a channel request
             self._channel = Channel(self.data['channel_layer']['name'],
                                     self.data['channel_layer']['description'],
-                                    self.data['channel_layer']['datatype'],
-                                    self.data['channel_layer']['max_time_step'])
+                                    self.data['channel_layer']['datatype'])
         else:
             # You have a layer request
             self._layer = Layer(self.data['channel_layer']['name'],
                                 self.data['channel_layer']['description'],
                                 self.data['channel_layer']['datatype'],
-                                self.data['channel_layer']['max_time_step'],
+                                self.data['channel_layer']['base_resolution'],
                                 self.data['channel_layer']['layer_map'])
 
     def populate_time_samples(self):

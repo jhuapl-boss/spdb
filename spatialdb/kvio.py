@@ -16,6 +16,7 @@
 # Copyright 2016 Johns Hopkins University Applied Physics Laboratory
 
 from abc import ABCMeta, abstractmethod
+from .error import SpdbError, ErrorCode
 
 
 class KVIO(metaclass=ABCMeta):
@@ -90,4 +91,6 @@ class KVIO(metaclass=ABCMeta):
             from spatialdb.rediskvio import RedisKVIO
             return RedisKVIO()
         else:
-            return KVIO()
+            raise SpdbError("KVIO Error", "Failed to create key-value engine.",
+                            ErrorCode.REDIS_ERROR)
+

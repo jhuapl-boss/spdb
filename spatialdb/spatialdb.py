@@ -20,13 +20,13 @@ from collections import namedtuple
 
 from operator import mod, floordiv
 
-from ..c_lib.ndlib import MortonXYZ, XYZMorton
+from c_lib.ndlib import MortonXYZ, XYZMorton
 
 from .error import SpdbError, ErrorCode
 from .kvio import KVIO
 from .cube import Cube
 
-from ..c_lib.ndtype import CUBOIDSIZE
+from c_lib.ndtype import CUBOIDSIZE
 
 """
 .. module:: spatialdb
@@ -35,8 +35,9 @@ from ..c_lib.ndtype import CUBOIDSIZE
 .. moduleauthor:: Kunal Lillaney <lillaney@jhu.edu> and Dean Kleissas <dean.kleissas@jhuapl.edu>
 """
 
-from bossutils.logger import BossLogger
-logger = BossLogger()
+# Todo: fix logger so you can mock it. Then reinsert into class
+#from bossutils.logger import BossLogger
+#logger = BossLogger()
 
 
 class SpatialDB:
@@ -52,16 +53,14 @@ class SpatialDB:
       kvio (KVIO): A key-value store engine instance
     """
 
-    def __init__(self, resource):
-        # Set the Boss Resource instance
-        self.resource = resource
+    def __init__(self):
 
-        # TODO: DMK Add S3 instance or move elsewhere
+        # TODO: DMK Add S3 interface or move elsewhere
         # Set the S3 backend for the data
         # self.s3io = s3io.S3IO(self)
         self.s3io = None
 
-        self.kvio = KVIO.get_kv_engine(self)
+        self.kvio = KVIO.get_kv_engine('redis')
 
         # TODO: DMK Add annotation support
         # self.annoIdx = annindex.AnnotateIndex(self.kvio, self.proj)
@@ -77,9 +76,9 @@ class SpatialDB:
         self.kvio.close()
 
     # GET Method
-    def get_cube(self, resource, morton_idx, resolution, update=False):
+    def get_cube(self, resource, resolution, morton_idx, update=False):
         """
-        Load a single cuboid from the cache key-value store
+        Load a single cuboid from the cache key-value store - primarily used by Blaze interface
 
         Args:
             resource (project.BossResource): Data model info based on the request or target resource
@@ -93,10 +92,10 @@ class SpatialDB:
         # TODO: DMK to add cuboid tracking indexing here
         # This is referring to adding redis/s3 index call here like below in get_cubes.  occasionally get_cube is called
         # directly so you need it here. Ultimately this might get replaced with a call to the cache manager?
-        cube = Cube.create_cube(CUBOIDSIZE[resolution], resource)
+        cube = Cube.create_cube(resource, CUBOIDSIZE[resolution])
 
         # get the block from the database
-        cube_bytes = self.kvio.get_cube(resource, morton_idx, resolution, update=update)
+        cube_bytes = self.kvio.get_cube(resource, resolution, morton_idx)
 
         if not cube_bytes:
             # There wasn't a cuboid so return zeros
@@ -107,7 +106,7 @@ class SpatialDB:
 
         return cube
 
-    def get_cubes(self, resource, morton_idx_list, resolution):
+    def get_cubes(self, resource, resolution, morton_idx_list):
         """Load an array of cuboids from the cache key-value store
 
         Args:
@@ -116,11 +115,11 @@ class SpatialDB:
             resolution (int): the resolution level
 
         Returns:
-            list[numpy.ndarray]: The cuboid data
+            list[(int, bytes)]: The cuboid data in a tuple, (mortonID, compressed bytes)
         """
         if len(resource.get_time_samples()) == 1:
+            # TODO: Update this block of code once S3 integration has occurred
             if self.s3io:
-                # TODO: Update this block of code once S3 integration has occurred
                 # Get the ids of the cuboids you need - only gives ids to be fetched
                 ids_to_fetch = self.kvio.get_cube_index(resource, resolution, morton_idx_list)
 
@@ -134,9 +133,9 @@ class SpatialDB:
                         # call put_cubes and update index in the table before returning data
                         self.put_cubes(resource, supercuboid_idx_list, resolution, supercuboid_list, update=True)
 
-            return self.kvio.get_cubes(resource, morton_idx_list, resolution)
+            return self.kvio.get_cubes(resource, resolution, morton_idx_list)
         else:
-            raise SpdbError('Not Supported', 'Time Series data not yet supported', ErrorCode.DATATYPE_NOT_SUPPORTED)
+            raise SpdbError('Not Supported', 'Time Series data not yet fully supported', ErrorCode.DATATYPE_NOT_SUPPORTED)
             # return self.kvio.getTimeCubes(resource, morton_idx_list, timestamp_list, resolution)
 
     # PUT Methods
@@ -157,9 +156,9 @@ class SpatialDB:
             # TODO: Update after S3 integration. Move index IO into new class
             self.kvio.put_cube_index(resource, resolution, [zidx])
 
-        self.kvio.put_cube(resource, zidx, resolution, cube.to_blosc_numpy(), not cube.from_zeros())
+        self.kvio.put_cubes(resource, zidx, resolution, [cube.to_blosc_numpy()], not cube.from_zeros())
 
-    def put_cubes(self, resource, morton_idx_list, resolution, cube_list, update=False):
+    def put_cubes(self, resource, resolution, morton_idx_list, cube_list, update=False):
         """Insert a list of cubes into the cache key-value store
 
         Args:
@@ -173,10 +172,11 @@ class SpatialDB:
             list[numpy.ndarray]: The cuboid data
         """
 
-        if self.s3io:
-            self.kvio.put_cube_index(resource, resolution, morton_idx_list)
+        #if self.s3io:
+        self.kvio.put_cube_index(resource, resolution, morton_idx_list)
 
-        return self.kvio.put_cubes(resource, morton_idx_list, resolution, cube_list, update)
+        return self.kvio.put_cubes(resource, resolution, morton_idx_list, [x.to_blosc_numpy() for x in cube_list],
+                                   update)
 
     def _up_sample_cutout(self, resource, corner, extent, resolution):
         """Transform coordinates of a base resolution cutout to a lower res level by up-sampling.
@@ -329,7 +329,6 @@ class SpatialDB:
                 cutout_coords = result_tuple(corner, extent, None, None)
         else:
             # Resouce is a channel, so no re-sampling
-
             # get the size of the image and cube
             [x_cube_dim, y_cube_dim, z_cube_dim] = cube_dim = CUBOIDSIZE[resolution]
             cutout_resolution = resolution
@@ -340,13 +339,13 @@ class SpatialDB:
             cutout_coords = result_tuple(corner, extent, None, None)
 
         # Round to the nearest larger cube in all dimensions
-        z_start = cutout_coords.corner[2] / z_cube_dim
-        y_start = cutout_coords.corner[1] / y_cube_dim
-        x_start = cutout_coords.corner[0] / x_cube_dim
+        z_start = cutout_coords.corner[2] // z_cube_dim
+        y_start = cutout_coords.corner[1] // y_cube_dim
+        x_start = cutout_coords.corner[0] // x_cube_dim
 
-        z_num_cubes = (cutout_coords.corner[2] + cutout_coords.extent[2] + z_cube_dim - 1) / z_cube_dim - z_start
-        y_num_cubes = (cutout_coords.corner[1] + cutout_coords.extent[1] + y_cube_dim - 1) / y_cube_dim - y_start
-        x_num_cubes = (cutout_coords.corner[0] + cutout_coords.extent[0] + x_cube_dim - 1) / x_cube_dim - x_start
+        z_num_cubes = (cutout_coords.corner[2] + cutout_coords.extent[2] + z_cube_dim - 1) // z_cube_dim - z_start
+        y_num_cubes = (cutout_coords.corner[1] + cutout_coords.extent[1] + y_cube_dim - 1) // y_cube_dim - y_start
+        x_num_cubes = (cutout_coords.corner[0] + cutout_coords.extent[0] + x_cube_dim - 1) // x_cube_dim - x_start
 
         in_cube = Cube.create_cube(resource, cube_dim)
         out_cube = Cube.create_cube(resource,
@@ -357,14 +356,14 @@ class SpatialDB:
         for z in range(z_num_cubes):
             for y in range(y_num_cubes):
                 for x in range(x_num_cubes):
-                    morton_idx = c_lib.XYZMorton([x + x_start, y + y_start, z + z_start])
+                    morton_idx = XYZMorton([x + x_start, y + y_start, z + z_start])
                     list_of_idxs.append(morton_idx)
 
         # Sort the indexes in Morton order
         list_of_idxs.sort()
 
         # xyz offset stored for later use
-        lowxyz = c_lib.MortonXYZ(list_of_idxs[0])
+        lowxyz = MortonXYZ(list_of_idxs[0])
 
         #TODO: We may not need time-series optimized cutouts. Consider removing.
         # checking for timeseries data and doing an optimized cutout here in timeseries column
@@ -376,7 +375,7 @@ class SpatialDB:
                 for idx, timestamp, data_string in cuboids:
 
                     # add the query result cube to the bigger cube
-                    curxyz = c_lib.MortonXYZ(int(idx))
+                    curxyz = MortonXYZ(int(idx))
                     offset = [curxyz[0] - lowxyz[0], curxyz[1] - lowxyz[1], curxyz[2] - lowxyz[2]]
 
                     in_cube.from_blosc_numpy(data_string[:])
@@ -385,13 +384,13 @@ class SpatialDB:
                     out_cube.add_data(in_cube, offset, timestamp)
 
         else:
-            cuboids = self.get_cubes(resource, list_of_idxs, cutout_resolution)
+            cuboids = self.get_cubes(resource, cutout_resolution, list_of_idxs)
 
             # use the batch generator interface
             for idx, data_string in cuboids:
 
                 # add the query result cube to the bigger cube
-                curxyz = c_lib.MortonXYZ(int(idx))
+                curxyz = MortonXYZ(int(idx))
                 offset = [curxyz[0] - lowxyz[0], curxyz[1] - lowxyz[1], curxyz[2] - lowxyz[2]]
 
                 in_cube.from_blosc_numpy(data_string[:])
@@ -523,14 +522,14 @@ class SpatialDB:
             None
         """
         # TODO: Look into data ordering when storing time series data and if it needs to be different
-        # TODO: Look into if the cuboid index needs to get updated to reflect writes to the cache
 
         # dim is in xyz, data is in zyx order
         if len(resource.get_time_samples()) == 1:
-            # Single time point
+            # Single time point - reorder from xyz to zyx
             dim = cuboid_data.shape[::-1]
         else:
             # Reshape based on optimizing cuboid organization for time access
+            # TODO: Look into if the cuboid index needs to get updated to reflect writes to the cache
             dim = cuboid_data.shape[::-1][:-1]
 
         # get the size of the image and cube
@@ -539,9 +538,9 @@ class SpatialDB:
         # Round to the nearest larger cube in all dimensions
         [x_start, y_start, z_start] = list(map(floordiv, corner, cube_dim))
 
-        z_num_cubes = (corner[2] + dim[2] + z_cube_dim - 1) / z_cube_dim - z_start
-        y_num_cubes = (corner[1] + dim[1] + y_cube_dim - 1) / y_cube_dim - y_start
-        x_num_cubes = (corner[0] + dim[0] + x_cube_dim - 1) / x_cube_dim - x_start
+        z_num_cubes = (corner[2] + dim[2] + z_cube_dim - 1) // z_cube_dim - z_start
+        y_num_cubes = (corner[1] + dim[1] + y_cube_dim - 1) // y_cube_dim - y_start
+        x_num_cubes = (corner[0] + dim[0] + x_cube_dim - 1) // x_cube_dim - x_start
 
         [x_offset, y_offset, z_offset] = list(map(mod, corner, cube_dim))
 
@@ -570,7 +569,7 @@ class SpatialDB:
                 for y in range(y_num_cubes):
                     for x in range(x_num_cubes):
                         morton_idx = XYZMorton([x + x_start, y + y_start, z + z_start])
-                        cube = self.get_cube(resource, morton_idx, resolution, update=True)
+                        cube = self.get_cube(resource, resolution, morton_idx, update=True)
 
                         # overwrite the cube
                         cube.overwrite(data_buffer[z * z_cube_dim:(z + 1) * z_cube_dim,
@@ -578,7 +577,7 @@ class SpatialDB:
                                                    x * x_cube_dim:(x + 1) * x_cube_dim])
 
                         # update in the database
-                        self.put_cube(resource, morton_idx, resolution, cube)
+                        self.put_cube(resource, resolution, morton_idx, cube)
         else:
             for z in range(z_num_cubes):
                 for y in range(y_num_cubes):

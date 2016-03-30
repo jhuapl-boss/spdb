@@ -28,6 +28,7 @@ class Experiment:
       num_hierarchy_levels (int): Number of levels in the zoom resolution hierarchy
       hierarchy_method (str): The style of down-sampling used to build the resolution hierarchy.
       Valid values are 'near_iso', 'iso', and 'slice'.
+      max_time_step (int): The maximum supported time sample
 
     Attributes:
       name (str): Unique string to identify the collection
@@ -35,12 +36,14 @@ class Experiment:
       num_hierarchy_levels (int): Number of levels in the zoom resolution hierarchy
       hierarchy_method (str): The style of down-sampling used to build the resolution hierarchy.
       Valid values are 'near_iso', 'iso', and 'slice'.
+      max_time_step (int): The maximum supported time sample
     """
-    def __init__(self, name, description, num_hierarchy_levels, hierarchy_method):
+    def __init__(self, name, description, num_hierarchy_levels, hierarchy_method, max_time_sample):
         self.name = name
         self.description = description
         self.num_hierarchy_levels = num_hierarchy_levels
         self.hierarchy_method = hierarchy_method
+        self.max_time_sample = max_time_sample
 
 
 class CoordinateFrame:
@@ -110,19 +113,16 @@ class Channel:
       name (str): Unique string to identify the channel
       description (str): A short description of the channel and what it contains
       datatype (int): The bitdepth of the channel.  Valid choices are uint8, uint16, uint32, and uint64
-      max_time_step (int): The maximum supported time sample
 
     Attributes:
       name (str): Unique string to identify the channel
       description (str): A short description of the channel and what it contains
       datatype (int): The bitdepth of the channel.  Valid choices are uint8, uint16, uint32, and uint64
-      max_time_step (int): The maximum supported time sample
     """
-    def __init__(self, name, description, datatype, max_time_step):
+    def __init__(self, name, description, datatype):
         self.name = name
         self.description = description
         self.datatype = datatype
-        self.max_time_step = max_time_step
 
 
 class Layer:
@@ -133,21 +133,21 @@ class Layer:
       name (str): Unique string to identify the layer
       description (str): A short description of the layer and what it contains
       datatype (int): The bitdepth of the channel.  Valid choices are uint8, uint16, uint32, and uint64
-      max_time_step (int): The maximum supported time sample
+      base_resolution (int): The resolution level of primary annotation/data (mainly used in layers).
       parent_channels (list): The names of the parent channel(s) to which the Layer is linked
 
     Attributes:
       name (str): Unique string to identify the layer
       description (str): A short description of the layer and what it contains
       datatype (int): The bitdepth of the channel.  Valid choices are uint8, uint16, uint32, and uint64
-      max_time_step (int): The maximum supported time sample
+      base_resolution (int): The resolution level of primary annotation and indicates where dynamic resampling will occur
       parent_channels (list): The names of the parent channel(s) to which the Layer is linked
     """
-    def __init__(self, name, description, datatype, max_time_step, parent_channels):
+    def __init__(self, name, description, datatype, base_resolution, parent_channels):
         self.name = name
         self.description = description
         self.datatype = datatype
-        self.max_time_step = max_time_step
+        self.base_resolution = base_resolution
         self.parent_channels = parent_channels
 
 
@@ -285,7 +285,7 @@ class BossResource(metaclass=ABCMeta):
         """
         if not self._channel and not self._layer:
             self.populate_channel_or_layer()
-        return self._layer == None
+        return self._layer is None
 
     def set_time_samples(self, idx):
         """Method to set the current time sample index or indices if needed and can't be done lazily

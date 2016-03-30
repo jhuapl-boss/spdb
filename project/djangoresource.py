@@ -51,7 +51,8 @@ class BossResourceDjango(BossResource):
         self._experiment = Experiment(self.boss_request.experiment.name,
                                       self.boss_request.experiment.description,
                                       self.boss_request.experiment.num_hierarchy_levels,
-                                      self.boss_request.experiment.hierarchy_method)
+                                      self.boss_request.experiment.hierarchy_method,
+                                      self.boss_request.experiment.max_time_sample)
 
     def populate_channel_or_layer(self):
         """
@@ -61,37 +62,36 @@ class BossResourceDjango(BossResource):
             # You have a channel request
             self._channel = Channel(self.boss_request.channel_layer.name,
                                     self.boss_request.channel_layer.description,
-                                    self.boss_request.channel_layer.datatype,
-                                    self.boss_request.channel_layer.base_resolution,
-                                    self.boss_request.channel_layer.max_time_step)
+                                    self.boss_request.channel_layer.datatype)
         else:
             # You have a layer request
+            if self.boss_request.channel_layer.linked_channel_layers:
+                linked_channels = self.boss_request.channel_layer.linked_channel_layers
+            else:
+                linked_channels = None
             self._layer = Layer(self.boss_request.channel_layer.name,
                                 self.boss_request.channel_layer.description,
                                 self.boss_request.channel_layer.datatype,
                                 self.boss_request.channel_layer.base_resolution,
-                                self.boss_request.channel_layer.max_time_step,
-                                self.boss_request.channel_layer.layer_map)
+                                linked_channels)
 
     def populate_time_samples(self):
         """
         Method to set self._time_samples.
         """
-        # TODO: add time sample support
-        self._time_samples = [0]
+        self._time_samples = self.boss_request.get_time()
 
     def populate_boss_key(self):
         """
         Method to set self._boss_key.
         """
-        self._boss_key = self.boss_request.get_bosskey
+        self._boss_key = self.boss_request.get_boss_key()
 
     def populate_lookup_key(self):
         """
         Method to set self._lookup_key.  Should be overridden.
         """
-        # TODO: add look up key
-        pass
+        self._lookup_key = self.boss_request.get_lookup_key()
 
     # Methods to delete the entry from the data model tables
     def delete_collection_model(self):
