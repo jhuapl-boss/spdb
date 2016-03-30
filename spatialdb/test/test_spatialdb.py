@@ -112,10 +112,11 @@ class TestSpatialDBImageDataOneTimeSample(unittest.TestCase):
             loaded_cube.from_blosc_numpy(c[1])
             np.testing.assert_array_equal(t.data, loaded_cube.data)
 
-    def test_write_cuboid_aligned(self):
+    def test_write_cuboid_aligned_single(self):
             """Test the write_cuboid method"""
             # At this point data should be in zyx
             data = np.random.randint(0, 254, (16, 128, 128))
+            data = data.astype(np.uint8)
 
             spdb = spatialdb.SpatialDB()
 
@@ -126,31 +127,35 @@ class TestSpatialDBImageDataOneTimeSample(unittest.TestCase):
             # make sure data was written
             assert len(spdb.kvio.cache_client.redis) == 1
 
-    def test_write_cuboid(self):
+    def test_write_cuboid_aligned_multiple(self):
         """Test the write_cuboid method"""
-        data = np.random.randint(0, 254, (240, 367, 128))
+        data = np.random.randint(0, 254, (16, 256, 128))
+        data = data.astype(np.uint8)
 
         spdb = spatialdb.SpatialDB()
 
         # Make sure no data is in the database
         assert len(spdb.kvio.cache_client.redis) == 0
-        spdb.write_cuboid(self.resource, (20, 30, 34), 0, data)
+        spdb.write_cuboid(self.resource, (0, 0, 0), 0, data)
 
         # make sure data was written
-        assert len(spdb.kvio.cache_client.redis) == 128
+        assert len(spdb.kvio.cache_client.redis) == 2
 
-
-    def test_cutout(self):
+    def test_cutout_no_offset(self):
         """Test the cutout method"""
-        data = np.random.randint(0, 254, (240, 367, 128))
+        data = np.random.randint(0, 254, (30, 500, 300))
+        data = data.astype(np.uint8)
 
         spdb = spatialdb.SpatialDB()
 
         # Write an arbitrary chunk into the cache
-        spdb.write_cuboid(self.resource, (20, 30, 34), 0, data)
+        spdb.write_cuboid(self.resource, (0, 0, 0), 0, data)
 
         # Get it back out
-        cutout = spdb.cutout(self.resource, (20, 30, 34), (240, 367, 128), 0)
+        cutout = spdb.cutout(self.resource, (0, 0, 0), (300, 500, 30), 0)
+        assert cutout.data.shape == data.shape
+        assert cutout.data.dtype == data.dtype
+        np.testing.assert_array_equal(cutout.data, data)
 
 
     # TODO: Add up_sample and down_sample methods once annotation interfaces are integrated.

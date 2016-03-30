@@ -5,6 +5,8 @@ from spatialdb import Cube
 from project import BossResourceBasic
 import numpy as np
 
+from spatialdb.error import SpdbError
+
 
 class TestImageCube8(unittest.TestCase):
     """Test the ImageCube8 Class parent class functionality"""
@@ -64,6 +66,76 @@ class TestImageCube8(unittest.TestCase):
         assert c_base.data[4, 4, 6] == 0
         assert c_base.data[6, 4, 4] == 0
         assert c_base.data[4, 6, 4] == 0
+
+        # Try an offset in x insert
+        c_base.zeros()
+        c_base.add_data(c_add, [1, 0, 0])
+        # Make sure insertion happened
+        assert c_base.data.sum() == 5 * 5 * 5
+
+        # Make sure it was in the right spot (remember data is still stored in zyx under the hood)
+        assert c_base.data[1, 1, 1] == 0
+        assert c_base.data[4, 4, 6] == 1
+
+        # Try an offset in y insert
+        c_base.zeros()
+        c_base.add_data(c_add, [0, 1, 0])
+        # Make sure insertion happened
+        assert c_base.data.sum() == 5 * 5 * 5
+
+        # Make sure it was in the right spot (remember data is still stored in zyx under the hood)
+        assert c_base.data[1, 1, 1] == 0
+        assert c_base.data[4, 6, 4] == 1
+
+        # Try an offset in z insert
+        c_base.zeros()
+        c_base.add_data(c_add, [0, 0, 1])
+        # Make sure insertion happened
+        assert c_base.data.sum() == 5 * 5 * 5
+
+        # Make sure it was in the right spot (remember data is still stored in zyx under the hood)
+        assert c_base.data[1, 1, 1] == 0
+        assert c_base.data[6, 4, 4] == 1
+
+# Todo add tests back in for uint32 data only
+#def test_overwrite_dtype_mismatch(self):
+#    c_base = ImageCube8([10, 10, 10])
+#    c_base.zeros()
+
+#    data = np.random.randint(0, 5, (5, 5, 5))
+
+#    # Make sure c_base empty
+#    assert c_base.data.sum() == 0
+
+#    # Insert c_add into c_base
+#    with self.assertRaises(SpdbError):
+#        c_base.overwrite(data)
+
+#def test_overwrite(self):
+#    """Test adding data from a smaller cube to a bigger one"""
+
+#    c_base = ImageCube8([10, 20, 5])
+#    c_base.zeros()
+
+#    data = np.zeros((10, 20, 5), np.uint32)
+#    data[5, 2, 1] = 1
+
+#    # Make sure c_base empty
+#    assert c_base.data.sum() == 0
+
+#    # Insert c_add into c_base
+#    c_base.overwrite(data)
+
+#    # Make sure insertion happened
+#    assert c_base.data.sum() == 5 * 5 * 5
+
+#    # Make sure it was in the right spot
+#    assert c_base.data[1, 2, 3] == 1
+#    assert c_base.data[4, 4, 4] == 1
+#    assert c_base.data[0, 0, 0] == 1
+#    assert c_base.data[4, 4, 6] == 0
+#    assert c_base.data[6, 4, 4] == 0
+#    assert c_base.data[4, 6, 4] == 0
 
         # Try an offset in x insert
         c_base.zeros()

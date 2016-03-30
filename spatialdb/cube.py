@@ -21,7 +21,7 @@ from PIL import Image
 
 from abc import ABCMeta, abstractmethod
 
-# from c_lib.ndlib import overwriteDense_ctype
+from c_lib.ndlib import overwriteDense_ctype
 from c_lib.ndtype import DTYPE_uint8, DTYPE_uint16, DTYPE_uint32, DTYPE_uint64
 
 from .error import SpdbError, ErrorCode
@@ -134,6 +134,9 @@ class Cube(metaclass=ABCMeta):
     def overwrite(self, input_data):
         """ Overwrite data with all non-zero values in the input_data
 
+        Function is accelerated for annotation overwrite operations since you often are merging
+        two sparse cubes.  If not uint32 or uint64 this basically just performs a copy.
+
         Args:
             input_data (numpy.ndarray): Input data matrix to overwrite the current Cube data
 
@@ -141,13 +144,14 @@ class Cube(metaclass=ABCMeta):
             None
 
         """
-        return NotImplemented
-        # This only works on annotation data. Specifically 32-bit annos it looks like.
-        #if self.data.dtype != input_data.dtype:
-        #    raise SpdbError("IO Error", "Conflicting data types for overwrite.",
-        #                    ErrorCode.IO_ERROR)
-#
-        #self.data = overwriteDense_ctype(self.data, input_data)
+        if self.data.dtype != input_data.dtype:
+            raise SpdbError("IO Error", "Conflicting data types for overwrite.",
+                            ErrorCode.IO_ERROR)
+
+        if self.data.dtype == np.uint32 or self.data.dtype == np.uint64:
+            self.data = overwriteDense_ctype(self.data, input_data)
+        else:
+            self.data = input_data
 
     def is_not_zeros(self):
         """Check if the data matrix is all zeros

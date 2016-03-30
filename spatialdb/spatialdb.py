@@ -406,11 +406,10 @@ class SpatialDB:
                 out_cube.add_data(in_cube, offset)
 
         # Get the base resolution if channel or layer for logic below
+        base_res = None
         if not resource.is_channel():
             # Get base resolution for the layer
             base_res = resource.get_layer().base_resolution
-        else:
-            base_res = resource.get_channel().base_resolution
 
         # A smaller cube was cutout due to off-base resolution query: up-sample and trim
         if not resource.is_channel() and base_res > resolution:
