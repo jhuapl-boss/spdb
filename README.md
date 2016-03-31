@@ -1,4 +1,6 @@
-Spatial Database Layer for the Boss powered by NeuroData
+###Spatial Database Layer for the Boss 
+
+Some components originally developed by the Open Connectome Project/NeuroData  
 
 [![Neurodata.io](https://img.shields.io/badge/Visit-neurodata.io-ff69b4.svg)](http://neurodata.io/)
 [![theBoss.io](https://img.shields.io/badge/visit-theBoss.io-blue.svg)](http://theBoss.io/)
@@ -10,4 +12,4 @@ Engines Support:
 | Key-value Store   | Spatial Database  
 | ----------------- | -----------------      
 | Redis             | Yes               
-| DynamoDB          | No (future)            
+         
