@@ -26,5 +26,5 @@ class SpdbError(Exception):
 
     def __init__(self, *args):
         # Log
-        blog = BossLogger()
+        blog = BossLogger().logger
         blog.error("SpdbError - Message: {0} - Description: {1} - Code: {2}".format(args[0], args[1], args[2]))
