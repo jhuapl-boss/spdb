@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 # Modified from original source by Johns Hopkins University Applied Physics Laboratory
-# Copyright 2016 Johns Hopkins University Applied Physics Laboratory
+# Copyright 2016 The Johns Hopkins University Applied Physics Laboratory
 
 import redis
 
