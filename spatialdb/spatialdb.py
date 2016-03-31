@@ -355,8 +355,7 @@ class SpatialDB:
         for z in range(z_num_cubes):
             for y in range(y_num_cubes):
                 for x in range(x_num_cubes):
-                    morton_idx = ndlib.XYZMorton(np.asarray([x + x_start, y + y_start, z + z_start],
-                                                                   dtype=np.uint64))
+                    morton_idx = ndlib.XYZMorton([x + x_start, y + y_start, z + z_start])
                     list_of_idxs.append(morton_idx)
 
         # Sort the indexes in Morton order
@@ -388,7 +387,6 @@ class SpatialDB:
 
             # use the batch generator interface
             for idx, data_string in cuboids:
-
                 # add the query result cube to the bigger cube
                 curxyz = ndlib.MortonXYZ(int(idx))
                 offset = [curxyz[0] - lowxyz[0], curxyz[1] - lowxyz[1], curxyz[2] - lowxyz[2]]
@@ -567,8 +565,8 @@ class SpatialDB:
             for z in range(z_num_cubes):
                 for y in range(y_num_cubes):
                     for x in range(x_num_cubes):
-                        morton_idx = ndlib.XYZMorton(np.asarray([x + x_start, y + y_start, z + z_start],
-                                                                       dtype=np.uint64))
+                        morton_idx = ndlib.XYZMorton([x + x_start, y + y_start, z + z_start])
+
                         cube = self.get_cube(resource, resolution, morton_idx, update=True)
 
                         # overwrite the cube
@@ -583,8 +581,7 @@ class SpatialDB:
                 for y in range(y_num_cubes):
                     for x in range(x_num_cubes):
                         for time_sample in resource.get_time_samples():
-                            morton_idx = ndlib.XYZMorton(np.asarray([x + x_start, y + y_start, z + z_start],
-                                                                           dtype=np.uint64))
+                            morton_idx = ndlib.XYZMorton([x + x_start, y + y_start, z + z_start])
 
                             cube = self.get_cube(resource, morton_idx, resolution, update=True)
 

@@ -1,4 +1,5 @@
 import unittest
+import os
 from unittest.mock import patch
 from mockredis import mock_strict_redis_client
 
@@ -7,14 +8,18 @@ from spdb.spatialdb import Cube, SpatialDB
 
 import numpy as np
 
+from bossutils import configuration
 
-class MockBossConfig:
+CONFIG_UNMOCKED = configuration.BossConfig()
+
+
+class MockBossIntegrationConfig:
     """Basic mock for BossConfig to contain the properties needed for this test"""
     def __init__(self):
         self.config = {}
         self.config["aws"] = {}
-        self.config["aws"]["cache"] = {"https://some.url.com"}
-        self.config["aws"]["cache-state"] = {"https://some.url2.com"}
+        self.config["aws"]["cache"] = CONFIG_UNMOCKED["aws"]["cache"]
+        self.config["aws"]["cache-state"] = CONFIG_UNMOCKED["aws"]["cache-state"]
         self.config["aws"]["cache-db"] = 1
         self.config["aws"]["cache-state-db"] = 1
 
@@ -25,13 +30,12 @@ class MockBossConfig:
         return self.config[key]
 
 
-@patch('redis.StrictRedis', mock_strict_redis_client)
-@patch('configparser.ConfigParser', MockBossConfig)
-class TestSpatialDBImageDataOneTimeSample(unittest.TestCase):
+@unittest.skipIf(os.environ.get('UNIT_ONLY') is not None, "Only running unit tests")
+class TestIntegrationSpatialDBImageDataOneTimeSample(unittest.TestCase):
 
     def setUp(self):
         """ Create a diction of configuration values for the test resource. """
-        self.patcher = patch('configparser.ConfigParser', MockBossConfig)
+        self.patcher = patch('configparser.ConfigParser', MockBossIntegrationConfig)
         self.mock_tests = self.patcher.start()
 
         self.data = {}
@@ -119,35 +123,6 @@ class TestSpatialDBImageDataOneTimeSample(unittest.TestCase):
             loaded_cube.from_blosc_numpy(c[1])
             np.testing.assert_array_equal(t.data, loaded_cube.data)
 
-    def test_write_cuboid_aligned_single(self):
-            """Test the write_cuboid method"""
-            # At this point data should be in zyx
-            data = np.random.randint(0, 254, (16, 128, 128))
-            data = data.astype(np.uint8)
-
-            spdb = SpatialDB()
-
-            # Make sure no data is in the database
-            assert len(spdb.kvio.cache_client.redis) == 0
-            spdb.write_cuboid(self.resource, (0, 0, 0), 0, data)
-
-            # make sure data was written
-            assert len(spdb.kvio.cache_client.redis) == 1
-
-    def test_write_cuboid_aligned_multiple(self):
-        """Test the write_cuboid method"""
-        data = np.random.randint(0, 254, (16, 256, 128))
-        data = data.astype(np.uint8)
-
-        spdb = SpatialDB()
-
-        # Make sure no data is in the database
-        assert len(spdb.kvio.cache_client.redis) == 0
-        spdb.write_cuboid(self.resource, (0, 0, 0), 0, data)
-
-        # make sure data was written
-        assert len(spdb.kvio.cache_client.redis) == 2
-
     def test_cutout_no_offset_uint8(self):
         """Test the cutout method"""
         data = np.random.randint(0, 254, (30, 500, 300))
@@ -163,6 +138,7 @@ class TestSpatialDBImageDataOneTimeSample(unittest.TestCase):
         assert cutout.data.shape == data.shape
         assert cutout.data.dtype == data.dtype
         np.testing.assert_array_equal(cutout.data, data)
+
 
     # TODO: Add up_sample and down_sample methods once annotation interfaces are integrated.
 

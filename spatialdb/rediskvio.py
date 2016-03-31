@@ -37,12 +37,14 @@ class RedisKVIO(KVIO):
         if cache_client:
             self.cache_client = cache_client
         else:
-            self.cache_client = redis.StrictRedis(host=config["aws"]["cache"], port=6379, db=0)
+            self.cache_client = redis.StrictRedis(host=config["aws"]["cache"], port=6379,
+                                                  db=config["aws"]["cache-db"])
 
         if status_client:
             self.status_client = status_client
         else:
-            self.status_client = redis.StrictRedis(host=config["aws"]["cache-state"], port=6379, db=0)
+            self.status_client = redis.StrictRedis(host=config["aws"]["cache-state"], port=6379,
+                                                   db=config["aws"]["cache-state-db"])
 
     def close(self):
         """Close the connection to the KV engine"""
@@ -62,11 +64,12 @@ class RedisKVIO(KVIO):
 
     def get_cache_index_base_key(self, resource, resolution):
         """Generate the base name of the key used to store status if cuboids are present in the cache"""
-        return 'CUBOID_IDX&{}&{}'.format(resource.get_lookup_key(), resolution)
+        return ['CUBOID_IDX&{}&{}'.format(key, resolution) for key in resource.get_lookup_key()]
 
     def get_cache_base_key(self, resource, resolution):
         """Generate the base name of the key used to store cuboids in the cache"""
-        return 'CUBOID&{}&{}'.format(resource.get_lookup_key(), resolution)
+        # TODO: Possibly update boss request to return the look up key so time isn't before resolution
+        return ['CUBOID&{}&{}'.format(key, resolution) for key in resource.get_lookup_key()]
 
     def generate_cache_index_keys(self, resource, resolution):
         """Generate Keys for cuboid index sets in the redis cache db
@@ -81,8 +84,7 @@ class RedisKVIO(KVIO):
             list[str]: A list of keys for each time sample index
 
         """
-        return ["{}&{}".format(self.get_cache_index_base_key(resource,
-                                                             resolution), x) for x in resource.get_time_samples()]
+        return self.get_cache_index_base_key(resource, resolution)
 
     def generate_cuboid_keys(self, resource, resolution, morton_idx_list):
         """Generate Keys for cuboid access in the redis cache db
@@ -102,9 +104,9 @@ class RedisKVIO(KVIO):
             morton_idx_list = [morton_idx_list]
 
         key_list = []
-        for sample in resource.get_time_samples():
+        for base_key in self.get_cache_base_key(resource, resolution):
             for z_idx in morton_idx_list:
-                key_list.append('{}&{}&{}'.format(self.get_cache_base_key(resource, resolution), sample, z_idx))
+                key_list.append('{}&{}'.format(base_key, z_idx))
 
         return key_list
 
@@ -263,7 +265,6 @@ class RedisKVIO(KVIO):
 
         # generating the list of keys
         key_list = self.generate_cuboid_keys(resource, resolution, morton_idx_list)
-
         try:
             self.cache_client.mset(dict(list(zip(key_list, cube_list))))
         except Exception as e:

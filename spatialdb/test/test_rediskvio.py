@@ -19,6 +19,8 @@ class MockBossConfig:
         self.config["aws"] = {}
         self.config["aws"]["cache"] = {"https://some.url.com"}
         self.config["aws"]["cache-state"] = {"https://some.url2.com"}
+        self.config["aws"]["cache-db"] = 1
+        self.config["aws"]["cache-state-db"] = 1
 
     def read(self, filename):
         pass
@@ -27,12 +29,14 @@ class MockBossConfig:
         return self.config[key]
 
 
-@patch('redis.StrictRedis', mock_strict_redis_client)
 @patch('configparser.ConfigParser', MockBossConfig)
+@patch('redis.StrictRedis', mock_strict_redis_client)
 class TestRedisKVIOImageDataOneTimeSample(unittest.TestCase):
 
     def setUp(self):
         """ Create a diction of configuration values for the test resource. """
+        self.patcher = patch('redis.StrictRedis', mock_strict_redis_client)
+        self.mock_tests = self.patcher.start()
 
         self.data = {}
         self.data['collection'] = {}
@@ -68,25 +72,33 @@ class TestRedisKVIOImageDataOneTimeSample(unittest.TestCase):
         self.data['channel_layer']['datatype'] = 'uint8'
         self.data['channel_layer']['max_time_step'] = 0
 
-        self.data['boss_key'] = 'col1&exp1&ch1'
-        self.data['lookup_key'] = '4&2&1'
+        self.data['boss_key'] = ['col1&exp1&ch1']
+        self.data['lookup_key'] = ['4&2&1&0']
 
         self.resource = BossResourceBasic(self.data)
 
         self.config = configuration.BossConfig()
 
-        self.redis_client = None
+        self.cache_client = redis.StrictRedis(host=self.config["aws"]["cache-state"], port=6379, db=1,
+                                              decode_responses=True)
+        self.cache_client.flushdb()
+
+        self.status_client = redis.StrictRedis(host=self.config["aws"]["cache-state"], port=6379, db=1,
+                                               decode_responses=True)
+        self.status_client.flushdb()
+
+    def tearDown(self):
+        self.mock_tests = self.patcher.stop()
 
     def test_get_cache_index_base_key(self):
         """Test the base key getter function for the cuboid index (cuboids that exist in the cache"""
         rkv = RedisKVIO()
-        assert rkv.get_cache_index_base_key(self.resource, 2) == "CUBOID_IDX&4&2&1&2"
-
+        assert rkv.get_cache_index_base_key(self.resource, 2) == ["CUBOID_IDX&4&2&1&0&2"]
 
     def test_get_cache_base_key(self):
         """Test the base key getter function for the cuboids"""
         rkv = RedisKVIO()
-        assert rkv.get_cache_base_key(self.resource, 2) == "CUBOID&4&2&1&2"
+        assert rkv.get_cache_base_key(self.resource, 2) == ["CUBOID&4&2&1&0&2"]
 
     def test_generate_cache_index_keys_single(self):
         """Test the generate cache index key generation for a single key"""
@@ -96,7 +108,7 @@ class TestRedisKVIOImageDataOneTimeSample(unittest.TestCase):
 
         assert isinstance(keys, list)
         assert len(keys) == 1
-        assert keys[0] == "CUBOID_IDX&4&2&1&2&0"
+        assert keys[0] == "CUBOID_IDX&4&2&1&0&2"
 
     def test_generate_cuboid_keys(self):
         """Test the generate cache cuboid keys"""
@@ -108,27 +120,27 @@ class TestRedisKVIOImageDataOneTimeSample(unittest.TestCase):
 
         assert isinstance(keys, list)
         assert len(keys) == 5
-        assert keys[0] == "CUBOID&4&2&1&5&0&2345"
-        assert keys[1] == "CUBOID&4&2&1&5&0&2346"
-        assert keys[2] == "CUBOID&4&2&1&5&0&2347"
-        assert keys[3] == "CUBOID&4&2&1&5&0&2348"
-        assert keys[4] == "CUBOID&4&2&1&5&0&2349"
+        assert keys[0] == "CUBOID&4&2&1&0&5&2345"
+        assert keys[1] == "CUBOID&4&2&1&0&5&2346"
+        assert keys[2] == "CUBOID&4&2&1&0&5&2347"
+        assert keys[3] == "CUBOID&4&2&1&0&5&2348"
+        assert keys[4] == "CUBOID&4&2&1&0&5&2349"
 
-    def test_generate_keys_multiple(self):
-        # TODO MOVE!
-        """Test the generate cache index key generation for a multiple time samples"""
-        rkv = RedisKVIO()
-
-        self.resource.set_time_samples([0, 1, 2, 3, 4, 5, 6, 7])
-        keys = rkv.generate_cache_index_keys(self.resource, 1)
-
-        assert isinstance(keys, list)
-        assert len(keys) == len(self.resource.get_time_samples())
-
-        for time_samaple, key in zip(self.resource.get_time_samples(), keys):
-            assert key == "CUBOID_IDX&4&2&1&1&{}".format(time_samaple)
-
-        self.resource.set_time_samples([0])
+    #def test_generate_keys_multiple(self):
+    #    # TODO MOVE once time samples are fully supported
+    #    """Test the generate cache index key generation for a multiple time samples"""
+    #    rkv = RedisKVIO()
+#
+    #    self.resource.set_time_samples([0, 1, 2, 3, 4, 5, 6, 7])
+    #    keys = rkv.generate_cache_index_keys(self.resource, 1)
+#
+    #    assert isinstance(keys, list)
+    #    assert len(keys) == len(self.resource.get_time_samples())
+#
+    #    for time_samaple, key in zip(self.resource.get_time_samples(), keys):
+    #        assert key == "CUBOID_IDX&4&2&1&1&{}".format(time_samaple)
+#
+    #    self.resource.set_time_samples([0])
 
     def test_put_cube_index(self):
         """Test adding cubes to the cuboid index"""

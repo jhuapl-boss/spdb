@@ -32,7 +32,7 @@ class ImageCube8(Cube):
         Cube.__init__(self, cube_size)
 
         # Note that this is self.cube_size (which is transposed) in Cube
-        self.data = np.zeros(self.cube_size, dtype=np.uint8)
+        self.data = np.zeros(self.cube_size, dtype=np.uint8, order='C')
 
         # variable that describes when a cube is created from zeros rather than loaded from another source
         self._created_from_zeros = False
@@ -44,7 +44,7 @@ class ImageCube8(Cube):
             None
         """
         self._created_from_zeros = True
-        self.data = np.zeros(self.cube_size, dtype=np.uint8)
+        self.data = np.zeros(self.cube_size, dtype=np.uint8, order='C')
 
     def xy_image(self, z_index=0):
         """Render an image in the XY plane.
@@ -102,7 +102,7 @@ class ImageCube16(Cube):
         Cube.__init__(self, cube_size)
 
         # note that this is self.cube_size (which is transposed) in Cube
-        self.data = np.zeros(self.cube_size, dtype=np.uint16)
+        self.data = np.zeros(self.cube_size, dtype=np.uint16, order='C')
 
         # variable that describes when a cube is created from zeros rather than loaded from another source
         self._created_from_zeros = False
@@ -114,7 +114,7 @@ class ImageCube16(Cube):
             None
         """
         self._created_from_zeros = True
-        self.data = np.zeros(self.cube_size, dtype=np.uint16)
+        self.data = np.zeros(self.cube_size, dtype=np.uint16, order='C')
 
     def xy_image(self, z_index=0):
         """Render an image in the XY plane.

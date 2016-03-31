@@ -1,7 +1,9 @@
 import unittest
 from spdb.spatialdb import SpdbError
+import os
 
 
+@unittest.skipIf(os.environ.get('UNIT_ONLY') is not None, "Only running unit tests")
 class SpdbErrorTests(unittest.TestCase):
 
     def test_creation(self):
