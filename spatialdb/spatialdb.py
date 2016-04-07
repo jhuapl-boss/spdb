@@ -367,6 +367,7 @@ class SpatialDB:
         #TODO: We may not need time-series optimized cutouts. Consider removing.
         # checking for timeseries data and doing an optimized cutout here in timeseries column
         if len(resource.get_time_samples()) > 1:
+            # TODO: remove/update this block as needed when time-series data is fully implemented
             for idx in list_of_idxs:
                 cuboids = self.get_cubes(resource, idx, resolution)
 
@@ -377,7 +378,10 @@ class SpatialDB:
                     curxyz = ndlib.MortonXYZ(int(idx))
                     offset = [curxyz[0] - lowxyz[0], curxyz[1] - lowxyz[1], curxyz[2] - lowxyz[2]]
 
-                    in_cube.from_blosc_numpy(data_string[:])
+                    if not data_string:
+                        in_cube.zeros()
+                    else:
+                        in_cube.from_blosc_numpy(data_string[:])
 
                     # add it to the output cube
                     out_cube.add_data(in_cube, offset, timestamp)
@@ -391,7 +395,10 @@ class SpatialDB:
                 curxyz = ndlib.MortonXYZ(int(idx))
                 offset = [curxyz[0] - lowxyz[0], curxyz[1] - lowxyz[1], curxyz[2] - lowxyz[2]]
 
-                in_cube.from_blosc_numpy(data_string[:])
+                if not data_string:
+                    in_cube.zeros()
+                else:
+                    in_cube.from_blosc_numpy(data_string[:])
 
                 # TODO: DMK commented out exception code since exceptions are not yet implemented.
                 # apply exceptions if it's an annotation project
