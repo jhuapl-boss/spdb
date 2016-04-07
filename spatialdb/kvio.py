@@ -1,4 +1,5 @@
-# Original Copyright 2014 NeuroData (http://neurodata.io)
+# Copyright 2014 NeuroData (http://neurodata.io)
+# Copyright 2016 The Johns Hopkins University Applied Physics Laboratory
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,9 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Modified from original source by Johns Hopkins University Applied Physics Laboratory
-# Copyright 2016 The Johns Hopkins University Applied Physics Laboratory
 
 from abc import ABCMeta, abstractmethod
 from .error import SpdbError, ErrorCode
