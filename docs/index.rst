@@ -1,4 +1,4 @@
-Welcome to boss-manage's documentation!
+Welcome to spdb's documentation!
 =======================================
 
 Contents:
