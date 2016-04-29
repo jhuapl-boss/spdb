@@ -45,42 +45,36 @@ class KVIO(metaclass=ABCMeta):
         return NotImplemented
 
     @abstractmethod
-    def get_missing_cube_index(self, resource, resolution, idx_list):
+    def get_missing_cube_index(self, resource, resolution, time_sample_list, idx_list):
         """Return the cuboid index list of inserted cubes in the cache DB"""
         return NotImplemented
 
     @abstractmethod
-    def put_cube_index(self, resource, resolution, idx_list):
+    def put_cube_index(self, resource, resolution, time_sample_list, idx_list):
         """Insert the index list of fetched cubes"""
         return NotImplemented
 
-    # TODO: Add if needed.  DMK pretty sure this was from OCPBlaze and not needed at the moment
-    #@abstractmethod
-    #def get_cube(self, resource, resolution, morton_idx, update=False):
-    #    """Retrieve a single cube from the database"""
-    #    return NotImplemented
-
     @abstractmethod
-    def get_cubes(self, resource, resolution, morton_idx_list):
+    def get_cubes(self, resource, resolution, time_sample_list, morton_idx_list):
         """Retrieve multiple cubes from the database"""
         return NotImplemented
 
-    # TODO: Investigate if unique representation of time-series data is needed and if this is needed
-    # @abstractmethod
-    # def getTimeCubes(self, ch, idx, listoftimestamps, resolution):
-    #     """Retrieve multiple cubes from the database"""
-    #     return NotImplemented
-
-    # TODO: Add if needed.  DMK pretty sure this was from OCPBlaze and not needed at the moment
-    #@abstractmethod
-    #def put_cube(self, resource, resolution, morton_idx, cube_bytes, update=False):
-    #    """Store a single cube into the database"""
-    #    return NotImplemented
-
     @abstractmethod
-    def put_cubes(self, resource, resolution, morton_idx_list, cube_list, update=False):
+    def put_cubes(self, resource, resolution, time_sample_list, morton_idx_list, cube_list, update=False):
         """Store multiple cubes into the database"""
         return NotImplemented
+
+    # TODO: Add if needed.  DMK pretty sure this was from OCPBlaze and not needed at the moment
+    # @abstractmethod
+    # def get_cube(self, resource, resolution, morton_idx, update=False):
+    #    """Retrieve a single cube from the database"""
+    #    return NotImplemented
+
+    # TODO: Add if needed.  DMK pretty sure this was from OCPBlaze and not needed at the moment
+    # @abstractmethod
+    # def put_cube(self, resource, resolution, morton_idx, cube_bytes, update=False):
+    #    """Store a single cube into the database"""
+    #    return NotImplemented
 
     # Factory method for KVIO Engine
     @staticmethod

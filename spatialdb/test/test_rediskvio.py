@@ -86,8 +86,8 @@ class TestRedisKVIOImageDataOneTimeSample(unittest.TestCase):
         self.data['channel_layer']['datatype'] = 'uint8'
         self.data['channel_layer']['max_time_step'] = 0
 
-        self.data['boss_key'] = ['col1&exp1&ch1']
-        self.data['lookup_key'] = ['4&2&1&0']
+        self.data['boss_key'] = 'col1&exp1&ch1'
+        self.data['lookup_key'] = '4&2&1'
 
         self.resource = BossResourceBasic(self.data)
 
@@ -104,94 +104,64 @@ class TestRedisKVIOImageDataOneTimeSample(unittest.TestCase):
     def tearDown(self):
         self.mock_tests = self.patcher.stop()
 
-    def test_get_cache_index_base_key(self):
+    def test_generate_cuboid_index_key(self):
         """Test the base key getter function for the cuboid index (cuboids that exist in the cache"""
         rkv = RedisKVIO()
-        assert rkv.get_cache_index_base_key(self.resource, 2) == ["CUBOID_IDX&4&2&1&0&2"]
+        assert rkv.generate_cuboid_index_key(self.resource, 2) == "CUBOID_IDX&4&2&1&2"
 
-    def test_get_cache_base_key(self):
+    def test_generate_cuboid_data_keys_single(self):
         """Test the base key getter function for the cuboids"""
         rkv = RedisKVIO()
-        assert rkv.get_cache_base_key(self.resource, 2) == ["CUBOID&4&2&1&0&2"]
+        assert rkv.generate_cuboid_data_keys(self.resource, 2, [0], [23445]) == ["CUBOID&4&2&1&2&0&23445"]
 
-    def test_generate_cache_index_keys_single(self):
+    def test_generate_cuboid_data_keys_multiple(self):
         """Test the generate cache index key generation for a single key"""
         rkv = RedisKVIO()
 
-        keys = rkv.generate_cache_index_keys(self.resource, 2)
+        keys = rkv.generate_cuboid_data_keys(self.resource, 2, [0], [123, 124, 125])
 
         assert isinstance(keys, list)
-        assert len(keys) == 1
-        assert keys[0] == "CUBOID_IDX&4&2&1&0&2"
-
-    def test_generate_cuboid_keys(self):
-        """Test the generate cache cuboid keys"""
-        rkv = RedisKVIO()
-        resolution = 5
-        morton_ids = list(range(2345, 2350))
-
-        keys = rkv.generate_cuboid_keys(self.resource, resolution, morton_ids)
-
-        assert isinstance(keys, list)
-        assert len(keys) == 5
-        assert keys[0] == "CUBOID&4&2&1&0&5&2345"
-        assert keys[1] == "CUBOID&4&2&1&0&5&2346"
-        assert keys[2] == "CUBOID&4&2&1&0&5&2347"
-        assert keys[3] == "CUBOID&4&2&1&0&5&2348"
-        assert keys[4] == "CUBOID&4&2&1&0&5&2349"
-
-    #def test_generate_keys_multiple(self):
-    #    # TODO MOVE once time samples are fully supported
-    #    """Test the generate cache index key generation for a multiple time samples"""
-    #    rkv = RedisKVIO()
-#
-    #    self.resource.set_time_samples([0, 1, 2, 3, 4, 5, 6, 7])
-    #    keys = rkv.generate_cache_index_keys(self.resource, 1)
-#
-    #    assert isinstance(keys, list)
-    #    assert len(keys) == len(self.resource.get_time_samples())
-#
-    #    for time_samaple, key in zip(self.resource.get_time_samples(), keys):
-    #        assert key == "CUBOID_IDX&4&2&1&1&{}".format(time_samaple)
-#
-    #    self.resource.set_time_samples([0])
+        assert len(keys) == 3
+        assert keys[0] == "CUBOID&4&2&1&2&0&123"
+        assert keys[1] == "CUBOID&4&2&1&2&0&124"
+        assert keys[2] == "CUBOID&4&2&1&2&0&125"
 
     def test_put_cube_index(self):
         """Test adding cubes to the cuboid index"""
-        redis_client = redis.StrictRedis(host=self.config["aws"]["cache-state"], port=6379, db=0,
-                                         decode_responses=True)
-        rkv = RedisKVIO(None, redis_client)
+        #redis_client = redis.StrictRedis(host=self.config["aws"]["cache-state"], port=6379, db=1,
+        #                                 decode_responses=True)
+        #rkv = RedisKVIO(None, redis_client)
+
         resolution = 1
-
+        rkv = RedisKVIO(self.cache_client, self.status_client)
+        #TODO FINISH TESTS STARTING HERE!!!
         # Make sure there are no items in the index
-        base_key = rkv.generate_cache_index_keys(self.resource, resolution)[0]
-        keys = redis_client.keys("{}*".format(base_key))
-
+        self.status_client.flushdb()
+        keys = self.status_client.keys("{}*".format(rkv.generate_cuboid_index_key(self.resource, resolution)))
         assert not keys
 
         # Update the index
         morton_ids = list(range(10, 23))
-        rkv.put_cube_index(self.resource, resolution, morton_ids)
+        rkv.put_cube_index(self.resource, resolution, [0], morton_ids)
 
-        keys = redis_client.keys("{}*".format(base_key))
+        keys = self.status_client.keys("{}*".format(rkv.generate_cuboid_index_key(self.resource, resolution)))
         assert len(keys) > 0
 
         # Make sure the keys are correct
-        morton_in_index = redis_client.smembers(base_key)
-
+        morton_in_index = self.status_client.smembers(rkv.generate_cuboid_index_key(self.resource, resolution))
         assert len(morton_ids) == len(morton_in_index)
 
         # Explicitly decode all values so you can compare since mockredis doesn't seem to do this automatically.
-        decoded_morton_in_index = [int(x.decode()) for x in morton_in_index]
+        expected_index = [int(x.decode()) for x in morton_in_index]
         for morton in morton_ids:
             assert morton in decoded_morton_in_index
 
-    def test_get_missing_cube_index_single_time_sample(self):
+    def test_get_missing_cube_index(self):
         """Test checking the index for cuboids that are missing"""
-        redis_client = redis.StrictRedis(host=self.config["aws"]["cache-state"], port=6379, db=0,
-                                         decode_responses=True)
-
-        rkv = RedisKVIO(None, redis_client)
+        #redis_client = redis.StrictRedis(host=self.config["aws"]["cache-state"], port=6379, db=1,
+        #                                 decode_responses=True)
+#
+        #rkv = RedisKVIO(None, redis_client)
         resolution = 1
 
         # Put some stuff in the index
@@ -217,7 +187,7 @@ class TestRedisKVIOImageDataOneTimeSample(unittest.TestCase):
         data = np.random.randint(50, size=[10, 15, 5])
 
         # Make sure there are no cuboids in the cache
-        base_key = rkv.get_cache_base_key(self.resource, resolution)
+        base_key = rkv.generate_cuboid_data_keys(self.resource, resolution)
         keys = redis_client.keys("{}*".format(base_key))
         assert not keys
 
@@ -237,7 +207,7 @@ class TestRedisKVIOImageDataOneTimeSample(unittest.TestCase):
         data = np.random.randint(50, size=[10, 15, 5])
 
         # Make sure there are no cuboids in the cache
-        base_key = rkv.get_cache_base_key(self.resource, resolution)
+        base_key = rkv.generate_cuboid_data_keys(self.resource, resolution)
         keys = redis_client.keys("{}*".format(base_key))
         assert not keys
 
@@ -256,7 +226,7 @@ class TestRedisKVIOImageDataOneTimeSample(unittest.TestCase):
         data = "A test string since just checking for key retrieval"
 
         # Make sure there are no cuboids in the cache
-        base_key = rkv.get_cache_base_key(self.resource, resolution)
+        base_key = rkv.generate_cuboid_data_keys(self.resource, resolution)
         keys = redis_client.keys("{}*".format(base_key))
         assert not keys
 
@@ -277,7 +247,7 @@ class TestRedisKVIOImageDataOneTimeSample(unittest.TestCase):
         data = "A test string since just checking for key retrieval"
 
         # Make sure there are no cuboids in the cache
-        base_key = rkv.get_cache_base_key(self.resource, resolution)
+        base_key = rkv.generate_cuboid_data_keys(self.resource, resolution)
         keys = redis_client.keys("{}*".format(base_key))
         assert not keys
 
@@ -306,7 +276,7 @@ class TestRedisKVIOImageDataOneTimeSample(unittest.TestCase):
             data_list.append("{}{}".format(data, ii))
 
         # Make sure there are no cuboids in the cache
-        base_key = rkv.get_cache_base_key(self.resource, resolution)
+        base_key = rkv.generate_cuboid_data_keys(self.resource, resolution)
         keys = redis_client.keys("{}*".format(base_key))
         assert not keys
 

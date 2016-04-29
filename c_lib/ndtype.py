@@ -16,7 +16,7 @@
 import numpy as np
 
 # Cuboid Size
-# TODO: Look into moving this into a data model table and set based on voxel sizt
+# TODO: Look into moving this into a data model table and set based on voxel size
 # non-isotropic slices should be 128,128,16. As you downsample move to 64,64,64 past isotropic
 CUBOIDSIZE = [[128, 128, 16],
               [128, 128, 16],
@@ -31,20 +31,6 @@ CUBOIDSIZE = [[128, 128, 16],
 
 # SuperCube Size
 SUPERCUBESIZE = [10, 10, 10]
-
-# TODO: DMK Can possibly strip this out
-# ND_Channel Types, Mapping, Groups
-IMAGE = 'image'
-ANNOTATION = 'annotation'
-TIMESERIES = 'timeseries'
-
-# TODO: DMK Can possibly strip this out
-ND_channeltypes = {0: IMAGE, 1: ANNOTATION, 2: TIMESERIES}
-
-# TODO: DMK Can possibly strip this out
-IMAGE_CHANNELS = [IMAGE]
-TIMESERIES_CHANNELS = [TIMESERIES]
-ANNOTATION_CHANNELS = [ANNOTATION]
 
 # ND Data Types, Mapping, Groups
 UINT8 = 'uint8'
@@ -62,6 +48,7 @@ DTYPE_float32 = [FLOAT32]
 ND_dtypetonp = {UINT8: np.uint8, UINT16: np.uint16, UINT32: np.uint32, UINT64: np.uint64, FLOAT32: np.float32}
 
 # Propagated Values
+# TODO: Propagation not supported yet
 PROPAGATED = 2
 UNDER_PROPAGATION = 1
 NOT_PROPAGATED = 0

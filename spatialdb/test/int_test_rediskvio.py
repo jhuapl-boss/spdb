@@ -45,7 +45,6 @@ class MockBossIntegrationConfig:
         return self.config[key]
 
 
-@unittest.skipIf(os.environ.get('UNIT_ONLY') is not None, "Only running unit tests")
 class TestIntegrationRedisKVIOImageDataOneTimeSample(unittest.TestCase):
 
     def setUp(self):
@@ -119,14 +118,14 @@ class TestIntegrationRedisKVIOImageDataOneTimeSample(unittest.TestCase):
         self.cache_client.flushdb()
         self.status_client.flushdb()
         rkv = RedisKVIO(self.cache_client, self.status_client)
-        assert rkv.get_cache_index_base_key(self.resource, 2) == ["CUBOID_IDX&4&2&1&0&2"]
+        assert rkv.generate_cuboid_index_keys(self.resource, 2) == ["CUBOID_IDX&4&2&1&0&2"]
 
     def test_get_cache_base_key(self):
         """Test the base key getter function for the cuboids"""
         self.cache_client.flushdb()
         self.status_client.flushdb()
         rkv = RedisKVIO(self.cache_client, self.status_client)
-        assert rkv.get_cache_base_key(self.resource, 2) == ["CUBOID&4&2&1&0&2"]
+        assert rkv.generate_cuboid_data_keys(self.resource, 2) == ["CUBOID&4&2&1&0&2"]
 
     def test_generate_cache_index_keys_single(self):
         """Test the generate cache index key generation for a single key"""
@@ -148,7 +147,7 @@ class TestIntegrationRedisKVIOImageDataOneTimeSample(unittest.TestCase):
         resolution = 5
         morton_ids = list(range(2345, 2350))
 
-        keys = rkv.generate_cuboid_keys(self.resource, resolution, morton_ids)
+        keys = rkv.generate_cuboid_data_keys(self.resource, resolution, morton_ids)
 
         assert isinstance(keys, list)
         assert len(keys) == 5
@@ -236,7 +235,7 @@ class TestIntegrationRedisKVIOImageDataOneTimeSample(unittest.TestCase):
         data = np.random.randint(50, size=[10, 15, 5])
 
         # Make sure there are no cuboids in the cache
-        base_key = rkv.get_cache_base_key(self.resource, resolution)
+        base_key = rkv.generate_cuboid_data_keys(self.resource, resolution)
         keys = self.cache_client.keys("{}*".format(base_key))
         assert not keys
 
@@ -256,7 +255,7 @@ class TestIntegrationRedisKVIOImageDataOneTimeSample(unittest.TestCase):
         data = np.random.randint(50, size=[10, 15, 5])
 
         # Make sure there are no cuboids in the cache
-        base_key = rkv.get_cache_base_key(self.resource, resolution)
+        base_key = rkv.generate_cuboid_data_keys(self.resource, resolution)
         keys = self.cache_client.keys("{}*".format(base_key))
         assert not keys
 
@@ -275,7 +274,7 @@ class TestIntegrationRedisKVIOImageDataOneTimeSample(unittest.TestCase):
         data = "A test string since just checking for key retrieval"
 
         # Make sure there are no cuboids in the cache
-        base_key = rkv.get_cache_base_key(self.resource, resolution)
+        base_key = rkv.generate_cuboid_data_keys(self.resource, resolution)
         keys = self.cache_client.keys("{}*".format(base_key))
         assert not keys
 
@@ -304,7 +303,7 @@ class TestIntegrationRedisKVIOImageDataOneTimeSample(unittest.TestCase):
             data_list.append("{}{}".format(data, ii))
 
         # Make sure there are no cuboids in the cache
-        base_key = rkv.get_cache_base_key(self.resource, resolution)
+        base_key = rkv.generate_cuboid_data_keys(self.resource, resolution)
         keys = self.cache_client.keys("{}*".format(base_key))
         assert not keys
 

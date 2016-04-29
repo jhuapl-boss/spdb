@@ -88,13 +88,6 @@ class BossResourceBasic(BossResource):
                                 self.data['channel_layer']['base_resolution'],
                                 self.data['channel_layer']['layer_map'])
 
-    def populate_time_samples(self):
-        """
-        Method to set self._time_samples.
-        """
-        # TODO: add time sample support
-        self._time_samples = [0]
-
     def populate_boss_key(self):
         """
         Method to set self._boss_key.
@@ -105,7 +98,6 @@ class BossResourceBasic(BossResource):
         """
         Method to set self._lookup_key.  Should be overridden.
         """
-        # TODO: add look up key
         self._lookup_key = self.data['lookup_key']
 
     # Methods to delete the entry from the data model tables

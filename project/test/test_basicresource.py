@@ -168,26 +168,6 @@ class TestBasicResource(unittest.TestCase):
         assert channel.parent_channels == setup_data['channel_layer']['layer_map']
         assert channel.base_resolution == setup_data['channel_layer']['base_resolution']
 
-    def test_basic_resource_time_samples(self):
-        """Test basic get and set time samples interface
-
-        Returns:
-            None
-
-        """
-        setup_data = self.get_image_dict()
-        resource = BossResourceBasic(setup_data)
-
-        assert resource.is_channel() == True
-
-        assert resource.get_time_samples() == [0]
-
-        resource.set_time_samples([0, 1, 2, 3, 4, 5])
-        assert resource.get_time_samples() == [0, 1, 2, 3, 4, 5]
-
-        resource.set_time_samples(3)
-        assert resource.get_time_samples() == [3]
-
     def test_basic_resource_get_boss_key(self):
         """Test basic get boss key interface
 

@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import redis
+import itertools
 
 from .error import SpdbError, ErrorCode
 from .kvio import KVIO
@@ -49,206 +50,173 @@ class RedisKVIO(KVIO):
         pass
 
     def start_txn(self):
-        """Start a transaction. Ensure database is in multi-statement mode."""
+        """Start a transaction. Ensure database is in multi-statement mode.
+
+        No transactions with redis
+
+        """
         pass
 
     def commit(self):
-        """Commit the transaction. Moved out of __del__ to make explicit."""
+        """Commit the transaction. Moved out of __del__ to make explicit.
+
+        No transactions with redis"""
         pass
 
     def rollback(self):
-        """Rollback the transaction. To be called on exceptions."""
+        """Rollback the transaction. To be called on exceptions.
+
+        No transactions with redis"""
         pass
 
-    def get_cache_index_base_key(self, resource, resolution):
-        """Generate the base name of the key used to store status if cuboids are present in the cache"""
-        return ['CUBOID_IDX&{}&{}'.format(key, resolution) for key in resource.get_lookup_key()]
+    def generate_cuboid_index_key(self, resource, resolution):
+        """Generate the key used to store index of cuboids that are present in the cache
 
-    def get_cache_base_key(self, resource, resolution):
-        """Generate the base name of the key used to store cuboids in the cache"""
-        # TODO: Possibly update boss request to return the look up key so time isn't before resolution
-        return ['CUBOID&{}&{}'.format(key, resolution) for key in resource.get_lookup_key()]
-
-    def generate_cache_index_keys(self, resource, resolution):
-        """Generate Keys for cuboid index sets in the redis cache db
-
-        The key contains the base lookup key with the time samples included in the resource.
-
-        Args:
-            resource (spdb.project.BossResource): Data model info based on the request or target resource
-            resolution (int): the resolution level
-
-        Returns:
-            list[str]: A list of keys for each time sample index
+        Cuboids are indexed by collection/experiment/channel_layer/resolution with the values in the set being a
+        combination of the time sample and morton ID.
 
         """
-        return self.get_cache_index_base_key(resource, resolution)
+        return 'CUBOID_IDX&{}&{}'.format(resource.get_lookup_key(), resolution)
 
-    def generate_cuboid_keys(self, resource, resolution, morton_idx_list):
-        """Generate Keys for cuboid access in the redis cache db
+    def generate_cuboid_data_keys(self, resource, resolution, time_sample_list, morton_idx_list):
+        """Generate Keys for cuboid storage in the redis cache db
 
-        The key contains the base lookup key with the time samples and morton ids
+        The keys are ordered by time sample followed by morton ID (e.g. 1&1, 1&2, 1&3, 2&1, 2&2, 2&3)
+
+        The key contains the base lookup key with the time samples and morton ids appended with the format:
+
+            CUBOID&{lookup_key}&time_sample&morton_id
 
         Args:
             resource (spdb.project.BossResource): Data model info based on the request or target resource
             resolution (int): the resolution level
             morton_idx_list (list[int]): a list of Morton ID of the cuboids to get
+            time_sample_list (list[int]): a list of time samples of the cuboids to get
 
         Returns:
             list[str]: A list of keys for each cuboid
 
         """
-        if not isinstance(morton_idx_list, list):
-            morton_idx_list = [morton_idx_list]
+        base_key = 'CUBOID&{}&{}'.format(resource.get_lookup_key(), resolution)
 
-        key_list = []
-        for base_key in self.get_cache_base_key(resource, resolution):
-            for z_idx in morton_idx_list:
-                key_list.append('{}&{}'.format(base_key, z_idx))
+        # Get the combinations of time and morton, properly ordered
+        key_suffix_list = itertools.product(time_sample_list, morton_idx_list)
 
-        return key_list
+        # Return a list of all keys
+        return ['{}&{}&{}'.format(base_key, s[0], s[1]) for s in key_suffix_list]
 
-    def get_missing_cube_index(self, resource, resolution, morton_idx_list):
-        """Retrieve the indexes of missing cubes in the cache db
+    def get_missing_cube_index(self, resource, resolution, time_sample_list, morton_idx_list):
+        """Retrieve the indexes of missing cubes in the cache db based on a morton ID list and time samples
+
+        The index of cuboids in the cache is maintained by a compound value of the time sample and morton ID in a
+        redis set for each {lookup_key}&resolution as the key of the set.
 
         Args:
             resource (spdb.project.BossResource): Data model info based on the request or target resource
             resolution (int): the resolution level
+            time_sample_list (list[int]): a list of time samples
             morton_idx_list (list[int]): a list of Morton ID of the cuboids to get
 
         Returns:
-            list[str]: A list of cuboid keys to query
+            list[str]: A list of cuboid index values to query
         """
+        # Get the key of the SET that stores the index
+        index_key = self.generate_cuboid_index_key(resource, resolution)
+        desired_index_key = '{}_temp'.format(self.generate_cuboid_index_key(resource, resolution))
 
-        index_keys = self.generate_cache_index_keys(resource, resolution)
-        index_store_temp = [x + '_temp' for x in index_keys]
+        # Generate index values for all requested cuboids
+        index_vals = ["{}&{}".format(x[0], x[1]) for x in itertools.product(time_sample_list, morton_idx_list)]
 
         try:
-            # Loop through each time sample, which has it's own index currently
-            ids_to_fetch = []
-            for index_key, temp_key in zip(index_keys, index_store_temp):
-                # Add
-                self.status_client.sadd(temp_key, *morton_idx_list)
+            # Add expected values to a temp key
+            self.status_client.sadd(desired_index_key, *index_vals)
 
-                ids_to_fetch.extend(list(self.status_client.sdiff(temp_key, index_key)))
+            # Perform server side set operation (index_key contents can be huge so currently this makes sense)
+            idxs_to_fetch = list(self.status_client.sdiff(desired_index_key, index_key))
 
-                self.status_client.delete(temp_key)
+            # Remove temporary set
+            self.status_client.delete(desired_index_key)
+
         except Exception as e:
             raise SpdbError("Redis Error", "Error retrieving cube indexes into the database. {}".format(e),
                             ErrorCode.REDIS_ERROR)
 
-        return ids_to_fetch
+        return idxs_to_fetch
 
-    def put_cube_index(self, resource, resolution, morton_idx_list):
-        """Add cuboid indicies that are loaded into the cache db
+    def index_to_time_and_morton(self, index_list):
+        """ Method to convert cuboid index values (time_sample&morton_id) to a list of time samples and morton ids
+        that are readily consumed by get_cubes
+
+        Args:
+            index_list (list(str)): A list of index values from the cache status db
+
+        Returns:
+            (list(int), list(int)): A tuple of two lists containing the time samples and morton ids
+        """
+        # Split index values into time samples and morton IDs
+        missing_time_samples, missing_morton_ids = zip(*(int(value.split("&")) for value in index_list))
+        missing_time_samples = list(set(missing_time_samples))
+        missing_morton_ids = list(set(missing_morton_ids))
+
+        return missing_time_samples, missing_morton_ids
+
+    def put_cube_index(self, resource, resolution, time_sample_list, morton_idx_list):
+        """Add cuboid indices that are loaded into the cache db
 
         Args:
             resource (spdb.project.BossResource): Data model info based on the request or target resource
             resolution (int): the resolution level
-            morton_idx_list (list[int]): a list of Morton ID of the cuboids to get
+            time_sample_list (list(int)): a list of time samples for the cubes that have that have been inserted
+            morton_idx_list (list(int)): a list of Morton IDs for the cubes that have that have been inserted
 
         Returns:
             None
         """
-        resolution = 1
+        # Generate index values for all cuboids
+        index_vals = ["{}&{}".format(x[0], x[1]) for x in itertools.product(time_sample_list, morton_idx_list)]
+
         try:
-            for key in self.generate_cache_index_keys(resource, resolution):
-                self.status_client.sadd(key, *morton_idx_list)
+            # Add index values to the set
+            self.status_client.sadd(self.generate_cuboid_index_key(resource, resolution), *index_vals)
 
         except Exception as e:
             raise SpdbError("Redis Error", "Error inserting cube indexes into the database. {}".format(e),
                             ErrorCode.REDIS_ERROR)
 
-    def get_cube(self, resource, resolution, morton_idx):
-        """Retrieve a single cuboid from the cache database
-
-        Args:
-            resource (spdb.project.BossResource): Data model info based on the request or target resource
-            resolution (int): the resolution level
-            morton_idx (int): the Morton ID of the cuboid to get
-
-        Returns:
-
-        """
-        # TODO: Add tracking of access time for LRU eviction
-
-        try:
-            rows = self.cache_client.mget(self.generate_cuboid_keys(resource, resolution, [morton_idx]))
-        except Exception as e:
-            raise SpdbError("Redis Error", "Error retrieving cubes from the cache database. {}".format(e),
-                            ErrorCode.REDIS_ERROR)
-
-        if rows[0]:
-            return rows[0]
-        else:
-            return None
-
-    def get_cubes(self, resource, resolution, morton_idx_list):
+    def get_cubes(self, resource, resolution, time_sample_list, morton_idx_list):
         """Retrieve multiple cubes from the cache database, yield one at a time via generator
+
+        Cubes are returned in order, by incrementing time sample followed by incrementing morton ID
 
         Args:s
             resource (spdb.project.BossResource): Data model info based on the request or target resource
             resolution (int): the resolution level
-            morton_idx (int): the Morton ID of the cuboid to get
+            morton_idx (int): the list of Morton IDs of the cuboids to get
+            time_sample_list (int): list of time sample points
 
         Returns:
-            (int, bytes): A tuple of the morton index and the blosc compressed byte array using the numpy interface
+            (int, int, bytes): A tuple of the time sample, morton index, and the blosc compressed byte array using
+             the numpy interface
         """
-
         try:
-            rows = self.cache_client.mget(self.generate_cuboid_keys(resource, resolution, morton_idx_list))
+            # Get the data from the DB
+            rows = self.cache_client.mget(self.generate_cuboid_data_keys(resource,
+                                                                         resolution,
+                                                                         morton_idx_list,
+                                                                         time_sample_list))
         except Exception as e:
             raise SpdbError("Redis Error", "Error retrieving cubes from the cache database. {}".format(e),
                             ErrorCode.REDIS_ERROR)
 
-        for idx, row in zip(morton_idx_list, rows):
-            yield (idx, row)
+        # Yield the resulting cuboids as RAW blosc compressed numpy arrays
+        for time, idx, row in zip(time_sample_list, morton_idx_list, rows):
+            yield (time, idx, row)
 
-    # TODO: Investigate if unique representation of time-series data is needed and if this is needed
-    #def getTimeCubes(self, ch, idx, listoftimestamps, resolution):
-    #   """Retrieve multiple cubes from the database"""
-
-    #   try:
-    #       rows = self.client.mget(self.generate_cache_index_keys(ch, resolution, [idx], listoftimestamps))
-    #   except Exception as e:
-    #       logger.error("Error inserting cubes into the database. {}".format(e))
-    #       raise SpatialDBError("Error inserting cubes into the database. {}".format(e))
-
-    #   for idx, timestamp, row in zip([idx] * len(listoftimestamps), listoftimestamps, rows):
-    #       yield (idx, timestamp, row)
-
-    # TODO: Add if needed.  DMK pretty sure this was from OCPBlaze and not needed at the moment
-    #def put_cube(self, resource, resolution, morton_idx, cube_bytes, update=False):
-    #    """Store a single cube into the database
-#
-    #    Args:
-    #        resource (spdb.project.BossResource): Data model info based on the request or target resource
-    #        resolution (int): the resolution level
-    #        morton_idx (int): the Morton ID of the cuboid to get
-    #        cube_bytes (bytes): a cube in a blosc compressed byte array using the numpy interface
-    #        update:
-#
-    #    Returns:
-    #        None
-    #    """
-    #    if not isinstance(morton_idx, list):
-    #        morton_idx = [morton_idx]
-#
-    #    # Generate the cuboid key
-    #    cuboid_key = self.generate_cuboid_keys(resource, resolution, morton_idx)
-    #    cuboid_index_key = self.generate_cache_index_keys(resource, resolution)
-#
-    #    try:
-    #        # Put cuboid
-    #        # Update cuboid index
-    #        self.put_cube_index(resource, resolution, morton_idx)
-#
-    #    except Exception as e:
-    #        raise SpdbError("Redis Error", "Error inserting cube into the cache database. {}".format(e),
-    #                        ErrorCode.REDIS_ERROR)
-
-    def put_cubes(self, resource, resolution, morton_idx_list, cube_list, update=False):
+    def put_cubes(self, resource, resolution, time_sample_list, morton_idx_list, cube_list, update=False):
         """Store multiple cubes in the cache database
+
+        The length of time_sample_list, morton_idx_list, and cube_list should all be the same and linked together
+        (e.g. time_sample_list[12] and morton_idx_list[12] are for the data in cube_list[12]
 
         Args:
             resource (spdb.project.BossResource): Data model info based on the request or target resource
@@ -260,11 +228,68 @@ class RedisKVIO(KVIO):
         Returns:
 
         """
+        # Generate the list of keys
+        key_list = self.generate_cuboid_data_keys(resource, resolution, time_sample_list, morton_idx_list)
 
-        # generating the list of keys
-        key_list = self.generate_cuboid_keys(resource, resolution, morton_idx_list)
+        # TODO: Update index?
+
         try:
+            # Write data to redis
+            # TODO this could be optimized/parallelized potentially for large numbers of cuboids
             self.cache_client.mset(dict(list(zip(key_list, cube_list))))
         except Exception as e:
             raise SpdbError("Redis Error", "Error inserting cubes into the cache database. {}".format(e),
                             ErrorCode.REDIS_ERROR)
+
+    # TODO: Add if needed.  DMK pretty sure this was from OCPBlaze and not needed at the moment
+    #def put_cube(self, resource, resolution, morton_idx, cube_bytes, update=False):
+    #    """Store a single cube into the database
+
+    #    Args:
+    #        resource (spdb.project.BossResource): Data model info based on the request or target resource
+    #        resolution (int): the resolution level
+    #        morton_idx (int): the Morton ID of the cuboid to get
+    #        cube_bytes (bytes): a cube in a blosc compressed byte array using the numpy interface
+    #        update:
+
+    #    Returns:
+    #        None
+    #    """
+    #    if not isinstance(morton_idx, list):
+    #        morton_idx = [morton_idx]
+
+    #    # Generate the cuboid key
+    #    cuboid_key = self.generate_cuboid_data_keys(resource, resolution, morton_idx)
+    #    cuboid_index_key = self.generate_cache_index_keys(resource, resolution)
+
+    #    try:
+    #        # Put cuboid
+    #        # Update cuboid index
+    #        self.put_cube_index(resource, resolution, morton_idx)
+
+    #    except Exception as e:
+    #        raise SpdbError("Redis Error", "Error inserting cube into the cache database. {}".format(e),
+    #                        ErrorCode.REDIS_ERROR)
+
+    #def get_cube(self, resource, resolution, morton_idx):
+    #    """Retrieve a single cuboid from the cache database
+
+    #    Args:
+    #        resource (spdb.project.BossResource): Data model info based on the request or target resource
+    #        resolution (int): the resolution level
+    #        morton_idx (int): the Morton ID of the cuboid to get
+
+    #    Returns:
+
+    #    """
+
+    #    try:
+    #        rows = self.cache_client.mget(self.generate_cuboid_data_keys(resource, resolution, [morton_idx]))
+    #    except Exception as e:
+    #        raise SpdbError("Redis Error", "Error retrieving cubes from the cache database. {}".format(e),
+    #                        ErrorCode.REDIS_ERROR)
+
+    #    if rows[0]:
+    #        return rows[0]
+    #    else:
+    #        return None

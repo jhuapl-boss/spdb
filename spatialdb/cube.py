@@ -107,7 +107,6 @@ class Cube(metaclass=ABCMeta):
             raise SpdbError("IO Error", "Failed to compress database cube.  Data integrity concern.",
                             ErrorCode.IO_ERROR)
 
-    # todo: look into seeing if this works Ok from C?
     def from_blosc_numpy(self, byte_array):
         """Uncompress and populate Cube data from a Blosc serialized and compressed byte array using the numpy interface
 
@@ -257,16 +256,6 @@ class Cube(metaclass=ABCMeta):
             # return anncube.AnnotateCube64(cube_size)
             raise SpdbError("Proposed Capability", "Data type not yet supported",
                             ErrorCode.FUTURE)
-
-        # TODO: DMK figure out if time series implementation needs separate cubes and storage optimization
-        #elif channel_type in TIMESERIES_CHANNELS and timerange is not None:
-        #    if data_type in DTYPE_uint8:
-        #        return timecube.TimeCube8(cube_size, timerange)
-        #    elif data_type in DTYPE_uint16:
-        #        return timecube.TimeCube16(cube_size, timerange)
-        #    elif data_type in DTYPE_float32:
-        #        return timecube.TimeCubeFloat32(cube_size, timerange)
-
         # Assume channels here
         elif data_type in ndtype.DTYPE_uint8:
             from .imagecube import ImageCube8

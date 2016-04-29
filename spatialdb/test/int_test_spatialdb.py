@@ -44,7 +44,6 @@ class MockBossIntegrationConfig:
         return self.config[key]
 
 
-@unittest.skipIf(os.environ.get('UNIT_ONLY') is not None, "Only running unit tests")
 class TestIntegrationSpatialDBImageDataOneTimeSample(unittest.TestCase):
 
     def setUp(self):

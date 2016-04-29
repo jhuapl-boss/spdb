@@ -196,49 +196,43 @@ class BossResource(metaclass=ABCMeta):
         """
         Method to create a Collection instance and set self._collection.  Should be overridden.
         """
-        pass
+        return NotImplemented
 
     @abstractmethod
     def populate_coord_frame(self):
         """
         Method to create a CoordinateFrame instance and set self._coord_frame.  Should be overridden.
         """
-        pass
+        return NotImplemented
 
     @abstractmethod
     def populate_experiment(self):
         """
         Method to create a Experiment instance and set self._experiment.  Should be overridden.
         """
-        pass
+        return NotImplemented
 
     @abstractmethod
     def populate_channel_or_layer(self):
         """
         Method to create a Channel or Layer instance and set self._channel or self._layer.  Should be overridden.
         """
-        pass
+        return NotImplemented
 
-    @abstractmethod
-    def populate_time_samples(self):
-        """
-        Method to set self._time_samples.  Should be overridden.
-        """
-        pass
 
     @abstractmethod
     def populate_boss_key(self):
         """
         Method to set self._boss_key.  Should be overridden.
         """
-        pass
+        return NotImplemented
 
     @abstractmethod
     def populate_lookup_key(self):
         """
         Method to set self._lookup_key.  Should be overridden.
         """
-        pass
+        return NotImplemented
 
     # GETTERS
     def get_collection(self):
@@ -301,27 +295,6 @@ class BossResource(metaclass=ABCMeta):
             self.populate_channel_or_layer()
         return self._layer is None
 
-    def set_time_samples(self, idx):
-        """Method to set the current time sample index or indices if needed and can't be done lazily
-
-        :returns The index or indices for the current resource.
-        :rtype list[int]
-        """
-        if isinstance(idx, list):
-            self._time_samples = idx
-        else:
-            self._time_samples = [idx]
-
-    def get_time_samples(self):
-        """Method to get the current time sample index or indicies.  Lazily populated.
-
-        :returns The index or indicies for the current resource.
-        :rtype list[int]
-        """
-        if not self._time_samples:
-            self.populate_time_samples()
-        return self._time_samples
-
     def get_boss_key(self):
         """Method to get the current boss key.  Lazily populated.
 
@@ -333,10 +306,10 @@ class BossResource(metaclass=ABCMeta):
         return self._boss_key
 
     def get_lookup_key(self):
-        """Method to get the current lookup key.  Lazily populated.
+        """Method to get the current lookup keys.  Lazily populated.
 
         :returns The lookup key
-        :rtype str
+        :rtype list[str]
         """
         if not self._lookup_key:
             self.populate_lookup_key()
