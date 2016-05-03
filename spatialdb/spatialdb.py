@@ -25,13 +25,6 @@ from .error import SpdbError, ErrorCode
 from .kvio import KVIO
 from .cube import Cube
 
-"""
-.. module:: spatialdb
-    :synopsis: Manipulate/create/read from the Morton-order cube store
-
-.. moduleauthor:: Kunal Lillaney <lillaney@jhu.edu> and Dean Kleissas <dean.kleissas@jhuapl.edu>
-"""
-
 # Todo: fix logger so you can mock it. Then reinsert into class
 #from bossutils.logger import BossLogger
 #logger = BossLogger()
@@ -46,7 +39,7 @@ class SpatialDB:
 
     Attributes:
       resource (project.BossResource): Data model info based on the request or target resource
-      s3io ():
+      s3io (): FUTURE
       kvio (KVIO): A key-value store engine instance
     """
 
@@ -72,108 +65,60 @@ class SpatialDB:
         """
         self.kvio.close()
 
-    # GET Method
-    def get_cube(self, resource, resolution, morton_idx, update=False):
-        """
-        Load a single cuboid from the cache key-value store - primarily used by Blaze interface
-
-        Args:
-            resource (project.BossResource): Data model info based on the request or target resource
-            morton_idx (int): the Morton ID of the cuboid
-            resolution (int): the resolution level
-            update (bool): True if this an update operation. False if the first time you are inserting the cuboid
-
-        Returns:
-            cube.Cube: The cuboid data
-        """
-        # TODO: DMK to add cuboid tracking indexing here
-        # This is referring to adding redis/s3 index call here like below in get_cubes.  occasionally get_cube is called
-        # directly so you need it here. Ultimately this might get replaced with a call to the cache manager?
-        cube = Cube.create_cube(resource, CUBOIDSIZE[resolution])
-
-        # get the block from the database
-        cube_bytes = self.kvio.get_cube(resource, resolution, morton_idx)
-
-        if not cube_bytes:
-            # There wasn't a cuboid so return zeros
-            cube.zeros()
-        else:
-            # Handle the cube format here and decompress the cube
-            cube.from_blosc_numpy(cube_bytes)
-
-        return cube
-
-    def get_cubes(self, resource, resolution, morton_idx_list):
-        """Load an array of cuboids from the cache key-value store
+    # Cube Processing Methods
+    def get_cubes(self, resource, resolution, time_sample_list, morton_idx_list):
+        """Load an array of cuboids from the cache key-value store as raw compressed byte arrays dealing with
+        cache misses if necessary (future)
 
         Args:
             resource (spdb.project.BossResource): Data model info based on the request or target resource
-            morton_idx_list (list[int]): a list of Morton ID of the cuboids to get
             resolution (int): the resolution level
+            time_sample_list (list(int)): a list of time samples to get
+            morton_idx_list (list(int)): a list of Morton ID of the cuboids to get
 
         Returns:
-            list[(int, bytes)]: The cuboid data in a tuple, (mortonID, compressed bytes)
+            list((int, int, bytes)): The cuboid data in a tuple - (time sample, morton ID, compressed bytes)
         """
-        if len(resource.get_time_samples()) == 1:
-            # TODO: Update this block of code once S3 integration has occurred
-            if self.s3io:
-                # Get the ids of the cuboids you need - only gives ids to be fetched
-                ids_to_fetch = self.kvio.get_cube_index(resource, resolution, morton_idx_list)
-
-                # Check if the index exists inside the cache database or if you must fetch from S3
-                if ids_to_fetch:
-                    logger.info("Cache miss on get_cubes. Loading from S3: {}".format(morton_idx_list))
-                    super_cuboids = self.s3io.get_cubes(resource, ids_to_fetch, resolution)
-
-                    # Iterating over super cuboids and load into the cache kv-stores
-                    for supercuboid_idx_list, supercuboid_list in super_cuboids:
-                        # call put_cubes and update index in the table before returning data
-                        self.put_cubes(resource, supercuboid_idx_list, resolution, supercuboid_list, update=True)
-
-            return self.kvio.get_cubes(resource, resolution, morton_idx_list)
-        else:
-            raise SpdbError('Not Supported', 'Time Series data not yet fully supported', ErrorCode.DATATYPE_NOT_SUPPORTED)
-            # return self.kvio.getTimeCubes(resource, morton_idx_list, timestamp_list, resolution)
-
-    # PUT Methods
-    def put_cube(self, resource, zidx, resolution, cube):
-        """Insert a cuboid into the cache key-value store
-
-        Args:
-            resource (project.BossResource): Data model info based on the request or target resource
-            zidx (int): a list of Morton ID of the cuboids to get
-            resolution (int): the resolution level
-            cube (cube.Cube): list of cuboids to store in the cache key-value store
-
-        Returns:
-            list[numpy.ndarray]: The cuboid data
-        """
-        # If using S3, update index of cuboids that exist in the cache key-value store
         if self.s3io:
-            # TODO: Update after S3 integration. Move index IO into new class
-            self.kvio.put_cube_index(resource, resolution, [zidx])
+            raise SpdbError('Not Supported', 'S3 backend not yet supported',
+                            ErrorCode.FUTURE)
 
-        self.kvio.put_cubes(resource, zidx, resolution, [cube.to_blosc_numpy()], not cube.from_zeros())
+            ## Get the ids of the cuboids you need - only gives ids to be fetched
+            #ids_to_fetch = self.kvio.get_cube_index(resource, resolution, morton_idx_list)
 
-    def put_cubes(self, resource, resolution, morton_idx_list, cube_list, update=False):
-        """Insert a list of cubes into the cache key-value store
+            ## Check if the index exists inside the cache database or if you must fetch from S3
+            #if ids_to_fetch:
+            #    logger.info("Cache miss on get_cubes. Loading from S3: {}".format(morton_idx_list))
+            #    super_cuboids = self.s3io.get_cubes(resource, ids_to_fetch, resolution)
+
+            #    # Iterating over super cuboids and load into the cache kv-stores
+            #    for supercuboid_idx_list, supercuboid_list in super_cuboids:
+            #        # call put_cubes and update index in the table before returning data
+            #        self.put_cubes(resource, supercuboid_idx_list, resolution, supercuboid_list, update=True)
+
+        return self.kvio.get_cubes(resource, resolution, time_sample_list, morton_idx_list)
+
+    def put_cubes(self, resource, resolution, time_sample_list, morton_idx_list, cube_list):
+        """Insert a list of Cube instances into the cache key-value store
 
         Args:
             resource (project.BossResource): Data model info based on the request or target resource
-            morton_idx_list (list[int]): a list of Morton ID of the cuboids to get
             resolution (int): the resolution level
-            cube_list (list[cube.Cube]): list of cuboids to store in the cache key-value store
+            morton_idx_list (list(int)): a list of Morton ID with 1-1 mapping to the cube_list
+            time_sample_list (list(int)): a list of time samples with 1-1 mapping to the cube_list
+            cube_list (list[cube.Cube]): list of Cube instances to store in the cache key-value store
             update (bool): True if this an update operation. False if the first time you are inserting the cuboid
 
         Returns:
             list[numpy.ndarray]: The cuboid data
         """
+        # Add cubes to cache
+        result = self.kvio.put_cubes(resource, resolution, morton_idx_list, [x.to_blosc_numpy() for x in cube_list])
 
-        #if self.s3io:
-        self.kvio.put_cube_index(resource, resolution, morton_idx_list)
+        # Add cubes to cache index if successful
+        self.kvio.put_cube_index(resource, resolution, time_sample_list, morton_idx_list)
 
-        return self.kvio.put_cubes(resource, resolution, morton_idx_list, [x.to_blosc_numpy() for x in cube_list],
-                                   update)
+        return result
 
     def _up_sample_cutout(self, resource, corner, extent, resolution):
         """Transform coordinates of a base resolution cutout to a lower res level by up-sampling.
@@ -185,7 +130,7 @@ class SpatialDB:
         and up-sample the data, creating a physically large image.
 
         Args:
-            resource (project.BossResource): Data model info based on the request or target resource:
+            resource (spdb.project.BossResource): Data model info based on the request or target resource:
             corner ((int, int, int)): the XYZ corner point of the cutout
             extent: ((int, int, int)): the XYZ extent of the cutout
             resolution: the requested resolution level
@@ -273,25 +218,35 @@ class SpatialDB:
 
         return result_tuple(effcorner, effdim, None, None)
 
-    def cutout(self, resource, corner, extent, resolution):
+    # Main Interface Methods
+    def cutout(self, resource, corner, extent, resolution, time_sample_list=None):
         """Extract a cube of arbitrary size. Need not be aligned to cuboid boundaries.
 
         Args:
-            resource (project.BossResource): Data model info based on the request or target resource
+            resource (spdb.project.BossResource): Data model info based on the request or target resource
             corner ((int, int, int)): a list of Morton ID of the cuboids to get
             extent ((int, int, int)): a list of Morton ID of the cuboids to get
             resolution (int): the resolution level
+            time_sample_list list((int)): a list of time samples to query
 
         Returns:
             cube.Cube: The cutout data stored in a Cube instance
         """
+        # TODO: DMK move CUBOIDSIZE into Resource
+
+        if not time_sample_list:
+            # If not time sample list defined, used default of 0
+            time_sample_list = [0]
 
         # if cutout is below resolution, get a smaller cube and scaleup
         # ONLY FOR ANNO CHANNELS - if data is missing on the current resolution but exists else where...extrapolate
-        # TODO: ask kunal what below resolution means? what is the getResolution method doing?
-        # ch.getResolution is the "base" resolution and you assume data exists there.
-        # If propagated you don't have to worry about this. -> currently they don't upsample annotations when hardening
-        # the database, so don't need to check for propagated.
+        # resource.get_layer().base_resolution is the "base" resolution and you assume data exists there.
+        # If propagated you don't have to worry about this.
+        # currently we don't upsample annotations when hardening the database, so don't need to check for propagated.
+
+        # Create namedtuple for consistency with re-sampling paths through the code
+        result_tuple = namedtuple('ResampleCoords',
+                                  ['corner', 'extent', 'x_pixel_offset', 'y_pixel_offset'])
 
         # Check if you need to scale a cutout due to off-base resolution cutouts/propagation state
         if not resource.is_channel():
@@ -307,8 +262,6 @@ class SpatialDB:
 
             elif not resource.is_channel() and base_res < resolution and not resource.is_propagated():
                 # If cutout is a layer, above base resolution (lower res), and NOT propagated, down-sample
-                #TODO: DMK move CUBOIDSIZE into Resource
-
                 cutout_coords = self._down_sample_cutout(resource, corner, extent, resolution)
 
                 [x_cube_dim, y_cube_dim, z_cube_dim] = cube_dim = CUBOIDSIZE[base_res]
@@ -321,8 +274,6 @@ class SpatialDB:
                 cutout_resolution = resolution
 
                 # Create namedtuple for consistency with re-sampling paths through the code
-                result_tuple = namedtuple('ResampleCoords',
-                                          ['corner', 'extent', 'x_pixel_offset', 'y_pixel_offset'])
                 cutout_coords = result_tuple(corner, extent, None, None)
         else:
             # Resouce is a channel, so no re-sampling
@@ -331,8 +282,6 @@ class SpatialDB:
             cutout_resolution = resolution
 
             # Create namedtuple for consistency with re-sampling paths through the code
-            result_tuple = namedtuple('ResampleCoords',
-                                      ['corner', 'extent', 'x_pixel_offset', 'y_pixel_offset'])
             cutout_coords = result_tuple(corner, extent, None, None)
 
         # Round to the nearest larger cube in all dimensions
@@ -459,59 +408,6 @@ class SpatialDB:
 
         return out_cube
 
-    def write_cuboids(self, resource, corner, resolution, cuboid_data):
-        """ Write an arbitary size data to the database
-
-        Main use is in OCP Blaze/cache in inconsistent mode since it reconciles writes in memory asynchronously
-
-        Args:
-            resource (project.BossResource): Data model info based on the request or target resource
-            corner ((int, int, int)): a list of Morton ID of the cuboids to get
-            resolution (int): the resolution level
-            cuboid_data (cube.Cube): arbitrary sized matrix of data to write to cuboids in the cache db
-
-
-        Returns:
-            None
-        """
-        # dim is in xyz, data is in zyx order
-        # TODO: Confirm if data should continue to be stored in zyx
-        dim = cuboid_data.shape[::-1]
-
-        # get the size of the image and cube
-        [x_cube_dim, y_cube_dim, z_cube_dim] = cube_dim = CUBOIDSIZE[resolution]
-
-        # TODO: DMK Double check that the div operation in python2 should be ported to the floordiv operation
-        # Round to the nearest larger cube in all dimensions
-        [x_start, y_start, z_start] = list(map(floordiv, corner, cube_dim))
-
-        z_num_cubes = (corner[2] + dim[2] + z_cube_dim - 1) / z_cube_dim - z_start
-        y_num_cubes = (corner[1] + dim[1] + y_cube_dim - 1) / y_cube_dim - y_start
-        x_num_cubes = (corner[0] + dim[0] + x_cube_dim - 1) / x_cube_dim - x_start
-
-        [x_offset, y_offset, z_offset] = list(map(mod, corner, cube_dim))
-
-        # TODO: Double check this...inserting data into a specific spot?
-        data_buffer = np.zeros([z_num_cubes * z_cube_dim, y_num_cubes * y_cube_dim, x_num_cubes * x_cube_dim],
-                               dtype=cuboid_data.dtype)
-        data_buffer[z_offset:z_offset + dim[2], y_offset:y_offset + dim[1], x_offset:x_offset + dim[0]] = cuboid_data
-
-        # TODO: What is this line?
-        incube = Cube.create_cube(cube_dim, resource)
-
-        list_of_idxs = []
-        list_of_cubes = []
-        for z in range(z_num_cubes):
-            for y in range(y_num_cubes):
-                for x in range(x_num_cubes):
-                    list_of_idxs.append(ndlib.XYZMorton([x + x_start, y + y_start, z + z_start]))
-                    incube.data = data_buffer[z * z_cube_dim:(z + 1) * z_cube_dim,
-                                              y * y_cube_dim:(y + 1) * y_cube_dim,
-                                              x * x_cube_dim:(x + 1) * x_cube_dim]
-                    list_of_cubes.append(incube.to_blosc_numpy())
-
-        self.put_cubes(resource, list_of_idxs, resolution, list_of_cubes, update=False)
-
     def write_cuboid(self, resource, corner, resolution, cuboid_data):
         """ Write a 3D/4D volume to the key-value store. Used by API/cache in consistent mode as it reconciles writes
         Args:
@@ -599,3 +495,112 @@ class SpatialDB:
                             # update in the database
                             self.put_cube(resource, morton_idx, resolution, cube)
 
+
+
+
+
+
+
+    # Blaze Methods to be updated
+
+    #def put_cube(self, resource, zidx, resolution, cube):
+    #    """Insert a cuboid into the cache key-value store
+#
+    #    Args:
+    #        resource (project.BossResource): Data model info based on the request or target resource
+    #        zidx (int): a list of Morton ID of the cuboids to get
+    #        resolution (int): the resolution level
+    #        cube (cube.Cube): list of cuboids to store in the cache key-value store
+#
+    #    Returns:
+    #        list[numpy.ndarray]: The cuboid data
+    #    """
+    #    # If using S3, update index of cuboids that exist in the cache key-value store
+    #    if self.s3io:
+    #        # TODO: Update after S3 integration. Move index IO into new class
+    #        self.kvio.put_cube_index(resource, resolution, [zidx])
+#
+    #    self.kvio.put_cubes(resource, zidx, resolution, [cube.to_blosc_numpy()], not cube.from_zeros())
+#
+    #def get_cube(self, resource, resolution, morton_idx, update=False):
+    #    """
+    #    Load a single cuboid from the cache key-value store - primarily used by Blaze interface
+#
+    #    Args:
+    #        resource (project.BossResource): Data model info based on the request or target resource
+    #        morton_idx (int): the Morton ID of the cuboid
+    #        resolution (int): the resolution level
+    #        update (bool): True if this an update operation. False if the first time you are inserting the cuboid
+#
+    #    Returns:
+    #        cube.Cube: The cuboid data
+    #    """
+    #    # TODO: DMK to add cuboid tracking indexing here
+    #    # This is referring to adding redis/s3 index call here like below in get_cubes.  occasionally get_cube is called
+    #    # directly so you need it here. Ultimately this might get replaced with a call to the cache manager?
+    #    cube = Cube.create_cube(resource, CUBOIDSIZE[resolution])
+#
+    #    # get the block from the database
+    #    cube_bytes = self.kvio.get_cube(resource, resolution, morton_idx)
+#
+    #    if not cube_bytes:
+    #        # There wasn't a cuboid so return zeros
+    #        cube.zeros()
+    #    else:
+    #        # Handle the cube format here and decompress the cube
+    #        cube.from_blosc_numpy(cube_bytes)
+#
+    #    return cube
+#
+    #def write_cuboids(self, resource, corner, resolution, cuboid_data):
+    #    """ Write an arbitary size data to the database
+    #
+    #    Main use is in OCP Blaze/cache in inconsistent mode since it reconciles writes in memory asynchronously
+    #
+    #    Args:
+    #        resource (project.BossResource): Data model info based on the request or target resource
+    #        corner ((int, int, int)): a list of Morton ID of the cuboids to get
+    #        resolution (int): the resolution level
+    #        cuboid_data (cube.Cube): arbitrary sized matrix of data to write to cuboids in the cache db
+    #
+    #
+    #    Returns:
+    #        None
+    #    """
+    #    # dim is in xyz, data is in zyx order
+    #    # TODO: Confirm if data should continue to be stored in zyx
+    #    dim = cuboid_data.shape[::-1]
+    #
+    #    # get the size of the image and cube
+    #    [x_cube_dim, y_cube_dim, z_cube_dim] = cube_dim = CUBOIDSIZE[resolution]
+    #
+    #    # TODO: DMK Double check that the div operation in python2 should be ported to the floordiv operation
+    #    # Round to the nearest larger cube in all dimensions
+    #    [x_start, y_start, z_start] = list(map(floordiv, corner, cube_dim))
+    #
+    #    z_num_cubes = (corner[2] + dim[2] + z_cube_dim - 1) / z_cube_dim - z_start
+    #    y_num_cubes = (corner[1] + dim[1] + y_cube_dim - 1) / y_cube_dim - y_start
+    #    x_num_cubes = (corner[0] + dim[0] + x_cube_dim - 1) / x_cube_dim - x_start
+    #
+    #    [x_offset, y_offset, z_offset] = list(map(mod, corner, cube_dim))
+    #
+    #    # TODO: Double check this...inserting data into a specific spot?
+    #    data_buffer = np.zeros([z_num_cubes * z_cube_dim, y_num_cubes * y_cube_dim, x_num_cubes * x_cube_dim],
+    #                           dtype=cuboid_data.dtype)
+    #    data_buffer[z_offset:z_offset + dim[2], y_offset:y_offset + dim[1], x_offset:x_offset + dim[0]] = cuboid_data
+    #
+    #    # TODO: What is this line?
+    #    incube = Cube.create_cube(cube_dim, resource)
+    #
+    #    list_of_idxs = []
+    #    list_of_cubes = []
+    #    for z in range(z_num_cubes):
+    #        for y in range(y_num_cubes):
+    #            for x in range(x_num_cubes):
+    #                list_of_idxs.append(ndlib.XYZMorton([x + x_start, y + y_start, z + z_start]))
+    #                incube.data = data_buffer[z * z_cube_dim:(z + 1) * z_cube_dim,
+    #                              y * y_cube_dim:(y + 1) * y_cube_dim,
+    #                              x * x_cube_dim:(x + 1) * x_cube_dim]
+    #                list_of_cubes.append(incube.to_blosc_numpy())
+    #
+    #    self.put_cubes(resource, list_of_idxs, resolution, list_of_cubes, update=False)

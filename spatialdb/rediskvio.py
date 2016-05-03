@@ -202,8 +202,8 @@ class RedisKVIO(KVIO):
             # Get the data from the DB
             rows = self.cache_client.mget(self.generate_cuboid_data_keys(resource,
                                                                          resolution,
-                                                                         morton_idx_list,
-                                                                         time_sample_list))
+                                                                         time_sample_list,
+                                                                         morton_idx_list))
         except Exception as e:
             raise SpdbError("Redis Error", "Error retrieving cubes from the cache database. {}".format(e),
                             ErrorCode.REDIS_ERROR)
@@ -230,8 +230,6 @@ class RedisKVIO(KVIO):
         """
         # Generate the list of keys
         key_list = self.generate_cuboid_data_keys(resource, resolution, time_sample_list, morton_idx_list)
-
-        # TODO: Update index?
 
         try:
             # Write data to redis

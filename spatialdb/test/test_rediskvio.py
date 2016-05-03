@@ -22,6 +22,7 @@ from spdb.spatialdb import RedisKVIO
 import redis
 
 import numpy as np
+import blosc
 
 from bossutils import configuration
 
@@ -128,13 +129,10 @@ class TestRedisKVIOImageDataOneTimeSample(unittest.TestCase):
 
     def test_put_cube_index(self):
         """Test adding cubes to the cuboid index"""
-        #redis_client = redis.StrictRedis(host=self.config["aws"]["cache-state"], port=6379, db=1,
-        #                                 decode_responses=True)
-        #rkv = RedisKVIO(None, redis_client)
 
         resolution = 1
         rkv = RedisKVIO(self.cache_client, self.status_client)
-        #TODO FINISH TESTS STARTING HERE!!!
+
         # Make sure there are no items in the index
         self.status_client.flushdb()
         keys = self.status_client.keys("{}*".format(rkv.generate_cuboid_index_key(self.resource, resolution)))
@@ -145,148 +143,147 @@ class TestRedisKVIOImageDataOneTimeSample(unittest.TestCase):
         rkv.put_cube_index(self.resource, resolution, [0], morton_ids)
 
         keys = self.status_client.keys("{}*".format(rkv.generate_cuboid_index_key(self.resource, resolution)))
-        assert len(keys) > 0
+        assert len(keys) == 1
 
         # Make sure the keys are correct
         morton_in_index = self.status_client.smembers(rkv.generate_cuboid_index_key(self.resource, resolution))
         assert len(morton_ids) == len(morton_in_index)
 
         # Explicitly decode all values so you can compare since mockredis doesn't seem to do this automatically.
-        expected_index = [int(x.decode()) for x in morton_in_index]
-        for morton in morton_ids:
-            assert morton in decoded_morton_in_index
+        expected_index = [x.decode() for x in morton_in_index]
+        for time, morton in zip([0]*len(morton_ids), morton_ids):
+            assert "{}&{}".format(time, morton) in expected_index
 
     def test_get_missing_cube_index(self):
         """Test checking the index for cuboids that are missing"""
-        #redis_client = redis.StrictRedis(host=self.config["aws"]["cache-state"], port=6379, db=1,
-        #                                 decode_responses=True)
-#
-        #rkv = RedisKVIO(None, redis_client)
         resolution = 1
+        rkv = RedisKVIO(self.cache_client, self.status_client)
+
+        # Make sure there are no items in the index
+        self.status_client.flushdb()
+        keys = self.status_client.keys("{}*".format(rkv.generate_cuboid_index_key(self.resource, resolution)))
+        assert not keys
 
         # Put some stuff in the index
-        morton_ids = list(range(10, 25))
-        rkv.put_cube_index(self.resource, resolution, morton_ids)
+        morton_ids = list(range(100, 125))
+        rkv.put_cube_index(self.resource, resolution, [0], morton_ids)
 
-        desired_morton_ids = list(range(15, 33))
-        missing_keys = rkv.get_missing_cube_index(self.resource, resolution, desired_morton_ids)
+        desired_morton_ids = list(range(115, 133))
+        missing_keys = rkv.get_missing_cube_index(self.resource, resolution, [0]*len(desired_morton_ids),
+                                                  desired_morton_ids)
 
         assert len(missing_keys) == 8
 
         missing_keys_true = list(set(desired_morton_ids) - set(morton_ids))
-        decoded_missing_keys = [int(x.decode()) for x in missing_keys]
-        for idx in decoded_missing_keys:
-            assert idx in missing_keys_true
+        decoded_missing_keys = [x.decode() for x in missing_keys]
+        for time, morton in zip([0] * len(missing_keys_true), missing_keys_true):
+            assert "{}&{}".format(time, morton) in decoded_missing_keys
 
     def test_put_cubes_single(self):
         """Test adding cubes to the cache"""
-        redis_client = redis.StrictRedis(host=self.config["aws"]["cache-state"], port=6379, db=0,
-                                         decode_responses=True)
-        rkv = RedisKVIO(redis_client, redis_client)
         resolution = 1
+        rkv = RedisKVIO(self.cache_client, self.status_client)
+
+        # Clean up data
+        self.cache_client.flushdb()
+        self.status_client.flushdb()
+
         data = np.random.randint(50, size=[10, 15, 5])
 
         # Make sure there are no cuboids in the cache
-        base_key = rkv.generate_cuboid_data_keys(self.resource, resolution)
-        keys = redis_client.keys("{}*".format(base_key))
+        keys = self.cache_client.keys('CUBOID&{}&{}*'.format(self.resource.get_lookup_key(), resolution))
         assert not keys
 
         # Add items
         morton_id = 53342
-        rkv.put_cubes(self.resource, resolution, [morton_id], [data])
+        rkv.put_cubes(self.resource, resolution, [0], [morton_id], [data])
 
-        keys = redis_client.keys("{}*".format(base_key))
+        keys = self.cache_client.keys('CUBOID&{}&{}*'.format(self.resource.get_lookup_key(), resolution))
         assert len(keys) == 1
+        assert keys[0].decode() == 'CUBOID&4&2&1&1&0&53342'
 
     def test_put_cubes_multiple(self):
         """Test adding cubes to the cache"""
-        redis_client = redis.StrictRedis(host=self.config["aws"]["cache-state"], port=6379, db=0,
-                                         decode_responses=True)
-        rkv = RedisKVIO(redis_client, redis_client)
         resolution = 1
+        rkv = RedisKVIO(self.cache_client, self.status_client)
+
+        # Clean up data
+        self.cache_client.flushdb()
+        self.status_client.flushdb()
+
         data = np.random.randint(50, size=[10, 15, 5])
 
         # Make sure there are no cuboids in the cache
-        base_key = rkv.generate_cuboid_data_keys(self.resource, resolution)
-        keys = redis_client.keys("{}*".format(base_key))
+        keys = self.cache_client.keys('CUBOID&{}&{}*'.format(self.resource.get_lookup_key(), resolution))
         assert not keys
 
         # Add items
-        rkv.put_cubes(self.resource, resolution, [651, 315, 561], [data, data, data])
+        rkv.put_cubes(self.resource, resolution, [0], [123, 124, 126], [data, data, data])
 
-        keys = redis_client.keys("{}*".format(base_key))
+        keys = self.cache_client.keys('CUBOID&{}&{}*'.format(self.resource.get_lookup_key(), resolution))
         assert len(keys) == 3
-
-    def test_get_cube_single(self):
-        """Test adding cubes to the cache"""
-        redis_client = redis.StrictRedis(host=self.config["aws"]["cache-state"], port=6379, db=0,
-                                         decode_responses=True)
-        rkv = RedisKVIO(redis_client, redis_client)
-        resolution = 1
-        data = "A test string since just checking for key retrieval"
-
-        # Make sure there are no cuboids in the cache
-        base_key = rkv.generate_cuboid_data_keys(self.resource, resolution)
-        keys = redis_client.keys("{}*".format(base_key))
-        assert not keys
-
-        # Add items
-        morton_id = 53342
-        rkv.put_cubes(self.resource, resolution, [morton_id], [data])
-
-        # Get cube
-        cube = rkv.get_cube(self.resource, resolution, morton_id)
-        assert "A test string since just checking for key retrieval" == cube.decode()
+        expected_keys = ["CUBOID&4&2&1&1&0&123", "CUBOID&4&2&1&1&0&124", "CUBOID&4&2&1&1&0&126"]
+        for k in keys:
+            assert k.decode() in expected_keys
 
     def test_get_cubes_single(self):
         """Test adding cubes to the cache"""
-        redis_client = redis.StrictRedis(host=self.config["aws"]["cache-state"], port=6379, db=0,
-                                         decode_responses=True)
-        rkv = RedisKVIO(redis_client, redis_client)
         resolution = 1
-        data = "A test string since just checking for key retrieval"
+        rkv = RedisKVIO(self.cache_client, self.status_client)
 
-        # Make sure there are no cuboids in the cache
-        base_key = rkv.generate_cuboid_data_keys(self.resource, resolution)
-        keys = redis_client.keys("{}*".format(base_key))
-        assert not keys
+        # Clean up data
+        self.cache_client.flushdb()
+        self.status_client.flushdb()
+
+        data = np.random.randint(50, size=[10, 15, 5])
+        data_packed = blosc.pack_array(data)
 
         # Add items
         morton_id = 53342
-        rkv.put_cubes(self.resource, resolution, [morton_id], [data])
+        rkv.put_cubes(self.resource, resolution, [0], [morton_id], [data_packed])
 
         # Get cube
-        for cnt, cube in enumerate(rkv.get_cubes(self.resource, resolution, [morton_id])):
-            assert 53342 == cube[0]
-            assert "A test string since just checking for key retrieval" == cube[1].decode()
+        cubes = rkv.get_cubes(self.resource, resolution, [0], [morton_id])
 
-        assert cnt == 0
+        cube = [x for x in cubes]
+
+        assert len(cube) == 1
+        cube = cube[0]
+        assert cube[0] == 0
+        assert cube[1] == morton_id
+        data_retrieved = blosc.unpack_array(cube[2])
+        np.testing.assert_array_equal(data_retrieved, data)
 
     def test_get_cubes_multiple(self):
         """Test adding cubes to the cache"""
-        redis_client = redis.StrictRedis(host=self.config["aws"]["cache-state"], port=6379, db=0,
-                                         decode_responses=True)
-        rkv = RedisKVIO(redis_client, redis_client)
         resolution = 1
-        data = "A test string since just checking for key retrieval - "
+        rkv = RedisKVIO(self.cache_client, self.status_client)
 
-        data_list = []
-        morton_id = list(range(234, 240))
-        for ii in morton_id:
-            data_list.append("{}{}".format(data, ii))
+        # Clean up data
+        self.cache_client.flushdb()
+        self.status_client.flushdb()
 
-        # Make sure there are no cuboids in the cache
-        base_key = rkv.generate_cuboid_data_keys(self.resource, resolution)
-        keys = redis_client.keys("{}*".format(base_key))
-        assert not keys
+        data1 = np.random.randint(50, size=[10, 15, 5])
+        data2 = np.random.randint(50, size=[10, 15, 5])
+        data3 = np.random.randint(50, size=[10, 15, 5])
+        data_packed1 = blosc.pack_array(data1)
+        data_packed2 = blosc.pack_array(data2)
+        data_packed3 = blosc.pack_array(data3)
+        data = [data_packed1, data_packed2, data_packed3]
 
         # Add items
-        rkv.put_cubes(self.resource, resolution, morton_id, data_list)
+        morton_id = [112, 125, 516]
+        rkv.put_cubes(self.resource, resolution, [0, 0, 0], morton_id, data)
 
         # Get cube
-        for cnt, cube in enumerate(rkv.get_cubes(self.resource, resolution, morton_id)):
-            assert morton_id[cnt] == cube[0]
-            assert data_list[cnt] == cube[1].decode()
+        cubes = rkv.get_cubes(self.resource, resolution, [0, 0, 0], morton_id)
 
-        assert cnt == 5
+        cube = [x for x in cubes]
 
+        assert len(cube) == 3
+
+        for m, c, d in zip(morton_id, cube, data):
+            assert c[0] == 0
+            assert c[1] == m
+            data_retrieved = blosc.unpack_array(c[2])
+            np.testing.assert_array_equal(data_retrieved,  blosc.unpack_array(d))
