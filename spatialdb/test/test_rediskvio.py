@@ -276,7 +276,7 @@ class TestRedisKVIOImageDataOneTimeSample(unittest.TestCase):
         rkv.put_cubes(self.resource, resolution, [0, 0, 0], morton_id, data)
 
         # Get cube
-        cubes = rkv.get_cubes(self.resource, resolution, [0, 0, 0], morton_id)
+        cubes = rkv.get_cubes(self.resource, resolution, [0], morton_id)
 
         cube = [x for x in cubes]
 

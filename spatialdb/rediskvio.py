@@ -16,8 +16,11 @@
 import redis
 import itertools
 
+from spdb.c_lib.ndtype import CUBOIDSIZE
+
 from .error import SpdbError, ErrorCode
 from .kvio import KVIO
+from .cube import Cube
 
 from bossutils import configuration
 
@@ -188,11 +191,11 @@ class RedisKVIO(KVIO):
 
         Cubes are returned in order, by incrementing time sample followed by incrementing morton ID
 
-        Args:s
+        Args:
             resource (spdb.project.BossResource): Data model info based on the request or target resource
             resolution (int): the resolution level
-            morton_idx (int): the list of Morton IDs of the cuboids to get
-            time_sample_list (int): list of time sample points
+            morton_idx_list (list(int)): the list of Morton IDs of the cuboids to get
+            time_sample_list (list(int)): list of time sample points
 
         Returns:
             (int, int, bytes): A tuple of the time sample, morton index, and the blosc compressed byte array using
@@ -208,8 +211,19 @@ class RedisKVIO(KVIO):
             raise SpdbError("Redis Error", "Error retrieving cubes from the cache database. {}".format(e),
                             ErrorCode.REDIS_ERROR)
 
+        # TODO: Currently, since no S3 integration, if missing in cache generate just an all 0 cube
+        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
+
         # Yield the resulting cuboids as RAW blosc compressed numpy arrays
-        for time, idx, row in zip(time_sample_list, morton_idx_list, rows):
+        index_values = itertools.product(time_sample_list, morton_idx_list)
+        time_samples, morton_ids = zip(*index_values)
+        for time, idx, row in zip(time_samples, morton_ids, rows):
+            if not row:
+                temp_cube = Cube.create_cube(resource, [x_cube_dim, y_cube_dim, z_cube_dim])
+                temp_cube.zeros()
+                row = temp_cube.to_blosc_numpy()
+            # end blank cube shim
+
             yield (time, idx, row)
 
     def put_cubes(self, resource, resolution, time_sample_list, morton_idx_list, cube_list, update=False):
@@ -233,7 +247,6 @@ class RedisKVIO(KVIO):
 
         try:
             # Write data to redis
-            # TODO this could be optimized/parallelized potentially for large numbers of cuboids
             self.cache_client.mset(dict(list(zip(key_list, cube_list))))
         except Exception as e:
             raise SpdbError("Redis Error", "Error inserting cubes into the cache database. {}".format(e),

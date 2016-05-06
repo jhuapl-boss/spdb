@@ -62,6 +62,7 @@ class Cube(metaclass=ABCMeta):
         self._created_from_zeros = False
 
         self.data = None
+        self.morton_id = None
 
         # Setup time sample properties
         if time_range:
@@ -73,6 +74,8 @@ class Cube(metaclass=ABCMeta):
 
     def add_data(self, input_cube, index):
         """Add data to a larger cube (this instance) from a smaller cube (input_cube)
+
+        Assumes all time samples are present in the smaller cube
 
         Args:
             input_cube (spdb.cube.Cube): Input Cube instance from which to merge data
@@ -91,7 +94,7 @@ class Cube(metaclass=ABCMeta):
                             x_offset:x_offset + input_cube.x_dim], input_cube.data[:, :, :, :])
 
     def trim(self, x_offset, x_size, y_offset, y_size, z_offset, z_size):
-        """Trim off excess data if not cuboid aligned. Applies to ALL time samples
+        """Trim off excess data if not cuboid aligned. Applies to ALL time samples.
 
         Args:
             x_offset (int): Start X index of data to keep
@@ -109,9 +112,28 @@ class Cube(metaclass=ABCMeta):
         # update the cube dimensions, ignoring the time component since it does not change
         self.z_dim, self.y_dim, self.x_dim = self.cube_size = list(self.data.shape[1:])
 
-    def to_blosc_numpy(self):
-        """A generator that packs each time point of data in this Cube instance using Blosc
-        and the numpy array specific interface.
+    def to_blosc_numpy(self, time_index=0):
+        """A method that packs data in this Cube instance using Blosc and the numpy array specific interface for a
+        single time sample.  The time index is the index value into self.data.
+
+        If the time_index isn't specified, 0 is used.
+
+        Args:
+            time_index (int): Index (starting from 0) into the time dimension of the data stored by this instance
+
+        Returns:
+            bytes - the compressed, serialized byte array of Cube matrix data for a given time sample
+
+        """
+        try:
+            # Index into the data array with time
+            return blosc.pack_array(self.data[time_index, :, :, :])
+        except:
+            raise SpdbError("IO Error", "Failed to decompress database cube.  Data integrity concern.",
+                            ErrorCode.IO_ERROR)
+
+    def to_blosc_numpy_all_time(self):
+        """A generator that packs data in this Cube instance using Blosc and the numpy array specific interface.
 
         Returns:
             (int, bytes) - a tuple of the time sample and the compressed, serialized byte array of Cube matrix data
@@ -136,6 +158,7 @@ class Cube(metaclass=ABCMeta):
             None
 
         """
+        # TODO: Revisit if this should be simplified to take single arrays
         try:
             if not time_sample_range:
                 # This isn't a time-series cube, so use default
@@ -147,10 +170,20 @@ class Cube(metaclass=ABCMeta):
 
             # Unpack all of the arrays into the cube
             for idx, t in enumerate(range(time_sample_range[0], time_sample_range[1])):
-                self.data[idx, :, :, :] = blosc.unpack_array(byte_arrays[idx])
+                if idx == 0:
+                    # On first cube get the size and allocate properly
+                    temp_mat = blosc.unpack_array(byte_arrays[idx])
 
-            # Set shape
-            self.z_dim, self.y_dim, self.x_dim = self.cube_size = list(self.data.shape[1:])
+                    # Set shape
+                    self.z_dim, self.y_dim, self.x_dim = self.cube_size = list(temp_mat.shape)
+
+                    # allocate
+                    self.data = np.zeros(shape=(time_sample_range[1] - time_sample_range[0],
+                                                self.z_dim, self.y_dim, self.x_dim), dtype=self.data.dtype)
+
+                    self.data[idx, :, :, :] = temp_mat
+                else:
+                    self.data[idx, :, :, :] = blosc.unpack_array(byte_arrays[idx])
 
         except:
             raise SpdbError("IO Error", "Failed to decompress database cube.  Data integrity concern.",
@@ -189,7 +222,11 @@ class Cube(metaclass=ABCMeta):
                 # Currently not optimized to overwrite all time samples at once so do one at a time
                 self.data[t, :, :, :] = ndlib.overwriteDense_ctype(self.data[t, :, :, :], input_data[cnt, :, :, :])
         else:
-            self.data[time_sample_range[0]:time_sample_range[1], :, :, :] = input_data[:, :, :, :]
+            if input_data.ndim == 4:
+                self.data[time_sample_range[0]:time_sample_range[1], :, :, :] = input_data[:, :, :, :]
+            else:
+                # Input data doesn't have any time indices
+                self.data[time_sample_range[0]:time_sample_range[1], :, :, :] = input_data[:, :, :]
 
     def is_not_zeros(self):
         """Check if the data matrix is all zeros
@@ -274,7 +311,7 @@ class Cube(metaclass=ABCMeta):
         return NotImplemented
 
     @staticmethod
-    def create_cube(resource, cube_size, time_range=None):
+    def create_cube(resource, cube_size=None, time_range=None):
         """Static factory method that creates the proper child class instance type based on the resource being accessed
 
         Args:

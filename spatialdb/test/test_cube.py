@@ -231,11 +231,11 @@ class TestImageCube8(unittest.TestCase):
 
         c = ImageCube8([10, 20, 5])
         c2 = ImageCube8([10, 20, 5])
-        data = np.random.randint(0, 200, size=[1, 5, 20, 10])
+        data = np.random.randint(0, 255, size=[1, 5, 20, 10])
         c.data = data
 
-        byte_array = [x for x in c.to_blosc_numpy()]
-        c2.from_blosc_numpy([byte_array[0][1]])
+        byte_array = c.to_blosc_numpy()
+        c2.from_blosc_numpy([byte_array])
 
         np.testing.assert_array_equal(c.data, c2.data)
         assert c.cube_size == c2.cube_size
@@ -243,15 +243,31 @@ class TestImageCube8(unittest.TestCase):
         assert c.y_dim == c2.y_dim
         assert c.x_dim == c2.x_dim
 
-    def test_blosc(self):
+    def test_blosc_specific_time(self):
+        """Test blosc compression of Cube data"""
+        c = ImageCube8([10, 20, 5], [0, 4])
+        c2 = ImageCube8([10, 20, 5], [0, 4])
+        data = np.random.randint(0, 255, size=[4, 5, 20, 10])
+        c.data = data
+
+        byte_array = c.to_blosc_numpy(2)
+        c2.from_blosc_numpy([byte_array])
+
+        np.testing.assert_array_equal(np.expand_dims(c.data[2, :, :, :], axis=0), c2.data)
+        assert c.cube_size == c2.cube_size
+        assert c.z_dim == c2.z_dim
+        assert c.y_dim == c2.y_dim
+        assert c.x_dim == c2.x_dim
+
+    def test_blosc_all_time_samples(self):
         """Test blosc compression of Cube data"""
 
         c = ImageCube8([10, 20, 5], [0, 4])
         c2 = ImageCube8([10, 20, 5], [0, 4])
-        data = np.random.randint(0, 200, size=[4, 5, 20, 10])
+        data = np.random.randint(0, 255, size=[4, 5, 20, 10])
         c.data = data
 
-        byte_array = [x for x in c.to_blosc_numpy()]
+        byte_array = [x for x in c.to_blosc_numpy_all_time()]
 
         # Unpack tuples
         time_list, byte_list = zip(*byte_array)
@@ -579,8 +595,8 @@ class TestImageCube16(unittest.TestCase):
         data = np.random.randint(0, 5000, size=[1, 5, 20, 10])
         c.data = data
 
-        byte_array = [x for x in c.to_blosc_numpy()]
-        c2.from_blosc_numpy([byte_array[0][1]])
+        byte_array = c.to_blosc_numpy()
+        c2.from_blosc_numpy([byte_array])
 
         np.testing.assert_array_equal(c.data, c2.data)
         assert c.cube_size == c2.cube_size
@@ -588,7 +604,23 @@ class TestImageCube16(unittest.TestCase):
         assert c.y_dim == c2.y_dim
         assert c.x_dim == c2.x_dim
 
-    def test_blosc(self):
+    def test_blosc_specific_time(self):
+        """Test blosc compression of Cube data"""
+        c = ImageCube16([10, 20, 5], [0, 4])
+        c2 = ImageCube16([10, 20, 5], [0, 4])
+        data = np.random.randint(0, 5000, size=[4, 5, 20, 10])
+        c.data = data
+
+        byte_array = c.to_blosc_numpy(2)
+        c2.from_blosc_numpy([byte_array])
+
+        np.testing.assert_array_equal(np.expand_dims(c.data[2,:,:,:], axis=0), c2.data)
+        assert c.cube_size == c2.cube_size
+        assert c.z_dim == c2.z_dim
+        assert c.y_dim == c2.y_dim
+        assert c.x_dim == c2.x_dim
+
+    def test_blosc_all_time_samples(self):
         """Test blosc compression of Cube data"""
 
         c = ImageCube16([10, 20, 5], [0, 4])
@@ -596,7 +628,7 @@ class TestImageCube16(unittest.TestCase):
         data = np.random.randint(0, 5000, size=[4, 5, 20, 10])
         c.data = data
 
-        byte_array = [x for x in c.to_blosc_numpy()]
+        byte_array = [x for x in c.to_blosc_numpy_all_time()]
 
         # Unpack tuples
         time_list, byte_list = zip(*byte_array)

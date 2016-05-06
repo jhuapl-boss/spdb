@@ -94,89 +94,184 @@ class TestSpatialDBImageDataOneTimeSample(unittest.TestCase):
         # Stop mocking
         self.mock_tests = self.patcher.stop()
 
-    def test_put_cubes_get_cube(self):
+    def test_put_single_cube_get_single_cube_no_time(self):
+        """Test the put_cubes and get_cube methods"""
+        # Generate random data
+        cube1 = Cube.create_cube(self.resource, [128, 128, 16])
+        cube1.data = np.random.randint(0, 254, (1, 16, 128, 128))
+
+        db = SpatialDB()
+
+        db.put_single_cube(self.resource, 0, 34, cube1)
+
+        cube2 = db.get_single_cube(self.resource, 0, 0, 34)
+
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+
+    def test_put_single_cube_get_single_cube(self):
+        """Test the put_cubes and get_cube methods"""
+        # Generate random data
+        cube_true = Cube.create_cube(self.resource, [128, 128, 16], [0, 4])
+        cube_true.data = np.random.randint(0, 254, (4, 16, 128, 128))
+
+        db = SpatialDB()
+
+        db.put_single_cube(self.resource, 0, 24, cube_true)
+
+        cube0 = db.get_single_cube(self.resource, 0, 0, 24)
+        cube1 = db.get_single_cube(self.resource, 0, 1, 24)
+        cube2 = db.get_single_cube(self.resource, 0, 2, 24)
+        cube3 = db.get_single_cube(self.resource, 0, 3, 24)
+
+        np.testing.assert_array_equal(cube_true.data[0, :, :, :], np.squeeze(cube0.data))
+        np.testing.assert_array_equal(cube_true.data[1, :, :, :], np.squeeze(cube1.data))
+        np.testing.assert_array_equal(cube_true.data[2, :, :, :], np.squeeze(cube2.data))
+        np.testing.assert_array_equal(cube_true.data[3, :, :, :], np.squeeze(cube3.data))
+
+    def test_put_cubes_get_cubes_no_time(self):
         """Test the put_cubes and get_cube methods"""
         # Generate random data
         cube1 = Cube.create_cube(self.resource, [128, 128, 16])
         cube2 = Cube.create_cube(self.resource, [128, 128, 16])
-        cube1.data = np.random.randint(0, 254, (16, 128, 128))
-        cube2.data = np.random.randint(0, 254, (16, 128, 128))
+        cube3 = Cube.create_cube(self.resource, [128, 128, 16])
+        cube1.data = np.random.randint(0, 254, (1, 16, 128, 128))
+        cube2.data = np.random.randint(0, 254, (1, 16, 128, 128))
+        cube3.data = np.random.randint(0, 254, (1, 16, 128, 128))
+
+        input_cubes = [cube1, cube2, cube3]
+        morton_ids = [12, 456, 13]
 
         spdb = SpatialDB()
 
-        spdb.put_cubes(self.resource, 0, [12, 13], [cube1, cube2])
+        spdb.put_cubes(self.resource, 0, morton_ids, input_cubes)
 
-        cubes1_test = spdb.get_cube(self.resource, 0, 12)
-        cubes2_test = spdb.get_cube(self.resource, 0, 13)
+        cube_array = spdb.get_cubes(self.resource, 0, [0, 1], morton_ids)
 
-        np.testing.assert_array_equal(cube1.data, cubes1_test.data)
-        np.testing.assert_array_equal(cube2.data, cubes2_test.data)
+        # Shuffle cubes since spdb sorts by morton
+        truth = [cube1, cube3, cube2]
+        for morton_id, test, true in zip(morton_ids, cube_array, truth):
+            np.testing.assert_array_equal(true.data, test.data)
 
     def test_put_cubes_get_cubes(self):
         """Test the put_cubes and get_cube methods"""
         # Generate random data
-        cube1 = Cube.create_cube(self.resource, [128, 128, 16])
-        cube2 = Cube.create_cube(self.resource, [128, 128, 16])
-        cube1.data = np.random.randint(0, 254, (16, 128, 128))
-        cube2.data = np.random.randint(0, 254, (16, 128, 128))
-        morton_ids = [12, 13]
+        cube1 = Cube.create_cube(self.resource, [128, 128, 16], [5, 10])
+        cube2 = Cube.create_cube(self.resource, [128, 128, 16], [5, 10])
+        cube3 = Cube.create_cube(self.resource, [128, 128, 16], [5, 10])
+        cube1.data = np.random.randint(0, 254, (5, 16, 128, 128))
+        cube2.data = np.random.randint(0, 254, (5, 16, 128, 128))
+        cube3.data = np.random.randint(0, 254, (5, 16, 128, 128))
+
+        input_cubes = [cube1, cube2, cube3]
+        morton_ids = [122, 4562, 132]
 
         spdb = SpatialDB()
 
-        spdb.put_cubes(self.resource, 0, [12, 13], [cube1, cube2])
+        spdb.put_cubes(self.resource, 0, morton_ids, input_cubes)
 
-        cubes = spdb.get_cubes(self.resource, 0, [12, 13])
+        cube_array = spdb.get_cubes(self.resource, 0, [5, 10], [122, 4562, 132])
 
-        for c, t, m in zip(cubes, [cube1, cube2], morton_ids):
-            assert c[0] == m
-            loaded_cube = Cube.create_cube(self.resource, [16, 128, 128])
-            loaded_cube.from_blosc_numpy(c[1])
-            np.testing.assert_array_equal(t.data, loaded_cube.data)
+        # Shuffle cubes since spdb sorts by morton
+        truth = [cube1, cube3, cube2]
+        morton_ids = sorted(morton_ids)
+        for morton_id, test, true in zip(morton_ids, cube_array, truth):
+            assert morton_id == test.morton_id
+            np.testing.assert_array_equal(true.data, test.data)
 
-    def test_write_cuboid_aligned_single(self):
-            """Test the write_cuboid method"""
-            # At this point data should be in zyx
-            data = np.random.randint(0, 254, (16, 128, 128))
-            data = data.astype(np.uint8)
+    def test_put_cubes_get_cubes_missing(self):
+        """Test the put_cubes and get_cube methods"""
+        # Generate random data
+        cube1 = Cube.create_cube(self.resource, [128, 128, 16], [5, 10])
+        cube2 = Cube.create_cube(self.resource, [128, 128, 16], [5, 10])
+        cube3 = Cube.create_cube(self.resource, [128, 128, 16], [5, 10])
+        cube4 = Cube.create_cube(self.resource, [128, 128, 16], [5, 10])
+        cube1.data = np.random.randint(0, 254, (5, 16, 128, 128))
+        cube2.data = np.random.randint(0, 254, (5, 16, 128, 128))
+        cube3.data = np.random.randint(0, 254, (5, 16, 128, 128))
+        cube4.zeros()
 
-            spdb = SpatialDB()
-
-            # Make sure no data is in the database
-            assert len(spdb.kvio.cache_client.redis) == 0
-            spdb.write_cuboid(self.resource, (0, 0, 0), 0, data)
-
-            # make sure data was written
-            assert len(spdb.kvio.cache_client.redis) == 1
-
-    def test_write_cuboid_aligned_multiple(self):
-        """Test the write_cuboid method"""
-        data = np.random.randint(0, 254, (16, 256, 128))
-        data = data.astype(np.uint8)
+        input_cubes = [cube1, cube2, cube3]
+        morton_ids = [122, 4562, 132]
 
         spdb = SpatialDB()
 
-        # Make sure no data is in the database
-        assert len(spdb.kvio.cache_client.redis) == 0
-        spdb.write_cuboid(self.resource, (0, 0, 0), 0, data)
+        spdb.put_cubes(self.resource, 0, morton_ids, input_cubes)
 
-        # make sure data was written
-        assert len(spdb.kvio.cache_client.redis) == 2
+        cube_array = spdb.get_cubes(self.resource, 0, [5, 10], [122, 4562, 132, 23446])
 
-    def test_cutout_no_offset_uint8(self):
-        """Test the cutout method"""
-        data = np.random.randint(0, 254, (30, 500, 300))
-        data = data.astype(np.uint8)
+        # Shuffle cubes since spdb sorts by morton
+        truth = [cube1, cube3, cube2, cube4]
+        morton_ids = sorted([122, 4562, 132, 23446])
+        for morton_id, test, true in zip(morton_ids, cube_array, truth):
+            assert morton_id == test.morton_id
+            np.testing.assert_array_equal(true.data, test.data)
 
-        spdb = SpatialDB()
-
-        # Write an arbitrary chunk into the cache
-        spdb.write_cuboid(self.resource, (0, 0, 0), 0, data)
-
-        # Get it back out
-        cutout = spdb.cutout(self.resource, (0, 0, 0), (300, 500, 30), 0)
-        assert cutout.data.shape == data.shape
-        assert cutout.data.dtype == data.dtype
-        np.testing.assert_array_equal(cutout.data, data)
-
-    # TODO: Add up_sample and down_sample methods once annotation interfaces are integrated.
-
+    # TODO: FINISH UNIT TESTS HERE
+    #def test_put_cubes_get_cubes(self):
+    #    """Test the put_cubes and get_cube methods"""
+    #    # Generate random data
+    #    cube1 = Cube.create_cube(self.resource, [128, 128, 16])
+    #    cube2 = Cube.create_cube(self.resource, [128, 128, 16])
+    #    cube1.data = np.random.randint(0, 254, (16, 128, 128))
+    #    cube2.data = np.random.randint(0, 254, (16, 128, 128))
+    #    morton_ids = [12, 13]
+#
+    #    spdb = SpatialDB()
+#
+    #    spdb.put_cubes(self.resource, 0, [12, 13], [cube1, cube2])
+#
+    #    cubes = spdb.get_cubes(self.resource, 0, [12, 13])
+#
+    #    for c, t, m in zip(cubes, [cube1, cube2], morton_ids):
+    #        assert c[0] == m
+    #        loaded_cube = Cube.create_cube(self.resource, [16, 128, 128])
+    #        loaded_cube.from_blosc_numpy(c[1])
+    #        np.testing.assert_array_equal(t.data, loaded_cube.data)
+#
+    #def test_write_cuboid_aligned_single(self):
+    #        """Test the write_cuboid method"""
+    #        # At this point data should be in zyx
+    #        data = np.random.randint(0, 254, (16, 128, 128))
+    #        data = data.astype(np.uint8)
+#
+    #        spdb = SpatialDB()
+#
+    #        # Make sure no data is in the database
+    #        assert len(spdb.kvio.cache_client.redis) == 0
+    #        spdb.write_cuboid(self.resource, (0, 0, 0), 0, data)
+#
+    #        # make sure data was written
+    #        assert len(spdb.kvio.cache_client.redis) == 1
+#
+    #def test_write_cuboid_aligned_multiple(self):
+    #    """Test the write_cuboid method"""
+    #    data = np.random.randint(0, 254, (16, 256, 128))
+    #    data = data.astype(np.uint8)
+#
+    #    spdb = SpatialDB()
+#
+    #    # Make sure no data is in the database
+    #    assert len(spdb.kvio.cache_client.redis) == 0
+    #    spdb.write_cuboid(self.resource, (0, 0, 0), 0, data)
+#
+    #    # make sure data was written
+    #    assert len(spdb.kvio.cache_client.redis) == 2
+#
+    #def test_cutout_no_offset_uint8(self):
+    #    """Test the cutout method"""
+    #    data = np.random.randint(0, 254, (30, 500, 300))
+    #    data = data.astype(np.uint8)
+#
+    #    spdb = SpatialDB()
+#
+    #    # Write an arbitrary chunk into the cache
+    #    spdb.write_cuboid(self.resource, (0, 0, 0), 0, data)
+#
+    #    # Get it back out
+    #    cutout = spdb.cutout(self.resource, (0, 0, 0), (300, 500, 30), 0)
+    #    assert cutout.data.shape == data.shape
+    #    assert cutout.data.dtype == data.dtype
+    #    np.testing.assert_array_equal(cutout.data, data)
+#
+    ## TODO: Add up_sample and down_sample methods once annotation interfaces are integrated.
+#

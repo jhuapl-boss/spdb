@@ -15,6 +15,8 @@
 
 import numpy as np
 from collections import namedtuple
+import collections
+import itertools
 
 from operator import mod, floordiv
 
@@ -77,12 +79,12 @@ class SpatialDB:
             morton_idx_list (list(int)): a list of Morton ID of the cuboids to get
 
         Returns:
-            list((int, int, bytes)): The cuboid data in a tuple - (time sample, morton ID, compressed bytes)
+            list(cube.Cube): The cuboid data with time-series support, packed into Cube instances, sorted by morton id
         """
         if self.s3io:
             raise SpdbError('Not Supported', 'S3 backend not yet supported',
                             ErrorCode.FUTURE)
-
+            #TODO: Insert S3 integration here
             ## Get the ids of the cuboids you need - only gives ids to be fetched
             #ids_to_fetch = self.kvio.get_cube_index(resource, resolution, morton_idx_list)
 
@@ -96,29 +98,135 @@ class SpatialDB:
             #        # call put_cubes and update index in the table before returning data
             #        self.put_cubes(resource, supercuboid_idx_list, resolution, supercuboid_list, update=True)
 
-        return self.kvio.get_cubes(resource, resolution, time_sample_list, morton_idx_list)
+        # Get all cuboids
+        cuboids = [x for x in self.kvio.get_cubes(resource, resolution, range(*time_sample_list), morton_idx_list)]
 
-    def put_cubes(self, resource, resolution, time_sample_list, morton_idx_list, cube_list):
-        """Insert a list of Cube instances into the cache key-value store
+        # Group by morton
+        cuboids = sorted(cuboids, key=lambda element: (element[1], element[0]))
+
+        # Unpack to lists
+        time, morton, cube_bytes = zip(*cuboids)
+
+        # Get groups of time samples by morton ID
+        morton = np.array(morton)
+        morton_boundaries = np.where(morton[:-1] != morton[1:])[0]
+        morton_boundaries += 1
+        morton_boundaries = np.append(morton_boundaries, len(morton))
+
+        if len(morton_boundaries) == len(morton):
+            # Single time samples only!
+            not_time_series = True
+        else:
+            not_time_series = False
+
+        start = 0
+        output_cubes = []
+        for end in morton_boundaries:
+            # Create a temporary cube instance
+            temp_cube = Cube.create_cube(resource)
+            temp_cube.morton_id = morton[start]
+
+            # populate with all the time samples
+            if not_time_series:
+                temp_cube.from_blosc_numpy(cube_bytes[start:end])
+            else:
+                temp_cube.from_blosc_numpy(cube_bytes[start:end], [time[start], time[end - 1] + 1])
+
+            # Save for output
+            output_cubes.append(temp_cube)
+
+            start = end
+
+        return output_cubes
+
+    def get_single_cube(self, resource, resolution, time_sample, morton_idx):
+        """Return a single cuboid (single time sample) from the cache key-value store as a Cube instance
+
+        Args:
+            resource (spdb.project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            time_sample (int): the time sample to get
+            morton_idx (int): the Morton ID of the cuboid to get
+
+        Returns:
+            spdb.cube.Cube: A cuboid instance
+        """
+        # Consume generator
+        cube = collections.deque(self.kvio.get_cubes(resource, resolution, [time_sample], [morton_idx]),
+                                 maxlen=1)
+
+        temp_cube = Cube.create_cube(resource, cube_size=None, time_range=[time_sample, time_sample + 1])
+        temp_cube.from_blosc_numpy([cube[0][2]])
+
+        return temp_cube
+
+    def put_cubes(self, resource, resolution, morton_idx_list, cube_list):
+        """Insert a list of Cube instances into the cache key-value store.
+
+        ALL TIME SAMPLES IN THE CUBE WILL BE INSERTED
 
         Args:
             resource (project.BossResource): Data model info based on the request or target resource
             resolution (int): the resolution level
             morton_idx_list (list(int)): a list of Morton ID with 1-1 mapping to the cube_list
-            time_sample_list (list(int)): a list of time samples with 1-1 mapping to the cube_list
             cube_list (list[cube.Cube]): list of Cube instances to store in the cache key-value store
-            update (bool): True if this an update operation. False if the first time you are inserting the cuboid
 
         Returns:
-            list[numpy.ndarray]: The cuboid data
+
         """
-        # Add cubes to cache
-        result = self.kvio.put_cubes(resource, resolution, morton_idx_list, [x.to_blosc_numpy() for x in cube_list])
+        # If cubes are time-series, insert 1 cube at a time, but all time points. If not, insert all cubes at once
+        if cube_list[0].is_time_series:
+            for m, c in zip(morton_idx_list, cube_list):
+                byte_arrays = []
+                time = []
+                for cnt, t in enumerate(range(*c.time_range)):
+                    time.append(t)
+                    byte_arrays.append(c.to_blosc_numpy(cnt))
+
+                # Add cubes to cache
+                self.kvio.put_cubes(resource, resolution, time, [m], byte_arrays)
+
+                # Add cubes to cache index if successful
+                self.kvio.put_cube_index(resource, resolution, time, [m])
+        else:
+            # Collect all cubes and insert at once
+            byte_arrays = []
+            time = []
+            for c in cube_list:
+                for t in range(*c.time_range):
+                    time.append(0)
+                    byte_arrays.append(c.to_blosc_numpy(0))
+
+            # Add cubes to cache
+            self.kvio.put_cubes(resource, resolution, time, morton_idx_list, byte_arrays)
+
+            # Add cubes to cache index if successful
+            self.kvio.put_cube_index(resource, resolution, time, morton_idx_list)
+
+    def put_single_cube(self, resource, resolution, morton_idx, cube):
+        """Insert a Cube into the cache key-value store. Supports time series and will put all time points in db.
+
+        ALL TIME SAMPLES IN THE CUBE WILL BE INSERTED
+
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            morton_idx (int): Morton ID of the cube
+            cube (cube.Cube): Cube instance to store in the cache key-value store
+
+
+        Returns:
+
+        """
+        time_points = range(*cube.time_range)
+
+        t, byte_arrays = zip(*collections.deque(cube.to_blosc_numpy_all_time()))
+
+        # Add cube to cache
+        self.kvio.put_cubes(resource, resolution, time_points, [morton_idx], byte_arrays)
 
         # Add cubes to cache index if successful
-        self.kvio.put_cube_index(resource, resolution, time_sample_list, morton_idx_list)
-
-        return result
+        self.kvio.put_cube_index(resource, resolution, time_points, [morton_idx])
 
     def _up_sample_cutout(self, resource, corner, extent, resolution):
         """Transform coordinates of a base resolution cutout to a lower res level by up-sampling.
@@ -311,51 +419,29 @@ class SpatialDB:
         # xyz offset stored for later use
         lowxyz = ndlib.MortonXYZ(list_of_idxs[0])
 
-        #TODO: We may not need time-series optimized cutouts. Consider removing.
-        # checking for timeseries data and doing an optimized cutout here in timeseries column
-        if len(resource.get_time_samples()) > 1:
-            # TODO: remove/update this block as needed when time-series data is fully implemented
-            for idx in list_of_idxs:
-                cuboids = self.get_cubes(resource, idx, resolution)
+        # Perform cutout
+        cuboids = self.get_cubes(resource, cutout_resolution, time_sample_list, list_of_idxs)
 
-                # use the batch generator interface
-                for idx, timestamp, data_string in cuboids:
+        # use the batch generator interface
+        for idx, data_string in cuboids:
+            # add the query result cube to the bigger cube
+            curxyz = ndlib.MortonXYZ(int(idx))
+            offset = [curxyz[0] - lowxyz[0], curxyz[1] - lowxyz[1], curxyz[2] - lowxyz[2]]
 
-                    # add the query result cube to the bigger cube
-                    curxyz = ndlib.MortonXYZ(int(idx))
-                    offset = [curxyz[0] - lowxyz[0], curxyz[1] - lowxyz[1], curxyz[2] - lowxyz[2]]
+            if not data_string:
+                in_cube.zeros()
+            else:
+                in_cube.from_blosc_numpy(data_string[:])
 
-                    if not data_string:
-                        in_cube.zeros()
-                    else:
-                        in_cube.from_blosc_numpy(data_string[:])
+            # TODO: DMK commented out exception code since exceptions are not yet implemented.
+            # apply exceptions if it's an annotation project
+            #if annoids != None and ch.getChannelType() in ANNOTATION_CHANNELS:
+            #    in_cube.data = c_lib.filter_ctype_OMP(in_cube.data, annoids)
+            #    if ch.getExceptions() == EXCEPTION_TRUE:
+            #        self.applyCubeExceptions(ch, annoids, cutout_resolution, idx, in_cube)
 
-                    # add it to the output cube
-                    out_cube.add_data(in_cube, offset, timestamp)
-
-        else:
-            cuboids = self.get_cubes(resource, cutout_resolution, list_of_idxs)
-
-            # use the batch generator interface
-            for idx, data_string in cuboids:
-                # add the query result cube to the bigger cube
-                curxyz = ndlib.MortonXYZ(int(idx))
-                offset = [curxyz[0] - lowxyz[0], curxyz[1] - lowxyz[1], curxyz[2] - lowxyz[2]]
-
-                if not data_string:
-                    in_cube.zeros()
-                else:
-                    in_cube.from_blosc_numpy(data_string[:])
-
-                # TODO: DMK commented out exception code since exceptions are not yet implemented.
-                # apply exceptions if it's an annotation project
-                #if annoids != None and ch.getChannelType() in ANNOTATION_CHANNELS:
-                #    in_cube.data = c_lib.filter_ctype_OMP(in_cube.data, annoids)
-                #    if ch.getExceptions() == EXCEPTION_TRUE:
-                #        self.applyCubeExceptions(ch, annoids, cutout_resolution, idx, in_cube)
-
-                # add it to the output cube
-                out_cube.add_data(in_cube, offset)
+            # add it to the output cube
+            out_cube.add_data(in_cube, offset)
 
         # Get the base resolution if channel or layer for logic below
         base_res = None
@@ -408,29 +494,39 @@ class SpatialDB:
 
         return out_cube
 
-    def write_cuboid(self, resource, corner, resolution, cuboid_data):
+    def write_cuboid(self, resource, corner, resolution, cuboid_data, time_sample_start=0):
         """ Write a 3D/4D volume to the key-value store. Used by API/cache in consistent mode as it reconciles writes
+
+        If cuboid_data.ndim == 4, data in time-series format - assume t,z,y,x
+        If cuboid_data.ndim == 3, data not in time-series format - assume z,y,x
+
         Args:
             resource (project.BossResource): Data model info based on the request or target resource
             corner ((int, int, int)): a list of Morton ID of the cuboids to get
             resolution (int): the resolution level
             cuboid_data (numpy.ndarray): Matrix of data to write as cuboids
+            time_sample_start (int): if cuboid_data.ndim == 3, the time sample for the data
+                                     if cuboid_data.ndim == 4, the time sample for cuboid_data[0, :, :, :]
 
         Returns:
             None
         """
-        # TODO: Look into data ordering when storing time series data and if it needs to be different
-
-        # dim is in xyz, data is in zyx order
-        if len(resource.get_time_samples()) == 1:
-            # Single time point - reorder from xyz to zyx
-            dim = cuboid_data.shape[::-1]
-        else:
-            # Reshape based on optimizing cuboid organization for time access
-            # TODO: Look into if the cuboid index needs to get updated to reflect writes to the cache
+        # Check if time-series
+        if cuboid_data.ndim == 4:
+            # Time-series - coords in xyz, data in zyx so shuffle to be consistent and drop time value
             dim = cuboid_data.shape[::-1][:-1]
+            time_sample_stop = time_sample_start + cuboid_data.ndim[0]
 
-        # get the size of the image and cube
+        elif cuboid_data.ndim == 3:
+            # Not time-series - coords in xyz, data in zyx so shuffle to be consistent
+            dim = cuboid_data.shape[::-1]
+            cuboid_data = np.expand_dims(cuboid_data, axis=0)
+            time_sample_stop = time_sample_start + 1
+        else:
+            raise SpdbError('Invalid Data Shape', 'Matrix must be 4D or 3D',
+                            ErrorCode.SPDB_ERROR)
+
+        # Get the size of cuboids
         [x_cube_dim, y_cube_dim, z_cube_dim] = cube_dim = CUBOIDSIZE[resolution]
 
         # Round to the nearest larger cube in all dimensions
@@ -442,58 +538,33 @@ class SpatialDB:
 
         [x_offset, y_offset, z_offset] = list(map(mod, corner, cube_dim))
 
-        if len(resource.get_time_samples()) == 1:
-            # Single time point
-            data_buffer = np.zeros([z_num_cubes * z_cube_dim, y_num_cubes * y_cube_dim, x_num_cubes * x_cube_dim],
-                                   dtype=cuboid_data.dtype)
+        # Populate the data buffer
+        data_buffer = np.zeros([time_sample_stop - time_sample_start] +
+                               [z_num_cubes * z_cube_dim, y_num_cubes * y_cube_dim, x_num_cubes * x_cube_dim],
+                               dtype=cuboid_data.dtype)
 
-            data_buffer[z_offset:z_offset + dim[2],
-                        y_offset:y_offset + dim[1],
-                        x_offset:x_offset + dim[0]] = cuboid_data
-        else:
-            data_buffer = np.zeros([resource.get_time_samples()[-1] -
-                                   resource.get_time_samples()[0]] +
-                                   [z_num_cubes * z_cube_dim, y_num_cubes * y_cube_dim, x_num_cubes * x_cube_dim],
-                                   dtype=cuboid_data.dtype)
+        data_buffer[:, z_offset:z_offset + dim[2],
+                       y_offset:y_offset + dim[1],
+                       x_offset:x_offset + dim[0]] = cuboid_data
 
-            data_buffer[:, z_offset:z_offset + dim[2],
-                           y_offset:y_offset + dim[1],
-                           x_offset:x_offset + dim[0]] = cuboid_data
-
-        # Get current cube from db, merge with new cube, write to db
-        if len(resource.get_time_samples()) == 1:
-            # Single time point
+        # Get current cube from db, merge with new cube, write back to the to db
+        for time_sample in range(time_sample_start, time_sample_stop):
             for z in range(z_num_cubes):
                 for y in range(y_num_cubes):
                     for x in range(x_num_cubes):
                         morton_idx = ndlib.XYZMorton([x + x_start, y + y_start, z + z_start])
 
-                        cube = self.get_cube(resource, resolution, morton_idx, update=True)
+                        cube = self.get_single_cube(resource, resolution, time_sample, morton_idx)
 
                         # overwrite the cube
-                        cube.overwrite(data_buffer[z * z_cube_dim:(z + 1) * z_cube_dim,
+                        cube.overwrite(data_buffer[time_sample,
+                                                   z * z_cube_dim:(z + 1) * z_cube_dim,
                                                    y * y_cube_dim:(y + 1) * y_cube_dim,
-                                                   x * x_cube_dim:(x + 1) * x_cube_dim])
+                                                   x * x_cube_dim:(x + 1) * x_cube_dim],
+                                       [time_sample, time_sample + 1])
 
                         # update in the database
-                        self.put_cube(resource, resolution, morton_idx, cube)
-        else:
-            for z in range(z_num_cubes):
-                for y in range(y_num_cubes):
-                    for x in range(x_num_cubes):
-                        for time_sample in resource.get_time_samples():
-                            morton_idx = ndlib.XYZMorton([x + x_start, y + y_start, z + z_start])
-
-                            cube = self.get_cube(resource, morton_idx, resolution, update=True)
-
-                            # overwrite the cube
-                            cube.overwrite(data_buffer[time_sample - resource.get_time_samples()[0],
-                                                       z * z_cube_dim:(z + 1) * z_cube_dim,
-                                                       y * y_cube_dim:(y + 1) * y_cube_dim,
-                                                       x * x_cube_dim:(x + 1) * x_cube_dim])
-
-                            # update in the database
-                            self.put_cube(resource, morton_idx, resolution, cube)
+                        self.put_cubes(resource, resolution, [time_sample], [morton_idx], [cube])
 
 
 
