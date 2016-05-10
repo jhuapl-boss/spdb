@@ -43,7 +43,7 @@ class MockBossConfig:
 
 @patch('redis.StrictRedis', mock_strict_redis_client)
 @patch('configparser.ConfigParser', MockBossConfig)
-class TestSpatialDBImageDataOneTimeSample(unittest.TestCase):
+class TestSpatialDBImageData(unittest.TestCase):
 
     def setUp(self):
         """ Create a diction of configuration values for the test resource8. """
