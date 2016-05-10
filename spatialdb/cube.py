@@ -35,7 +35,7 @@ class Cube(metaclass=ABCMeta):
     """An abstract base class to store 3D matrix data with time-series support and perform common operations
 
     The create_cube method is a factory method that will return the proper Cube child class instance based on the
-    provided resource instance
+    provided resource8 instance
 
     Args:
       cube_size list(int): Dimensions of the matrix in [x, y, z]
@@ -88,7 +88,7 @@ class Cube(metaclass=ABCMeta):
         y_offset = index[1] * input_cube.y_dim
         z_offset = index[2] * input_cube.z_dim
 
-        np.copyto(self.data[input_cube.time_range[0]:input_cube.time_range[1],
+        np.copyto(self.data[input_cube.time_range[0] - self.time_range[0]:input_cube.time_range[1] - self.time_range[0],
                             z_offset:z_offset + input_cube.z_dim,
                             y_offset:y_offset + input_cube.y_dim,
                             x_offset:x_offset + input_cube.x_dim], input_cube.data[:, :, :, :])
@@ -312,12 +312,12 @@ class Cube(metaclass=ABCMeta):
 
     @staticmethod
     def create_cube(resource, cube_size=None, time_range=None):
-        """Static factory method that creates the proper child class instance type based on the resource being accessed
+        """Static factory method that creates the proper child class instance type based on the resource8 being accessed
 
         Args:
-            resource (project.BossResource): Data model info based on the request or target resource
+            resource (project.BossResource): Data model info based on the request or target resource8
             cube_size ([int, int int]): Dimensions of the matrix in [x, y, z]
-            time_range list(int): The contiguous range of time samples stored in this cube instance
+            time_range list(int): The contiguous range of time samples stored in this cube instance [start, stop)
 
         Returns:
             cube.Cube - Instance of a child class of Cube

@@ -66,13 +66,13 @@ class KVIO(metaclass=ABCMeta):
 
     # TODO: Add if needed.  DMK pretty sure this was from OCPBlaze and not needed at the moment
     # @abstractmethod
-    # def get_cube(self, resource, resolution, morton_idx, update=False):
+    # def get_cube(self, resource8, resolution, morton_idx, update=False):
     #    """Retrieve a single cube from the database"""
     #    return NotImplemented
 
     # TODO: Add if needed.  DMK pretty sure this was from OCPBlaze and not needed at the moment
     # @abstractmethod
-    # def put_cube(self, resource, resolution, morton_idx, cube_bytes, update=False):
+    # def put_cube(self, resource8, resolution, morton_idx, cube_bytes, update=False):
     #    """Store a single cube into the database"""
     #    return NotImplemented
 

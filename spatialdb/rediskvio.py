@@ -91,7 +91,7 @@ class RedisKVIO(KVIO):
             CUBOID&{lookup_key}&time_sample&morton_id
 
         Args:
-            resource (spdb.project.BossResource): Data model info based on the request or target resource
+            resource (spdb.project.BossResource): Data model info based on the request or target resource8
             resolution (int): the resolution level
             morton_idx_list (list[int]): a list of Morton ID of the cuboids to get
             time_sample_list (list[int]): a list of time samples of the cuboids to get
@@ -115,7 +115,7 @@ class RedisKVIO(KVIO):
         redis set for each {lookup_key}&resolution as the key of the set.
 
         Args:
-            resource (spdb.project.BossResource): Data model info based on the request or target resource
+            resource (spdb.project.BossResource): Data model info based on the request or target resource8
             resolution (int): the resolution level
             time_sample_list (list[int]): a list of time samples
             morton_idx_list (list[int]): a list of Morton ID of the cuboids to get
@@ -167,7 +167,7 @@ class RedisKVIO(KVIO):
         """Add cuboid indices that are loaded into the cache db
 
         Args:
-            resource (spdb.project.BossResource): Data model info based on the request or target resource
+            resource (spdb.project.BossResource): Data model info based on the request or target resource8
             resolution (int): the resolution level
             time_sample_list (list(int)): a list of time samples for the cubes that have that have been inserted
             morton_idx_list (list(int)): a list of Morton IDs for the cubes that have that have been inserted
@@ -192,7 +192,7 @@ class RedisKVIO(KVIO):
         Cubes are returned in order, by incrementing time sample followed by incrementing morton ID
 
         Args:
-            resource (spdb.project.BossResource): Data model info based on the request or target resource
+            resource (spdb.project.BossResource): Data model info based on the request or target resource8
             resolution (int): the resolution level
             morton_idx_list (list(int)): the list of Morton IDs of the cuboids to get
             time_sample_list (list(int)): list of time sample points
@@ -233,7 +233,7 @@ class RedisKVIO(KVIO):
         (e.g. time_sample_list[12] and morton_idx_list[12] are for the data in cube_list[12]
 
         Args:
-            resource (spdb.project.BossResource): Data model info based on the request or target resource
+            resource (spdb.project.BossResource): Data model info based on the request or target resource8
             resolution (int): the resolution level
             morton_idx_list (list[int]): a list of Morton ID of the cuboids to get
             cube_list: list of cubes in a blosc compressed byte arrays using the numpy interface
@@ -253,11 +253,11 @@ class RedisKVIO(KVIO):
                             ErrorCode.REDIS_ERROR)
 
     # TODO: Add if needed.  DMK pretty sure this was from OCPBlaze and not needed at the moment
-    #def put_cube(self, resource, resolution, morton_idx, cube_bytes, update=False):
+    #def put_cube(self, resource8, resolution, morton_idx, cube_bytes, update=False):
     #    """Store a single cube into the database
 
     #    Args:
-    #        resource (spdb.project.BossResource): Data model info based on the request or target resource
+    #        resource8 (spdb.project.BossResource): Data model info based on the request or target resource8
     #        resolution (int): the resolution level
     #        morton_idx (int): the Morton ID of the cuboid to get
     #        cube_bytes (bytes): a cube in a blosc compressed byte array using the numpy interface
@@ -270,23 +270,23 @@ class RedisKVIO(KVIO):
     #        morton_idx = [morton_idx]
 
     #    # Generate the cuboid key
-    #    cuboid_key = self.generate_cuboid_data_keys(resource, resolution, morton_idx)
-    #    cuboid_index_key = self.generate_cache_index_keys(resource, resolution)
+    #    cuboid_key = self.generate_cuboid_data_keys(resource8, resolution, morton_idx)
+    #    cuboid_index_key = self.generate_cache_index_keys(resource8, resolution)
 
     #    try:
     #        # Put cuboid
     #        # Update cuboid index
-    #        self.put_cube_index(resource, resolution, morton_idx)
+    #        self.put_cube_index(resource8, resolution, morton_idx)
 
     #    except Exception as e:
     #        raise SpdbError("Redis Error", "Error inserting cube into the cache database. {}".format(e),
     #                        ErrorCode.REDIS_ERROR)
 
-    #def get_cube(self, resource, resolution, morton_idx):
+    #def get_cube(self, resource8, resolution, morton_idx):
     #    """Retrieve a single cuboid from the cache database
 
     #    Args:
-    #        resource (spdb.project.BossResource): Data model info based on the request or target resource
+    #        resource8 (spdb.project.BossResource): Data model info based on the request or target resource8
     #        resolution (int): the resolution level
     #        morton_idx (int): the Morton ID of the cuboid to get
 
@@ -295,7 +295,7 @@ class RedisKVIO(KVIO):
     #    """
 
     #    try:
-    #        rows = self.cache_client.mget(self.generate_cuboid_data_keys(resource, resolution, [morton_idx]))
+    #        rows = self.cache_client.mget(self.generate_cuboid_data_keys(resource8, resolution, [morton_idx]))
     #    except Exception as e:
     #        raise SpdbError("Redis Error", "Error retrieving cubes from the cache database. {}".format(e),
     #                        ErrorCode.REDIS_ERROR)

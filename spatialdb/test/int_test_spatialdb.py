@@ -47,7 +47,7 @@ class MockBossIntegrationConfig:
 class TestIntegrationSpatialDBImageDataOneTimeSample(unittest.TestCase):
 
     def setUp(self):
-        """ Create a diction of configuration values for the test resource. """
+        """ Create a diction of configuration values for the test resource8. """
         self.patcher = patch('configparser.ConfigParser', MockBossIntegrationConfig)
         self.mock_tests = self.patcher.start()
 

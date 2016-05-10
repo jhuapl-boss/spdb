@@ -45,10 +45,11 @@ class MockBossIntegrationConfig:
         return self.config[key]
 
 
-class TestIntegrationRedisKVIOImageDataOneTimeSample(unittest.TestCase):
+@patch('configparser.ConfigParser', MockBossIntegrationConfig)
+class TestIntegrationRedisKVIOImageData(unittest.TestCase):
 
     def setUp(self):
-        """ Create a diction of configuration values for the test resource. """
+        """ Create a diction of configuration values for the test resource8. """
         self.patcher = patch('configparser.ConfigParser', MockBossIntegrationConfig)
         self.mock_tests = self.patcher.start()
 
@@ -164,16 +165,16 @@ class TestIntegrationRedisKVIOImageDataOneTimeSample(unittest.TestCase):
     #    self.status_client.flushdb()
     #    rkv = RedisKVIO(self.cache_client, self.status_client)
 #
-    #    self.resource.set_time_samples([0, 1, 2, 3, 4, 5, 6, 7])
-    #    keys = rkv.generate_cache_index_keys(self.resource, 1)
+    #    self.resource8.set_time_samples([0, 1, 2, 3, 4, 5, 6, 7])
+    #    keys = rkv.generate_cache_index_keys(self.resource8, 1)
 #
     #    assert isinstance(keys, list)
-    #    assert len(keys) == len(self.resource.get_time_samples())
+    #    assert len(keys) == len(self.resource8.get_time_samples())
 #
-    #    for time_samaple, key in zip(self.resource.get_time_samples(), keys):
+    #    for time_samaple, key in zip(self.resource8.get_time_samples(), keys):
     #        assert key == "CUBOID_IDX&4&2&1&1&{}".format(time_samaple)
 #
-    #    self.resource.set_time_samples([0])
+    #    self.resource8.set_time_samples([0])
 
     def test_put_cube_index(self):
         """Test adding cubes to the cuboid index"""
