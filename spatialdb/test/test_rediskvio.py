@@ -49,7 +49,7 @@ class MockBossConfig:
 class TestRedisKVIOImageData(unittest.TestCase):
 
     def setUp(self):
-        """ Create a diction of configuration values for the test resource8. """
+        """ Create a diction of configuration values for the test resource. """
         self.patcher = patch('redis.StrictRedis', mock_strict_redis_client)
         self.mock_tests = self.patcher.start()
 

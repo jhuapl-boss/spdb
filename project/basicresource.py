@@ -22,10 +22,10 @@ class BossResourceBasic(BossResource):
     and from this is able to populate all values as needed.
 
      Args:
-      data (dict): a dictionary containing all the values to configure the resource8
+      data (dict): a dictionary containing all the values to configure the resource
 
     Attributes:
-      data (dict): a dictionary containing all the values to configure the resource8
+      data (dict): a dictionary containing all the values to configure the resource
     """
     def __init__(self, data):
         # call the base class constructor

@@ -167,17 +167,17 @@ class Layer:
 
 class BossResource(metaclass=ABCMeta):
     """
-    Parent class to represent a Boss data model resource8.
+    Parent class to represent a Boss data model resource.
 
     Attributes:
-      _collection (spdb.project.resource.Collection): A Collection instance for the resource8
-      _coord_frame (spdb.project.resource.CoordinateFrame): A coordinate frame instance for the resource8
-      _experiment (spdb.project.resource.Experiment): A experiment instance for the resource8
-      _channel (spdb.project.resource.Channel): A channel instance for the resource8 (if a channel)
-      _layer (spdb.project.resource.Layer): A layer instance for the resource8 (if a layer)
-      _time_samples (list): The time sample index for the resource8
-      _boss_key (str): The unique, plain text key identifying the resource8 - used to query for the lookup key
-      _lookup_key (str): The unique key identifying the resource8 that enables renaming resources and physically used to
+      _collection (spdb.project.resource.Collection): A Collection instance for the resource
+      _coord_frame (spdb.project.resource.CoordinateFrame): A coordinate frame instance for the resource
+      _experiment (spdb.project.resource.Experiment): A experiment instance for the resource
+      _channel (spdb.project.resource.Channel): A channel instance for the resource (if a channel)
+      _layer (spdb.project.resource.Layer): A layer instance for the resource (if a layer)
+      _time_samples (list): The time sample index for the resource
+      _boss_key (str): The unique, plain text key identifying the resource - used to query for the lookup key
+      _lookup_key (str): The unique key identifying the resource that enables renaming resources and physically used to
       ID data in databases
     """
     def __init__(self):
@@ -238,7 +238,7 @@ class BossResource(metaclass=ABCMeta):
     def get_collection(self):
         """Method to get the current Collection instance.  Lazily populated.
 
-        :returns A Collection instance for the given resource8
+        :returns A Collection instance for the given resource
         :rtype spdb.project.Collection
         """
         if not self._collection:
@@ -248,8 +248,8 @@ class BossResource(metaclass=ABCMeta):
     def get_experiment(self):
         """Method to get the current Experiment instance.  Lazily populated.
 
-        :returns A Experiment instance for the given resource8
-        :rtype spdb.project.resource8.Experiment
+        :returns A Experiment instance for the given resource
+        :rtype spdb.project.resource.Experiment
         """
         if not self._experiment:
             self.populate_experiment()
@@ -258,17 +258,17 @@ class BossResource(metaclass=ABCMeta):
     def get_coord_frame(self):
         """Method to get the current Coordinate Frame instance.  Lazily populated.
 
-        :returns A Coordinate Frame instance for the given resource8
-        :rtype spdb.project.resource8.CoordinateFrame
+        :returns A Coordinate Frame instance for the given resource
+        :rtype spdb.project.resource.CoordinateFrame
         """
         if not self._coord_frame:
             self.populate_coord_frame()
         return self._coord_frame
 
     def get_channel(self):
-        """Method to get the current Channel instance.  Lazily populated. None if current resource8 is a layer
+        """Method to get the current Channel instance.  Lazily populated. None if current resource is a layer
 
-        :returns A Channel instance for the given resource8
+        :returns A Channel instance for the given resource
         :rtype spdb.project.Channel
         """
         if not self._channel and not self._layer:
@@ -276,9 +276,9 @@ class BossResource(metaclass=ABCMeta):
         return self._channel
 
     def get_layer(self):
-        """Method to get the current Layer instance.  Lazily populated. None if current resource8 is a channel
+        """Method to get the current Layer instance.  Lazily populated. None if current resource is a channel
 
-        :returns A Layer instance for the given resource8
+        :returns A Layer instance for the given resource
         :rtype spdb.project.Layer
         """
         if not self._channel and not self._layer:
@@ -286,9 +286,9 @@ class BossResource(metaclass=ABCMeta):
         return self._layer
 
     def is_channel(self):
-        """Method to check if the resource8 is a channel or a layer
+        """Method to check if the resource is a channel or a layer
 
-        :returns True if resource8 is a channel. False if a layer
+        :returns True if resource is a channel. False if a layer
         :rtype bool
         """
         if not self._channel and not self._layer:
@@ -331,13 +331,13 @@ class BossResource(metaclass=ABCMeta):
         """Check if a layer/channel has been propagated, building out the res hierarchy
 
         Returns:
-            bool: True if the resource8 has been propagated, False if not.
+            bool: True if the resource has been propagated, False if not.
 
         """
         return False
 
     def get_data_type(self):
-        """Method to get data type.  Lazily populated. None if current resource8 is not a channel or layer
+        """Method to get data type.  Lazily populated. None if current resource is not a channel or layer
 
         :returns A string identifying the data type for the channel or layer
         :rtype str

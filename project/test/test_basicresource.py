@@ -20,9 +20,9 @@ from spdb.project import BossResourceBasic
 class TestBasicResource(unittest.TestCase):
 
     def get_image_dict(self):
-        """Method to generate an initial set of parameters to use to instantiate a basic resource8
+        """Method to generate an initial set of parameters to use to instantiate a basic resource
         Returns:
-            dict - a dictionary of data to initialize a basic resource8
+            dict - a dictionary of data to initialize a basic resource
 
         """
         data = {}
