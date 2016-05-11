@@ -41,64 +41,13 @@ class MockBossConfig:
         return self.config[key]
 
 
-@patch('redis.StrictRedis', mock_strict_redis_client)
-@patch('configparser.ConfigParser', MockBossConfig)
-class TestSpatialDBImageData(unittest.TestCase):
+class SpatialDBImageDataTestMixin(object):
 
-    def setUp(self):
-        """ Create a diction of configuration values for the test resource8. """
-        self.patcher = patch('configparser.ConfigParser', MockBossConfig)
-        self.mock_tests = self.patcher.start()
+    def get_num_cache_keys(self, spdb):
+        raise NotImplemented
 
-        data = {}
-        data['collection'] = {}
-        data['collection']['name'] = "col1"
-        data['collection']['description'] = "Test collection 1"
-
-        data['coord_frame'] = {}
-        data['coord_frame']['name'] = "coord_frame_1"
-        data['coord_frame']['description'] = "Test coordinate frame"
-        data['coord_frame']['x_start'] = 0
-        data['coord_frame']['x_stop'] = 2000
-        data['coord_frame']['y_start'] = 0
-        data['coord_frame']['y_stop'] = 5000
-        data['coord_frame']['z_start'] = 0
-        data['coord_frame']['z_stop'] = 200
-        data['coord_frame']['x_voxel_size'] = 4
-        data['coord_frame']['y_voxel_size'] = 4
-        data['coord_frame']['z_voxel_size'] = 35
-        data['coord_frame']['voxel_unit'] = "nanometers"
-        data['coord_frame']['time_step'] = 0
-        data['coord_frame']['time_step_unit'] = "na"
-
-        data['experiment'] = {}
-        data['experiment']['name'] = "exp1"
-        data['experiment']['description'] = "Test experiment 1"
-        data['experiment']['num_hierarchy_levels'] = 7
-        data['experiment']['hierarchy_method'] = 'slice'
-        data['experiment']['base_resolution'] = 0
-
-        data['channel_layer'] = {}
-        data['channel_layer']['name'] = "ch1"
-        data['channel_layer']['description'] = "Test channel 1"
-        data['channel_layer']['is_channel'] = True
-        data['channel_layer']['datatype'] = 'uint8'
-        data['channel_layer']['max_time_sample'] = 0
-
-        data['boss_key'] = 'col1&exp1&ch1'
-        data['lookup_key'] = '4&2&1'
-
-        self.resource8 = BossResourceBasic(data)
-
-        data16 = copy.deepcopy(data)
-        data16['channel_layer']['datatype'] = 'uint16'
-        self.resource16 = BossResourceBasic(data16)
-
-        self.redis_client = None
-
-    def tearDown(self):
-        # Stop mocking
-        self.mock_tests = self.patcher.stop()
+    def get_num_status_keys(self, spdb):
+        raise NotImplemented
 
     def test_put_single_cube_get_single_cube_no_time(self):
         """Test the put_cubes and get_cube methods"""
@@ -221,11 +170,11 @@ class TestSpatialDBImageData(unittest.TestCase):
         spdb = SpatialDB()
 
         # Make sure no data is in the database
-        assert len(spdb.kvio.cache_client.redis) == 0
+        assert self.get_num_cache_keys(spdb) == 0
         spdb.write_cuboid(self.resource8, (0, 0, 0), 0, data)
 
         # make sure data was written
-        assert len(spdb.kvio.cache_client.redis) == 1
+        assert self.get_num_cache_keys(spdb) == 1
 
     def test_write_cuboid_aligned_single(self):
         """Test the write_cuboid method"""
@@ -236,13 +185,13 @@ class TestSpatialDBImageData(unittest.TestCase):
         spdb = SpatialDB()
 
         # Make sure no data is in the database
-        assert len(spdb.kvio.cache_client.redis) == 0
-        assert len(spdb.kvio.status_client.redis) == 0
+        assert self.get_num_cache_keys(spdb) == 0
+        assert self.get_num_status_keys(spdb) == 0
         spdb.write_cuboid(self.resource8, (0, 0, 0), 0, data)
 
         # make sure data was written
-        assert len(spdb.kvio.cache_client.redis) == 4
-        assert len(spdb.kvio.status_client.redis) == 1
+        assert self.get_num_cache_keys(spdb) == 4
+        assert self.get_num_status_keys(spdb) == 1
 
     def test_write_cuboid_aligned_multiple_no_time(self):
         """Test the write_cuboid method"""
@@ -253,11 +202,11 @@ class TestSpatialDBImageData(unittest.TestCase):
         spdb = SpatialDB()
 
         # Make sure no data is in the database
-        assert len(spdb.kvio.cache_client.redis) == 0
+        assert self.get_num_cache_keys(spdb)== 0
         spdb.write_cuboid(self.resource8, (0, 0, 0), 0, data)
 
         # make sure data was written
-        assert len(spdb.kvio.cache_client.redis) == 2
+        assert self.get_num_cache_keys(spdb)== 2
 
     def test_write_cuboid_aligned_multiple(self):
         """Test the write_cuboid method"""
@@ -268,13 +217,13 @@ class TestSpatialDBImageData(unittest.TestCase):
         spdb = SpatialDB()
 
         # Make sure no data is in the database
-        assert len(spdb.kvio.cache_client.redis) == 0
-        assert len(spdb.kvio.status_client.redis) == 0
+        assert self.get_num_cache_keys(spdb)== 0
+        assert self.get_num_status_keys(spdb)== 0
         spdb.write_cuboid(self.resource8, (0, 0, 0), 0, data)
 
         # make sure data was written
-        assert len(spdb.kvio.cache_client.redis) == 8
-        assert len(spdb.kvio.status_client.redis) == 1
+        assert self.get_num_cache_keys(spdb)== 8
+        assert self.get_num_status_keys(spdb)== 1
 
     def test_write_cuboid_multiple_no_time(self):
         """Test the write_cuboid method"""
@@ -285,11 +234,11 @@ class TestSpatialDBImageData(unittest.TestCase):
         spdb = SpatialDB()
 
         # Make sure no data is in the database
-        assert len(spdb.kvio.cache_client.redis) == 0
+        assert self.get_num_cache_keys(spdb)== 0
         spdb.write_cuboid(self.resource8, (0, 0, 0), 0, data)
 
         # make sure data was written
-        assert len(spdb.kvio.cache_client.redis) == 6
+        assert self.get_num_cache_keys(spdb)== 6
 
     def test_write_cuboid_multiple(self):
         """Test the write_cuboid method"""
@@ -300,13 +249,13 @@ class TestSpatialDBImageData(unittest.TestCase):
         spdb = SpatialDB()
 
         # Make sure no data is in the database
-        assert len(spdb.kvio.cache_client.redis) == 0
-        assert len(spdb.kvio.status_client.redis) == 0
+        assert self.get_num_cache_keys(spdb)== 0
+        assert self.get_num_status_keys(spdb)== 0
         spdb.write_cuboid(self.resource8, (0, 0, 0), 0, data)
 
         # make sure data was written
-        assert len(spdb.kvio.cache_client.redis) == 24
-        assert len(spdb.kvio.status_client.redis) == 1
+        assert self.get_num_cache_keys(spdb)== 24
+        assert self.get_num_status_keys(spdb)== 1
 
     def test_cutout_aligned_single_no_time_uint8(self):
         """Test the write_cuboid method"""
@@ -485,3 +434,68 @@ class TestSpatialDBImageData(unittest.TestCase):
 
     # TODO: Add up_sample and down_sample methods once annotation interfaces are integrated.
 
+
+@patch('redis.StrictRedis', mock_strict_redis_client)
+@patch('configparser.ConfigParser', MockBossConfig)
+class TestSpatialDBImageData(SpatialDBImageDataTestMixin, unittest.TestCase):
+
+    def setUp(self):
+        """ Create a diction of configuration values for the test resource8. """
+        self.patcher = patch('configparser.ConfigParser', MockBossConfig)
+        self.mock_tests = self.patcher.start()
+
+        data = {}
+        data['collection'] = {}
+        data['collection']['name'] = "col1"
+        data['collection']['description'] = "Test collection 1"
+
+        data['coord_frame'] = {}
+        data['coord_frame']['name'] = "coord_frame_1"
+        data['coord_frame']['description'] = "Test coordinate frame"
+        data['coord_frame']['x_start'] = 0
+        data['coord_frame']['x_stop'] = 2000
+        data['coord_frame']['y_start'] = 0
+        data['coord_frame']['y_stop'] = 5000
+        data['coord_frame']['z_start'] = 0
+        data['coord_frame']['z_stop'] = 200
+        data['coord_frame']['x_voxel_size'] = 4
+        data['coord_frame']['y_voxel_size'] = 4
+        data['coord_frame']['z_voxel_size'] = 35
+        data['coord_frame']['voxel_unit'] = "nanometers"
+        data['coord_frame']['time_step'] = 0
+        data['coord_frame']['time_step_unit'] = "na"
+
+        data['experiment'] = {}
+        data['experiment']['name'] = "exp1"
+        data['experiment']['description'] = "Test experiment 1"
+        data['experiment']['num_hierarchy_levels'] = 7
+        data['experiment']['hierarchy_method'] = 'slice'
+        data['experiment']['base_resolution'] = 0
+
+        data['channel_layer'] = {}
+        data['channel_layer']['name'] = "ch1"
+        data['channel_layer']['description'] = "Test channel 1"
+        data['channel_layer']['is_channel'] = True
+        data['channel_layer']['datatype'] = 'uint8'
+        data['channel_layer']['max_time_sample'] = 0
+
+        data['boss_key'] = 'col1&exp1&ch1'
+        data['lookup_key'] = '4&2&1'
+
+        self.resource8 = BossResourceBasic(data)
+
+        data16 = copy.deepcopy(data)
+        data16['channel_layer']['datatype'] = 'uint16'
+        self.resource16 = BossResourceBasic(data16)
+
+        self.redis_client = None
+
+    def tearDown(self):
+        # Stop mocking
+        self.mock_tests = self.patcher.stop()
+
+    def get_num_cache_keys(self, spdb):
+        return len(spdb.kvio.cache_client.redis)
+
+    def get_num_status_keys(self, spdb):
+        return len(spdb.kvio.status_client.redis)

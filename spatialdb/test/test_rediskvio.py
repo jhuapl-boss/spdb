@@ -44,66 +44,7 @@ class MockBossConfig:
         return self.config[key]
 
 
-@patch('configparser.ConfigParser', MockBossConfig)
-@patch('redis.StrictRedis', mock_strict_redis_client)
-class TestRedisKVIOImageData(unittest.TestCase):
-
-    def setUp(self):
-        """ Create a diction of configuration values for the test resource. """
-        self.patcher = patch('redis.StrictRedis', mock_strict_redis_client)
-        self.mock_tests = self.patcher.start()
-
-        self.data = {}
-        self.data['collection'] = {}
-        self.data['collection']['name'] = "col1"
-        self.data['collection']['description'] = "Test collection 1"
-
-        self.data['coord_frame'] = {}
-        self.data['coord_frame']['name'] = "coord_frame_1"
-        self.data['coord_frame']['description'] = "Test coordinate frame"
-        self.data['coord_frame']['x_start'] = 0
-        self.data['coord_frame']['x_stop'] = 2000
-        self.data['coord_frame']['y_start'] = 0
-        self.data['coord_frame']['y_stop'] = 5000
-        self.data['coord_frame']['z_start'] = 0
-        self.data['coord_frame']['z_stop'] = 200
-        self.data['coord_frame']['x_voxel_size'] = 4
-        self.data['coord_frame']['y_voxel_size'] = 4
-        self.data['coord_frame']['z_voxel_size'] = 35
-        self.data['coord_frame']['voxel_unit'] = "nanometers"
-        self.data['coord_frame']['time_step'] = 0
-        self.data['coord_frame']['time_step_unit'] = "na"
-
-        self.data['experiment'] = {}
-        self.data['experiment']['name'] = "exp1"
-        self.data['experiment']['description'] = "Test experiment 1"
-        self.data['experiment']['num_hierarchy_levels'] = 7
-        self.data['experiment']['hierarchy_method'] = 'slice'
-
-        self.data['channel_layer'] = {}
-        self.data['channel_layer']['name'] = "ch1"
-        self.data['channel_layer']['description'] = "Test channel 1"
-        self.data['channel_layer']['is_channel'] = True
-        self.data['channel_layer']['datatype'] = 'uint8'
-        self.data['channel_layer']['max_time_step'] = 0
-
-        self.data['boss_key'] = 'col1&exp1&ch1'
-        self.data['lookup_key'] = '4&2&1'
-
-        self.resource = BossResourceBasic(self.data)
-
-        self.config = configuration.BossConfig()
-
-        self.cache_client = redis.StrictRedis(host=self.config["aws"]["cache-state"], port=6379, db=1,
-                                              decode_responses=True)
-        self.cache_client.flushdb()
-
-        self.status_client = redis.StrictRedis(host=self.config["aws"]["cache-state"], port=6379, db=1,
-                                               decode_responses=True)
-        self.status_client.flushdb()
-
-    def tearDown(self):
-        self.mock_tests = self.patcher.stop()
+class RedisKVIOTestMixin(object):
 
     def test_generate_cuboid_index_key(self):
         """Test the base key getter function for the cuboid index (cuboids that exist in the cache"""
@@ -287,3 +228,64 @@ class TestRedisKVIOImageData(unittest.TestCase):
             assert c[1] == m
             data_retrieved = blosc.unpack_array(c[2])
             np.testing.assert_array_equal(data_retrieved,  blosc.unpack_array(d))
+
+
+@patch('configparser.ConfigParser', MockBossConfig)
+class TestRedisKVIOImageData(RedisKVIOTestMixin, unittest.TestCase):
+
+    def setUp(self):
+        """ Create a diction of configuration values for the test resource. """
+        self.patcher = patch('redis.StrictRedis', mock_strict_redis_client)
+        self.mock_tests = self.patcher.start()
+
+        self.data = {}
+        self.data['collection'] = {}
+        self.data['collection']['name'] = "col1"
+        self.data['collection']['description'] = "Test collection 1"
+
+        self.data['coord_frame'] = {}
+        self.data['coord_frame']['name'] = "coord_frame_1"
+        self.data['coord_frame']['description'] = "Test coordinate frame"
+        self.data['coord_frame']['x_start'] = 0
+        self.data['coord_frame']['x_stop'] = 2000
+        self.data['coord_frame']['y_start'] = 0
+        self.data['coord_frame']['y_stop'] = 5000
+        self.data['coord_frame']['z_start'] = 0
+        self.data['coord_frame']['z_stop'] = 200
+        self.data['coord_frame']['x_voxel_size'] = 4
+        self.data['coord_frame']['y_voxel_size'] = 4
+        self.data['coord_frame']['z_voxel_size'] = 35
+        self.data['coord_frame']['voxel_unit'] = "nanometers"
+        self.data['coord_frame']['time_step'] = 0
+        self.data['coord_frame']['time_step_unit'] = "na"
+
+        self.data['experiment'] = {}
+        self.data['experiment']['name'] = "exp1"
+        self.data['experiment']['description'] = "Test experiment 1"
+        self.data['experiment']['num_hierarchy_levels'] = 7
+        self.data['experiment']['hierarchy_method'] = 'slice'
+
+        self.data['channel_layer'] = {}
+        self.data['channel_layer']['name'] = "ch1"
+        self.data['channel_layer']['description'] = "Test channel 1"
+        self.data['channel_layer']['is_channel'] = True
+        self.data['channel_layer']['datatype'] = 'uint8'
+        self.data['channel_layer']['max_time_step'] = 0
+
+        self.data['boss_key'] = 'col1&exp1&ch1'
+        self.data['lookup_key'] = '4&2&1'
+
+        self.resource = BossResourceBasic(self.data)
+
+        self.config = configuration.BossConfig()
+
+        self.cache_client = redis.StrictRedis(host=self.config["aws"]["cache-state"], port=6379, db=1,
+                                              decode_responses=True)
+        self.cache_client.flushdb()
+
+        self.status_client = redis.StrictRedis(host=self.config["aws"]["cache-state"], port=6379, db=1,
+                                               decode_responses=True)
+        self.status_client.flushdb()
+
+    def tearDown(self):
+        self.mock_tests = self.patcher.stop()
