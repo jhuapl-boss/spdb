@@ -221,7 +221,7 @@ class RedisKVIO(KVIO):
             if not row:
                 temp_cube = Cube.create_cube(resource, [x_cube_dim, y_cube_dim, z_cube_dim])
                 temp_cube.zeros()
-                row = temp_cube.to_blosc_numpy()
+                row = temp_cube.get_blosc_numpy_by_time_index()
             # end blank cube shim
 
             yield (time, idx, row)

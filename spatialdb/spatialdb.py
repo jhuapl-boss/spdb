@@ -181,7 +181,7 @@ class SpatialDB:
                 time = []
                 for cnt, t in enumerate(range(*c.time_range)):
                     time.append(t)
-                    byte_arrays.append(c.to_blosc_numpy(cnt))
+                    byte_arrays.append(c.get_blosc_numpy_by_time_index(cnt))
 
                 # Add cubes to cache
                 self.kvio.put_cubes(resource, resolution, time, [m], byte_arrays)
@@ -195,7 +195,7 @@ class SpatialDB:
             for c in cube_list:
                 for t in range(*c.time_range):
                     time.append(0)
-                    byte_arrays.append(c.to_blosc_numpy(0))
+                    byte_arrays.append(c.get_blosc_numpy_by_time_index(0))
 
             # Add cubes to cache
             self.kvio.put_cubes(resource, resolution, time, morton_idx_list, byte_arrays)
@@ -220,7 +220,7 @@ class SpatialDB:
         """
         time_points = range(*cube.time_range)
 
-        t, byte_arrays = zip(*collections.deque(cube.to_blosc_numpy_all_time()))
+        t, byte_arrays = zip(*collections.deque(cube.get_all_blosc_numpy_arrays()))
 
         # Add cube to cache
         self.kvio.put_cubes(resource, resolution, time_points, [morton_idx], byte_arrays)

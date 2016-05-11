@@ -112,7 +112,24 @@ class Cube(metaclass=ABCMeta):
         # update the cube dimensions, ignoring the time component since it does not change
         self.z_dim, self.y_dim, self.x_dim = self.cube_size = list(self.data.shape[1:])
 
-    def to_blosc_numpy(self, time_index=0):
+    def to_blosc_numpy(self):
+        """A method that packs data in this Cube instance using Blosc and the numpy array specific interface for all
+        time samples (assumes a 4-D matrix).
+
+        Args:
+
+        Returns:
+            bytes - the compressed, serialized byte array of Cube matrix data for a given time sample
+
+        """
+        try:
+            # Index into the data array with time
+            return blosc.pack_array(self.data[:, :, :, :])
+        except:
+            raise SpdbError("IO Error", "Failed to decompress database cube.  Data integrity concern.",
+                            ErrorCode.IO_ERROR)
+
+    def get_blosc_numpy_by_time_index(self, time_index=0):
         """A method that packs data in this Cube instance using Blosc and the numpy array specific interface for a
         single time sample.  The time index is the index value into self.data.
 
@@ -132,7 +149,7 @@ class Cube(metaclass=ABCMeta):
             raise SpdbError("IO Error", "Failed to decompress database cube.  Data integrity concern.",
                             ErrorCode.IO_ERROR)
 
-    def to_blosc_numpy_all_time(self):
+    def get_all_blosc_numpy_arrays(self):
         """A generator that packs data in this Cube instance using Blosc and the numpy array specific interface.
 
         Returns:
@@ -147,7 +164,11 @@ class Cube(metaclass=ABCMeta):
     def from_blosc_numpy(self, byte_arrays, time_sample_range=None):
         """Uncompress and populate Cube data from a Blosc serialized and compressed byte array using the numpy interface
 
-        Assume data is stored in cube in tzyx ordering and each byte array should be zyx ordered.
+        If byte_arrays is a list, assume data is stored internally in this Cube instance in tzyx ordering and
+        each byte array is a single zyx ordered time sample, in order, matching time_sample_range.
+
+        If byte_arrays is a single list, assume it contains the entire Cube's data for all time samples and is of the
+        format tzyx. Directly decompress and replace data in the Cube instance.
 
         Args:
             byte_arrays list[str]:  list of time ordered, compressed, serialized byte array of Cube matrix data
@@ -158,7 +179,6 @@ class Cube(metaclass=ABCMeta):
             None
 
         """
-        # TODO: Revisit if this should be simplified to take single arrays
         try:
             if not time_sample_range:
                 # This isn't a time-series cube, so use default
@@ -168,22 +188,29 @@ class Cube(metaclass=ABCMeta):
                 self.is_time_series = True
                 self.time_range = time_sample_range
 
-            # Unpack all of the arrays into the cube
-            for idx, t in enumerate(range(time_sample_range[0], time_sample_range[1])):
-                if idx == 0:
-                    # On first cube get the size and allocate properly
-                    temp_mat = blosc.unpack_array(byte_arrays[idx])
+            if isinstance(byte_arrays, bytes):
+                # If you get a single array assume it is the complete 4D array
+                self.data[:, :, :, :] = blosc.unpack_array(byte_arrays)
+                self.z_dim, self.y_dim, self.x_dim = self.cube_size = list(self.data.shape)[1:]
+            else:
+                # Got a list of byte arrays, so assume they are each 3-D, corresponding to time samples
 
-                    # Set shape
-                    self.z_dim, self.y_dim, self.x_dim = self.cube_size = list(temp_mat.shape)
+                # Unpack all of the arrays into the cube
+                for idx, t in enumerate(range(time_sample_range[0], time_sample_range[1])):
+                    if idx == 0:
+                        # On first cube get the size and allocate properly
+                        temp_mat = blosc.unpack_array(byte_arrays[idx])
 
-                    # allocate
-                    self.data = np.zeros(shape=(time_sample_range[1] - time_sample_range[0],
-                                                self.z_dim, self.y_dim, self.x_dim), dtype=self.data.dtype)
+                        # Set shape
+                        self.z_dim, self.y_dim, self.x_dim = self.cube_size = list(temp_mat.shape)
 
-                    self.data[idx, :, :, :] = temp_mat
-                else:
-                    self.data[idx, :, :, :] = blosc.unpack_array(byte_arrays[idx])
+                        # allocate
+                        self.data = np.zeros(shape=(time_sample_range[1] - time_sample_range[0],
+                                                    self.z_dim, self.y_dim, self.x_dim), dtype=self.data.dtype)
+
+                        self.data[idx, :, :, :] = temp_mat
+                    else:
+                        self.data[idx, :, :, :] = blosc.unpack_array(byte_arrays[idx])
 
         except:
             raise SpdbError("IO Error", "Failed to decompress database cube.  Data integrity concern.",
