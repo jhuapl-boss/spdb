@@ -18,6 +18,9 @@ from PIL import Image
 
 from .cube import Cube
 
+from spdb.c_lib import ndlib
+from .error import SpdbError, ErrorCode
+
 
 class ImageCube8(Cube):
     def __init__(self, cube_size=None, time_range=None):
@@ -43,6 +46,40 @@ class ImageCube8(Cube):
         """
         self._created_from_zeros = True
         self.data = np.zeros([self.time_range[1]-self.time_range[0]] + self.cube_size, dtype=np.uint8, order='C')
+
+    def overwrite(self, input_data, time_sample_range=None):
+        """ Overwrite data with all non-zero values in the input_data
+
+        Function is accelerated via ctypes lib.
+
+        If time_sample_range is provided, data will be inserted at the appropriate time sample
+
+        Args:
+            input_data (numpy.ndarray): Input data matrix to overwrite the current Cube data
+            time_sample_range list(int): The min and max time samples that input_data represents in python convention
+            (start inclusive, stop exclusive)
+
+        Returns:
+            None
+
+        """
+        if self.data.dtype != input_data.dtype:
+            raise SpdbError("IO Error", "Conflicting data types for overwrite.",
+                            ErrorCode.IO_ERROR)
+
+        if not time_sample_range:
+            # If no time sample range provided use default of 0
+            time_sample_range = [0, 1]
+
+        if input_data.ndim == 4:
+            for t in range(*time_sample_range):
+                self.data[t - self.time_range[0], :, :, :] = ndlib.overwriteDense8_ctype(
+                    self.data[t - self.time_range[0], :, :, :], input_data[t - time_sample_range[0], :, :, :])
+        else:
+            # Input data doesn't have any time indices
+            self.data[time_sample_range[0], :, :, :] = ndlib.overwriteDense8_ctype(
+                self.data[time_sample_range[0], :, :, :], input_data[time_sample_range[0], :, :, :])
+
 
     def xy_image(self, z_index=0, t_index=0):
         """Render an image in the XY plane.
@@ -116,6 +153,39 @@ class ImageCube16(Cube):
         """
         self._created_from_zeros = True
         self.data = np.zeros([self.time_range[1] - self.time_range[0]] + self.cube_size, dtype=np.uint16, order='C')
+
+    def overwrite(self, input_data, time_sample_range=None):
+        """ Overwrite data with all non-zero values in the input_data
+
+        Function is accelerated via ctypes lib.
+
+        If time_sample_range is provided, data will be inserted at the appropriate time sample
+
+        Args:
+            input_data (numpy.ndarray): Input data matrix to overwrite the current Cube data
+            time_sample_range list(int): The min and max time samples that input_data represents in python convention
+            (start inclusive, stop exclusive)
+
+        Returns:
+            None
+
+        """
+        if self.data.dtype != input_data.dtype:
+            raise SpdbError("IO Error", "Conflicting data types for overwrite.",
+                            ErrorCode.IO_ERROR)
+
+        if not time_sample_range:
+            # If no time sample range provided use default of 0
+            time_sample_range = [0, 1]
+
+        if input_data.ndim == 4:
+            for t in range(*time_sample_range):
+                self.data[t - self.time_range[0], :, :, :] = ndlib.overwriteDense16_ctype(
+                    self.data[t - self.time_range[0], :, :, :], input_data[t - time_sample_range[0], :, :, :])
+        else:
+            # Input data doesn't have any time indices
+            self.data[time_sample_range[0], :, :, :] = ndlib.overwriteDense16_ctype(
+                self.data[time_sample_range[0], :, :, :], input_data[time_sample_range[0], :, :, :])
 
     def xy_image(self, z_index=0, t_index=0):
         """Render an image in the XY plane.

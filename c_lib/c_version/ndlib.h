@@ -59,8 +59,11 @@ void shaveDense ( uint32_t * , uint32_t * , int * );
 // Declaring the exceptionDense function
 void exceptionDense ( uint32_t * , uint32_t * , int * );
 
-// Declaring the exceptionDense function
-void overwriteDense ( uint32_t * , uint32_t * , int * );
+// Declaring the overwriteDense function
+void overwriteDense ( uint32_t * , uint32_t * , int * );  // Legacy overwrite function is for uint32 data
+void overwriteDense8 ( uint8_t * , uint8_t * , int * );
+void overwriteDense16 ( uint16_t * , uint16_t * , int * );
+void overwriteDense64 ( uint64_t * , uint64_t * , int * );
 
 // Declaring the zoomOutData function
 void zoomOutData ( uint32_t * , uint32_t * , int * , int );

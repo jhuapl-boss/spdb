@@ -351,7 +351,7 @@ class BossResource(metaclass=ABCMeta):
                 # You have a channel
                 data_type = self._channel.datatype
         else:
-            if self._layer():
+            if self._layer:
                 # You have a layer
                 data_type = self._layer.datatype
 

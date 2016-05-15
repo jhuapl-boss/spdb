@@ -25,13 +25,67 @@
 
 void overwriteDense( uint32_t * data, uint32_t * annodata ,int * dims )
 {
-		int i,j,k,index;
+	int i,j,k,index;
 
     int xdim = dims[0];
     int ydim = dims[1];
     int zdim = dims[2];
     
-		for ( i=0; i<xdim; i++ )
+	for ( i=0; i<xdim; i++ )
+      for ( j=0; j<ydim; j++ )
+        for ( k=0; k<zdim; k++ )
+        {
+          index = (i*zdim*ydim)+(j*zdim)+(k);
+          if ( annodata[index] !=0 )
+            data[index] = annodata[index];
+        }
+}
+
+void overwriteDense8( uint8_t * data, uint8_t * annodata ,int * dims )
+{
+	int i,j,k,index;
+
+    int xdim = dims[0];
+    int ydim = dims[1];
+    int zdim = dims[2];
+
+	for ( i=0; i<xdim; i++ )
+      for ( j=0; j<ydim; j++ )
+        for ( k=0; k<zdim; k++ )
+        {
+          index = (i*zdim*ydim)+(j*zdim)+(k);
+          if ( annodata[index] !=0 )
+            data[index] = annodata[index];
+        }
+}
+
+void overwriteDense16( uint16_t * data, uint16_t * annodata ,int * dims )
+{
+	int i,j,k,index;
+
+    int xdim = dims[0];
+    int ydim = dims[1];
+    int zdim = dims[2];
+
+	for ( i=0; i<xdim; i++ )
+      for ( j=0; j<ydim; j++ )
+        for ( k=0; k<zdim; k++ )
+        {
+          index = (i*zdim*ydim)+(j*zdim)+(k);
+          if ( annodata[index] !=0 )
+            data[index] = annodata[index];
+        }
+}
+
+void overwriteDense64( uint64_t * data, uint64_t * annodata ,int * dims )
+{
+	int i,j,k,index;
+
+    int xdim = dims[0];
+    int ydim = dims[1];
+    int zdim = dims[2];
+
+	for ( i=0; i<xdim; i++ )
       for ( j=0; j<ydim; j++ )
         for ( k=0; k<zdim; k++ )
         {

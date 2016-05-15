@@ -218,43 +218,6 @@ class Cube(metaclass=ABCMeta):
 
         self._created_from_zeros = False
 
-    def overwrite(self, input_data, time_sample_range=None):
-        """ Overwrite data with all non-zero values in the input_data
-
-        Function is accelerated for annotation overwrite operations since you often are merging
-        two sparse cubes.  If not uint32 or uint64 this just performs a copy.
-
-        If time_sample_range is provided, data will be inserted at the appropriate time sample
-
-        Args:
-            input_data (numpy.ndarray): Input data matrix to overwrite the current Cube data
-            time_sample_range list(int): The min and max time samples that input_data represents in python convention
-            (start inclusive, stop exclusive)
-
-        Returns:
-            None
-
-        """
-        if self.data.dtype != input_data.dtype:
-            raise SpdbError("IO Error", "Conflicting data types for overwrite.",
-                            ErrorCode.IO_ERROR)
-
-        if not time_sample_range:
-            # If no time sample range provided use default of 0
-            time_sample_range = [0, 1]
-
-        if self.data.dtype == np.uint32 or self.data.dtype == np.uint64:
-            for cnt, t in enumerate(range(time_sample_range)):
-                # TODO: look into accelerating time-series overwrites
-                # Currently not optimized to overwrite all time samples at once so do one at a time
-                self.data[t, :, :, :] = ndlib.overwriteDense_ctype(self.data[t, :, :, :], input_data[cnt, :, :, :])
-        else:
-            if input_data.ndim == 4:
-                self.data[time_sample_range[0]:time_sample_range[1], :, :, :] = input_data[:, :, :, :]
-            else:
-                # Input data doesn't have any time indices
-                self.data[time_sample_range[0]:time_sample_range[1], :, :, :] = input_data[:, :, :]
-
     def is_not_zeros(self):
         """Check if the data matrix is all zeros
 
@@ -270,6 +233,25 @@ class Cube(metaclass=ABCMeta):
             bool
         """
         return self._created_from_zeros
+
+    @abstractmethod
+    def overwrite(self, input_data, time_sample_range=None):
+        """ Overwrite data with all non-zero values in the input_data
+
+        Function is accelerated via ctypes lib.
+
+        If time_sample_range is provided, data will be inserted at the appropriate time sample
+
+        Args:
+            input_data (numpy.ndarray): Input data matrix to overwrite the current Cube data
+            time_sample_range list(int): The min and max time samples that input_data represents in python convention
+            (start inclusive, stop exclusive)
+
+        Returns:
+            None
+
+        """
+        return NotImplemented
 
     @abstractmethod
     def zeros(self):
@@ -351,15 +333,10 @@ class Cube(metaclass=ABCMeta):
         """
         data_type = resource.get_data_type()
 
-        # 32-Bit layer is an Annotation Cube
-        if not resource.is_channel() and data_type in ndtype.DTYPE_uint32:
-            # return anncube.AnnotateCube32(cube_size)
-            raise SpdbError("Proposed Capability", "Data type not yet supported",
-                            ErrorCode.FUTURE)
-        elif not resource.is_channel() and data_type in ndtype.DTYPE_uint64:
-            # return anncube.AnnotateCube64(cube_size)
-            raise SpdbError("Proposed Capability", "Data type not yet supported",
-                            ErrorCode.FUTURE)
+        if not resource.is_channel() and data_type in ndtype.DTYPE_uint64:
+            from .annocube import AnnotateCube64
+            return AnnotateCube64(cube_size, time_range)
+
         # Assume channels here
         elif data_type in ndtype.DTYPE_uint8:
             from .imagecube import ImageCube8

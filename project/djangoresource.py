@@ -89,12 +89,6 @@ class BossResourceDjango(BossResource):
                                 self.boss_request.channel_layer.base_resolution,
                                 linked_channels)
 
-    def populate_time_samples(self):
-        """
-        Method to set self._time_samples.
-        """
-        self._time_samples = self.boss_request.get_time()
-
     def populate_boss_key(self):
         """
         Method to set self._boss_key.

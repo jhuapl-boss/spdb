@@ -167,7 +167,7 @@ class TestImageCube8(unittest.TestCase):
         # Make sure it was in the right spot
         assert c_base.data[0, 1, 2, 5] == 1
 
-    def test_overwrite(self):
+    def test_overwrite_simple(self):
         """Test overwriting data - for ImageCub8 this just does a copy."""
         c_base = ImageCube8([10, 20, 5], [0, 10])
         c_base.zeros()
@@ -194,6 +194,48 @@ class TestImageCube8(unittest.TestCase):
         # Should insert starting at T=4
         assert c_base.data[4, 1, 2, 5] == 1
         assert c_base.data[6, 3, 15, 7] == 3
+
+    def test_overwrite(self):
+        """Test overwriting data with existing data in place."""
+        # Create base data
+        c_base = ImageCube8([10, 20, 5], [0, 10])
+        c_base.zeros()
+
+        c_base.data[1, 1, 1, 1] = 1
+        c_base.data[2, 4, 4, 1] = 2
+
+        # Create overwrite data - all zero locations
+        data = np.zeros((2, 5, 20, 10), np.uint8)
+        data[0, 2, 2, 2] = 3
+        data[1, 4, 5, 6] = 4
+
+        # Insert c_add into c_base
+        c_base.overwrite(data, [1, 3])
+
+        # Make sure insertion happened
+        assert c_base.data.sum() == 1 + 2 + 3 + 4
+
+        # Make sure it was in the right spot
+        assert c_base.data[1, 1, 1, 1] == 1
+        assert c_base.data[2, 4, 4, 1] == 2
+        assert c_base.data[1, 2, 2, 2] == 3
+        assert c_base.data[2, 4, 5, 6] == 4
+
+        # Place data in existing voxel locations and re-do overwrite
+        data[0, 1, 1, 1] = 5
+        data[1, 4, 4, 1] = 6
+
+        # Insert into c_base
+        c_base.overwrite(data, [1, 3])
+
+        # Make sure insertion happened
+        assert c_base.data.sum() == 3 + 4 + 5 + 6
+
+        # Make sure it was in the right spot
+        assert c_base.data[1, 1, 1, 1] == 5
+        assert c_base.data[2, 4, 4, 1] == 6
+        assert c_base.data[1, 2, 2, 2] == 3
+        assert c_base.data[2, 4, 5, 6] == 4
 
     def test_trim_no_time(self):
         """Test trimming off part of a cube"""
@@ -549,7 +591,7 @@ class TestImageCube16(unittest.TestCase):
         # Make sure it was in the right spot
         assert c_base.data[0, 1, 2, 5] == 1
 
-    def test_overwrite(self):
+    def test_overwrite_simple(self):
         """Test overwriting data - for ImageCub8 this just does a copy."""
         c_base = ImageCube16([10, 20, 5], [0, 10])
         c_base.zeros()
@@ -576,6 +618,48 @@ class TestImageCube16(unittest.TestCase):
         # Should insert starting at T=4
         assert c_base.data[4, 1, 2, 5] == 1
         assert c_base.data[6, 3, 15, 7] == 3
+
+    def test_overwrite(self):
+        """Test overwriting data with existing data in place."""
+        # Create base data
+        c_base = ImageCube16([10, 20, 5], [0, 10])
+        c_base.zeros()
+
+        c_base.data[1, 1, 1, 1] = 1
+        c_base.data[2, 4, 4, 1] = 2
+
+        # Create overwrite data - all zero locations
+        data = np.zeros((2, 5, 20, 10), np.uint16)
+        data[0, 2, 2, 2] = 3
+        data[1, 4, 5, 6] = 4
+
+        # Insert c_add into c_base
+        c_base.overwrite(data, [1, 3])
+
+        # Make sure insertion happened
+        assert c_base.data.sum() == 1 + 2 + 3 + 4
+
+        # Make sure it was in the right spot
+        assert c_base.data[1, 1, 1, 1] == 1
+        assert c_base.data[2, 4, 4, 1] == 2
+        assert c_base.data[1, 2, 2, 2] == 3
+        assert c_base.data[2, 4, 5, 6] == 4
+
+        # Place data in existing voxel locations and re-do overwrite
+        data[0, 1, 1, 1] = 5
+        data[1, 4, 4, 1] = 6
+
+        # Insert into c_base
+        c_base.overwrite(data, [1, 3])
+
+        # Make sure insertion happened
+        assert c_base.data.sum() == 3 + 4 + 5 + 6
+
+        # Make sure it was in the right spot
+        assert c_base.data[1, 1, 1, 1] == 5
+        assert c_base.data[2, 4, 4, 1] == 6
+        assert c_base.data[1, 2, 2, 2] == 3
+        assert c_base.data[2, 4, 5, 6] == 4
 
     def test_trim_no_time(self):
         """Test trimming off part of a cube"""

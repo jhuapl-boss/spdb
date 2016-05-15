@@ -30,6 +30,7 @@ ndlib_ctypes = npct.load_library("ndlib.so", BASE_PATH + "/c_version")
 # Defining numpy array times for C
 array_1d_uint8 = npct.ndpointer(dtype=np.uint8, ndim=1, flags='C_CONTIGUOUS')
 array_2d_uint8 = npct.ndpointer(dtype=np.uint8, ndim=2, flags='C_CONTIGUOUS')
+array_3d_uint8 = npct.ndpointer(dtype=np.uint8, ndim=3, flags='C_CONTIGUOUS')
 array_1d_uint16 = npct.ndpointer(dtype=np.uint16, ndim=1, flags='C_CONTIGUOUS')
 array_2d_uint16 = npct.ndpointer(dtype=np.uint16, ndim=2, flags='C_CONTIGUOUS')
 array_3d_uint16 = npct.ndpointer(dtype=np.uint16, ndim=3, flags='C_CONTIGUOUS')
@@ -38,6 +39,7 @@ array_2d_uint32 = npct.ndpointer(dtype=np.uint32, ndim=2, flags='C_CONTIGUOUS')
 array_3d_uint32 = npct.ndpointer(dtype=np.uint32, ndim=3, flags='C_CONTIGUOUS')
 array_1d_uint64 = npct.ndpointer(dtype=np.uint64, ndim=1, flags='C_CONTIGUOUS')
 array_2d_uint64 = npct.ndpointer(dtype=np.uint64, ndim=2, flags='C_CONTIGUOUS')
+array_3d_uint64 = npct.ndpointer(dtype=np.uint64, ndim=3, flags='C_CONTIGUOUS')
 array_2d_float32 = npct.ndpointer(dtype=np.float32, ndim=2, flags='C_CONTIGUOUS')
 
 # defining the parameter types of the functions in C
@@ -58,6 +60,9 @@ ndlib_ctypes.annotateEntityDense.argtypes = [array_3d_uint32, cp.POINTER(cp.c_in
 ndlib_ctypes.shaveDense.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int)]
 ndlib_ctypes.exceptionDense.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int)]
 ndlib_ctypes.overwriteDense.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int)]
+ndlib_ctypes.overwriteDense8.argtypes = [array_3d_uint8, array_3d_uint8, cp.POINTER(cp.c_int)]
+ndlib_ctypes.overwriteDense16.argtypes = [array_3d_uint16, array_3d_uint16, cp.POINTER(cp.c_int)]
+ndlib_ctypes.overwriteDense64.argtypes = [array_3d_uint64, array_3d_uint64, cp.POINTER(cp.c_int)]
 ndlib_ctypes.zoomOutData.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int), cp.c_int]
 ndlib_ctypes.zoomOutDataOMP.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int), cp.c_int]
 ndlib_ctypes.zoomInData.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int), cp.c_int]
@@ -88,6 +93,9 @@ ndlib_ctypes.annotateEntityDense.restype = None
 ndlib_ctypes.shaveDense.restype = None
 ndlib_ctypes.exceptionDense.restype = None
 ndlib_ctypes.overwriteDense.restype = None
+ndlib_ctypes.overwriteDense8.restype = None
+ndlib_ctypes.overwriteDense16.restype = None
+ndlib_ctypes.overwriteDense64.restype = None
 ndlib_ctypes.zoomOutData.restype = None
 ndlib_ctypes.zoomOutDataOMP.restype = None
 ndlib_ctypes.zoomInData.restype = None
@@ -291,6 +299,40 @@ def overwriteDense_ctype(data, annodata):
     dims = [i for i in data.shape]
     ndlib_ctypes.overwriteDense(data, annodata, (cp.c_int * len(dims))(*dims))
     return (data.astype(orginal_dtype, copy=False))
+
+
+def overwriteDense8_ctype(data, annodata):
+    """ Get a dense voxel region and overwrite all the non-zero values """
+
+    orginal_dtype = data.dtype
+    if not annodata.flags['C_CONTIGUOUS']:
+        annodata = np.ascontiguousarray(annodata, dtype=np.uint8)
+    dims = list(data.shape)
+    ndlib_ctypes.overwriteDense8(data, annodata, (cp.c_int * len(dims))(*dims))
+    return data.astype(orginal_dtype, copy=False)
+
+
+
+def overwriteDense16_ctype(data, annodata):
+    """ Get a dense voxel region and overwrite all the non-zero values """
+
+    orginal_dtype = data.dtype
+    if not annodata.flags['C_CONTIGUOUS']:
+        annodata = np.ascontiguousarray(annodata, dtype=np.uint16)
+    dims = [i for i in data.shape]
+    ndlib_ctypes.overwriteDense16(data, annodata, (cp.c_int * len(dims))(*dims))
+    return data.astype(orginal_dtype, copy=False)
+
+
+def overwriteDense64_ctype(data, annodata):
+    """ Get a dense voxel region and overwrite all the non-zero values """
+
+    orginal_dtype = data.dtype
+    if not annodata.flags['C_CONTIGUOUS']:
+        annodata = np.ascontiguousarray(annodata, dtype=np.uint64)
+    dims = [i for i in data.shape]
+    ndlib_ctypes.overwriteDense64(data, annodata, (cp.c_int * len(dims))(*dims))
+    return data.astype(orginal_dtype, copy=False)
 
 
 def zoomOutData_ctype(olddata, newdata, factor):

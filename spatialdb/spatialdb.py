@@ -447,7 +447,7 @@ class SpatialDB:
 
         # A smaller cube was cutout due to off-base resolution query: up-sample and trim
         if not resource.is_channel() and base_res > resolution:
-            # TODO: look into optimizing zoomData and rename
+            # TODO: optimizing zoomData and rename when implementing propagate
             out_cube.zoomData(base_res - resolution)
 
             # need to trim based on the cube cutout at new resolution
@@ -460,7 +460,7 @@ class SpatialDB:
 
         # A larger cube was cutout due to off-base resolution query: down-sample and trim
         elif not resource.is_channel() and base_res < resolution and not resource.is_propagated():
-            # TODO: look into optimizing zoomData and rename
+            # TODO: optimizing downScale and rename when implementing propagate
             out_cube.downScale(resolution - base_res)
 
             # need to trim based on the cube cutout at new resolution
