@@ -71,8 +71,8 @@ class AnnotateCube64(Cube):
 
         if input_data.ndim == 4:
             for t in range(*time_sample_range):
-                self.data[t - self.time_range[0], :, :, :] = ndlib.overwriteDense64_ctype(
-                    self.data[t - self.time_range[0], :, :, :], input_data[t - time_sample_range[0], :, :, :])
+                self.data[t, :, :, :] = ndlib.overwriteDense64_ctype(
+                    self.data[t, :, :, :], input_data[t - time_sample_range[0], :, :, :])
         else:
             # Input data doesn't have any time indices
             self.data[time_sample_range[0], :, :, :] = ndlib.overwriteDense64_ctype(
