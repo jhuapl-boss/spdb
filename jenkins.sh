@@ -9,9 +9,8 @@ cd $WORKSPACE/spdb/c_lib/c_version
 cp makefile_LINUX makefile
 make all
 
-cd $WORKSPACE
-
 # Set path so the old spdb in python3/site-packages not used.
 export PYTHONPATH=$WORKSPACE
 
+cd $WORKSPACE/spdb
 nose2
