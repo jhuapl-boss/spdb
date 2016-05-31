@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from abc import ABCMeta, abstractmethod
+import numpy as np
 
 
 class Collection:
@@ -356,6 +357,40 @@ class BossResource(metaclass=ABCMeta):
                 data_type = self._layer.datatype
 
         return data_type
+
+    def get_bit_depth(self):
+        """Method to get the bit depth of the channel or layer
+
+        :returns An integer indicating the bit depth
+        :rtype int
+        """
+        data_type = self.get_data_type()
+        if data_type == "uint8":
+            bit_depth = 8
+        elif data_type == "uint16":
+            bit_depth = 16
+        elif data_type == "uint64":
+            bit_depth = 64
+        else:
+            return ValueError("Unsupported datatype")
+
+        return bit_depth
+
+    def get_numpy_data_type(self):
+        """Method to get data type as a numpy data type instance
+
+        """
+        data_type = self.get_data_type()
+        if data_type == "uint8":
+            bit_depth = np.uint8
+        elif data_type == "uint16":
+            bit_depth = np.uint16
+        elif data_type == "uint64":
+            bit_depth = np.uint64
+        else:
+            return ValueError("Unsupported data type")
+
+        return bit_depth
 
     # Methods to delete the entry from the data model tables
     @abstractmethod

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import unittest
+import numpy as np
 
 from spdb.project import BossResourceBasic
 
@@ -203,4 +204,29 @@ class TestBasicResource(unittest.TestCase):
         resource = BossResourceBasic(setup_data)
 
         assert resource.get_data_type() == setup_data['channel_layer']['datatype']
+
+    def test_basic_resource_get_bit_depth(self):
+        """Test basic get bit depth interface
+
+        Returns:
+            None
+
+        """
+        setup_data = self.get_image_dict()
+        resource = BossResourceBasic(setup_data)
+
+        assert resource.get_bit_depth() == 8
+
+
+    def test_basic_resource_numpy_data_type(self):
+        """Test basic get bit depth interface
+
+        Returns:
+            None
+
+        """
+        setup_data = self.get_image_dict()
+        resource = BossResourceBasic(setup_data)
+
+        assert resource.get_numpy_data_type() == np.uint8
 
