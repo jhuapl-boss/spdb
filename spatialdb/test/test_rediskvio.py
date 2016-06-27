@@ -54,13 +54,13 @@ class RedisKVIOTestMixin(object):
     def test_generate_cuboid_data_keys_single(self):
         """Test the base key getter function for the cuboids"""
         rkv = RedisKVIO()
-        assert rkv.generate_cuboid_data_keys(self.resource, 2, [0], [23445]) == ["CUBOID&4&2&1&2&0&23445"]
+        assert rkv.generate_cached_cuboid_keys(self.resource, 2, [0], [23445]) == ["CUBOID&4&2&1&2&0&23445"]
 
     def test_generate_cuboid_data_keys_multiple(self):
         """Test the generate cache index key generation for a single key"""
         rkv = RedisKVIO()
 
-        keys = rkv.generate_cuboid_data_keys(self.resource, 2, [0], [123, 124, 125])
+        keys = rkv.generate_cached_cuboid_keys(self.resource, 2, [0], [123, 124, 125])
 
         assert isinstance(keys, list)
         assert len(keys) == 3
@@ -110,8 +110,8 @@ class RedisKVIOTestMixin(object):
         rkv.put_cube_index(self.resource, resolution, [0], morton_ids)
 
         desired_morton_ids = list(range(115, 133))
-        missing_keys = rkv.get_missing_cube_index(self.resource, resolution, [0]*len(desired_morton_ids),
-                                                  desired_morton_ids)
+        missing_keys = rkv.get_missing_read_cache_keys(self.resource, resolution, [0] * len(desired_morton_ids),
+                                                       desired_morton_ids)
 
         assert len(missing_keys) == 8
 

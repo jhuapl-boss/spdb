@@ -3,3 +3,4 @@ redis==2.10.5
 mockredispy==2.9.0.12
 blosc==1.2.8
 nose2
+numpy

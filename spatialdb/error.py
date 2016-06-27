@@ -13,19 +13,21 @@
 # limitations under the License.
 
 from bossutils.logger import BossLogger
-from enum import Enum
+from enum import IntEnum
 
 
-class ErrorCode(Enum):
+class ErrorCodes(IntEnum):
     """
-    Enumeration of error codes for the SPDB library.
-    SPDB errors start at 1000
+    Enumeration of Error codes to support consistency
+
+    SPDB errors are 100-199
     """
-    SPDB_ERROR = 1000
-    DATATYPE_NOT_SUPPORTED = 1001
-    FUTURE = 1002
-    IO_ERROR = 1003
-    REDIS_ERROR = 1004
+    SPDB_ERROR = 100
+    DATATYPE_NOT_SUPPORTED = 101
+    FUTURE = 102
+    IO_ERROR = 103
+    REDIS_ERROR = 104
+    ASYNC_ERROR = 105
 
 
 class SpdbError(Exception):
@@ -34,11 +36,12 @@ class SpdbError(Exception):
 
     When you reach a point in your code where you want to raise an exceptions
 
-        raise SpdbError("Key already exists", "The key already exists.  When trying to create key it must not exist", 20001)
+        raise SpdbError("The key already exists.  When trying to create key it must not exist", ErrorCodes.SPDB_ERROR)
 
     """
 
     def __init__(self, *args):
         # Log
+        # TODO: Look into removing boss logger dependency
         blog = BossLogger().logger
-        blog.error("SpdbError - Message: {0} - Description: {1} - Code: {2}".format(args[0], args[1], args[2]))
+        blog.error("SpdbError - Message: {0} - Code: {1}".format(args[0], args[1]))

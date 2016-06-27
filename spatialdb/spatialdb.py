@@ -19,17 +19,16 @@ import collections
 import itertools
 
 from operator import mod, floordiv
+from operator import itemgetter
 
 from spdb.c_lib import ndlib
 from spdb.c_lib.ndtype import CUBOIDSIZE
 
-from .error import SpdbError, ErrorCode
-from .kvio import KVIO
+from .error import SpdbError, ErrorCodes
+from .rediskvio import RedisKVIO
 from .cube import Cube
-
-# Todo: fix logger so you can mock it. Then reinsert into class
-#from bossutils.logger import BossLogger
-#logger = BossLogger()
+from .object import AWSObjectStore
+from .state import CacheStateDB
 
 
 class SpatialDB:
@@ -37,7 +36,7 @@ class SpatialDB:
     Main interface class to the spatial database system/cache engine
 
     Args:
-      resource (project.BossResource): Data model info based on the request or target resource
+      kv_conf (dict): Data model info based on the request or target resource
 
     Attributes:
       resource (project.BossResource): Data model info based on the request or target resource
@@ -45,16 +44,21 @@ class SpatialDB:
       kvio (KVIO): A key-value store engine instance
     """
 
-    def __init__(self):
+    def __init__(self, conf, object_store_conf=None):
+        self.kv_conf = conf
+        self.object_store_conf = object_store_conf
 
-        # TODO: DMK Add S3 interface or move elsewhere
-        # Set the S3 backend for the data
-        # self.s3io = s3io.S3IO(self)
-        self.s3io = None
+        # Currently only a AWS object store is supported, so create interface instance
+        if object_store_conf:
+            self.objectio = AWSObjectStore(object_store_conf)
 
-        self.kvio = KVIO.get_kv_engine('redis')
+        # Currently only a redis based cache db is supported, so create interface instance
+        self.kvio = RedisKVIO(conf)
 
-        # TODO: DMK Add annotation support
+        # Create interface instance for the cache state db (redis backed)
+        self.cache_state = CacheStateDB(conf)
+
+        # TODO: Add annotation support
         # self.annoIdx = annindex.AnnotateIndex(self.kvio, self.proj)
 
     def close(self):
@@ -68,7 +72,84 @@ class SpatialDB:
         self.kvio.close()
 
     # Cube Processing Methods
-    def get_cubes(self, resource, resolution, time_sample_range, morton_idx_list):
+    def get_cubes(self, resource, key_list):
+        """Load an array of cuboids from the cache key-value store as raw compressed byte arrays dealing with
+        cache misses if necessary (future)
+
+        Args:
+            resource (spdb.project.BossResource): Data model info based on the request or target resource
+            key_list (list(str)): List of cached-cuboid keys to read from the database
+
+        Returns:
+            list(cube.Cube): The cuboid data with time-series support, packed into Cube instances, sorted by morton id
+        """
+        # Get all cuboid byte arrays from db
+        cuboids = self.kvio.get_cubes(key_list)
+
+        # Group by morton
+        cuboids = sorted(cuboids, key=lambda element: (element[0], element[1]))
+
+        # Unpack to lists
+        morton, time, cube_bytes = zip(*cuboids)
+
+        # Get groups of time samples by morton ID
+        morton = np.array(morton)
+        morton_boundaries = np.where(morton[:-1] != morton[1:])[0]
+        morton_boundaries += 1
+        morton_boundaries = np.append(morton_boundaries, morton.size)
+
+        if morton_boundaries.size == morton.size:
+            # Single time samples only!
+            not_time_series = True
+        else:
+            not_time_series = False
+
+        start = 0
+        output_cubes = []
+        for end in morton_boundaries:
+            # Create a temporary cube instance
+            temp_cube = Cube.create_cube(resource)
+            temp_cube.morton_id = morton[start]
+
+            # populate with all the time samples
+            if not_time_series:
+                temp_cube.from_blosc_numpy(cube_bytes[start:end], [time[start], time[start] + 1])
+            else:
+                temp_cube.from_blosc_numpy(cube_bytes[start:end], [time[start], time[end - 1] + 1])
+
+            # Save for output
+            output_cubes.append(temp_cube)
+
+            start = end
+
+        return output_cubes
+
+    def page_in_cubes(self, key_list, timeout=60):
+        """
+        Method to trigger the page-in of cubes from the object store, waiting until all are available
+
+        Args:
+            key_list (list(str)): List of cached-cuboid keys to page in from the object store
+            timeout (int): Number of seconds page in which the operation should complete before an error is raised
+
+        Returns:
+            None
+        """
+        # Setup status channel
+        page_in_chan = self.cache_state.create_page_in_channel()
+
+        # Trigger page in operations
+        object_keys = self.objectio.page_in_objects(key_list, page_in_chan, timeout)
+
+        # Wait for page in operation to complete
+        self.cache_state.wait_for_page_in(object_keys, page_in_chan, timeout)
+
+        # If you got here everything successfully paged in!
+        self.cache_state.delete_page_in_channel(page_in_chan)
+
+
+    # TODO: MAYBE REMOVE
+    def get_cached_cubes(self, resource, resolution, time_sample_range, morton_idx_list):
         """Load an array of cuboids from the cache key-value store as raw compressed byte arrays dealing with
         cache misses if necessary (future)
 
@@ -83,7 +164,7 @@ class SpatialDB:
         """
         if self.s3io:
             raise SpdbError('Not Supported', 'S3 backend not yet supported',
-                            ErrorCode.FUTURE)
+                            ErrorCodes.FUTURE)
             #TODO: Insert S3 integration here
             ## Get the ids of the cuboids you need - only gives ids to be fetched
             #ids_to_fetch = self.kvio.get_cube_index(resource, resolution, morton_idx_list)
@@ -139,28 +220,8 @@ class SpatialDB:
 
         return output_cubes
 
-    def get_single_cube(self, resource, resolution, time_sample, morton_idx):
-        """Return a single cuboid (single time sample) from the cache key-value store as a Cube instance
-
-        Args:
-            resource (spdb.project.BossResource): Data model info based on the request or target resource
-            resolution (int): the resolution level
-            time_sample (int): the time sample to get
-            morton_idx (int): the Morton ID of the cuboid to get
-
-        Returns:
-            spdb.cube.Cube: A cuboid instance
-        """
-        # Consume generator
-        cube = collections.deque(self.kvio.get_cubes(resource, resolution, [time_sample], [morton_idx]),
-                                 maxlen=1)
-
-        temp_cube = Cube.create_cube(resource, cube_size=None, time_range=[time_sample, time_sample + 1])
-        temp_cube.from_blosc_numpy([cube[0][2]])
-
-        return temp_cube
-
-    def put_cubes(self, resource, resolution, morton_idx_list, cube_list):
+    # TODO: MAYBE REMOVE
+    def put_cached_cubes(self, resource, resolution, morton_idx_list, cube_list):
         """Insert a list of Cube instances into the cache key-value store.
 
         ALL TIME SAMPLES IN THE CUBE WILL BE INSERTED
@@ -203,7 +264,53 @@ class SpatialDB:
             # Add cubes to cache index if successful
             self.kvio.put_cube_index(resource, resolution, time, morton_idx_list)
 
-    def put_single_cube(self, resource, resolution, morton_idx, cube):
+    # TODO: MAYBE REMOVE
+    def put_write_cubes(self, resource, resolution, morton_idx_list, cube_list):
+        """Insert a list of Cube instances into the cache key-value store.
+
+        ALL TIME SAMPLES IN THE CUBE WILL BE INSERTED
+
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            morton_idx_list (list(int)): a list of Morton ID with 1-1 mapping to the cube_list
+            cube_list (list[cube.Cube]): list of Cube instances to store in the cache key-value store
+
+        Returns:
+
+        """
+        # If cubes are time-series, insert 1 cube at a time, but all time points. If not, insert all cubes at once
+        if cube_list[0].is_time_series:
+            for m, c in zip(morton_idx_list, cube_list):
+                byte_arrays = []
+                time = []
+                for cnt, t in enumerate(range(*c.time_range)):
+                    time.append(t)
+                    byte_arrays.append(c.get_blosc_numpy_by_time_index(cnt))
+
+                # Add cubes to cache
+                self.kvio.put_cubes(resource, resolution, time, [m], byte_arrays)
+
+                # Add cubes to cache index if successful
+                self.kvio.put_cube_index(resource, resolution, time, [m])
+        else:
+            # Collect all cubes and insert at once
+            byte_arrays = []
+            time = []
+            for c in cube_list:
+                for t in range(*c.time_range):
+                    time.append(0)
+                    byte_arrays.append(c.get_blosc_numpy_by_time_index(0))
+
+            # Add cubes to cache
+            self.kvio.put_cubes(resource, resolution, time, morton_idx_list, byte_arrays)
+
+            # Add cubes to cache index if successful
+            self.kvio.put_cube_index(resource, resolution, time, morton_idx_list)
+
+
+    # TODO: MAYBE REMOVE
+    def put_single_cube(self, key, cube):
         """Insert a Cube into the cache key-value store. Supports time series and will put all time points in db.
 
         ALL TIME SAMPLES IN THE CUBE WILL BE INSERTED
@@ -228,6 +335,7 @@ class SpatialDB:
         # Add cubes to cache index if successful
         self.kvio.put_cube_index(resource, resolution, time_points, [morton_idx])
 
+    # Private Cube Processing Methods
     def _up_sample_cutout(self, resource, corner, extent, resolution):
         """Transform coordinates of a base resolution cutout to a lower res level by up-sampling.
 
@@ -401,12 +509,13 @@ class SpatialDB:
         y_num_cubes = (cutout_coords.corner[1] + cutout_coords.extent[1] + y_cube_dim - 1) // y_cube_dim - y_start
         x_num_cubes = (cutout_coords.corner[0] + cutout_coords.extent[0] + x_cube_dim - 1) // x_cube_dim - x_start
 
-        #in_cube = Cube.create_cube(resource, cube_dim)
+        # Initialize the final output cube (before trim operation since adding full cuboids)
         out_cube = Cube.create_cube(resource,
                                     [x_num_cubes * x_cube_dim, y_num_cubes * y_cube_dim, z_num_cubes * z_cube_dim],
                                     time_sample_range)
 
         # Build a list of indexes to access
+        # TODO: Move this for loop directly into c-lib
         list_of_idxs = []
         for z in range(z_num_cubes):
             for y in range(y_num_cubes):
@@ -420,21 +529,49 @@ class SpatialDB:
         # xyz offset stored for later use
         lowxyz = ndlib.MortonXYZ(list_of_idxs[0])
 
-        # Perform cutout
-        cuboids = self.get_cubes(resource, cutout_resolution, time_sample_range, list_of_idxs)
+        # Get index of missing keys for cuboids to read
+        missing_key_idx, cached_key_idx, all_keys = self.kvio.get_missing_read_cache_keys(resource,
+                                                                                          cutout_resolution,
+                                                                                          time_sample_range,
+                                                                                          list_of_idxs)
+        s3_key_idx = []
+        zero_key_idx = []
+        cache_cuboids = []
+        s3_cuboids = []
+        zero_cuboids = []
+        if len(missing_key_idx) > 0:
+            # There are keys that are missing in the cache
+            # Get index of missing keys that are in S3
+            s3_key_idx, zero_key_idx = self.objectio.cuboids_exist(all_keys, missing_key_idx)
 
-        # use the batch generator interface
-        for idx, cube in zip(list_of_idxs, cuboids):
-            # add the query result cube to the bigger cube
-            curxyz = ndlib.MortonXYZ(int(idx))
+            if len(s3_key_idx) > 0:
+                # Trigger page-in of available blocks from object store and wait for completion
+                self.page_in_cubes(list(itemgetter(*s3_key_idx)(all_keys)))
+
+            if len(zero_key_idx) > 0:
+                # Keys that don't exist in object store render as zeros
+                [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
+                for idx in zero_key_idx:
+                    vals = all_keys[idx].split("&")
+                    temp_cube = Cube.create_cube(resource, [x_cube_dim, y_cube_dim, z_cube_dim], [vals[3], vals[3] + 1])
+                    temp_cube.morton_id = vals[4]
+                    temp_cube.zeros()
+                    zero_cuboids.append(temp_cube)
+
+        # Get cubes from the cache database (either already there or freshly paged in)
+        if len(cached_key_idx) > 0:
+            cache_cuboids = self.get_cubes(resource, list(itemgetter(*cached_key_idx)(all_keys)))
+        if len(s3_key_idx) > 0:
+            s3_cuboids = self.get_cubes(resource, list(itemgetter(*s3_key_idx)(all_keys)))
+
+            # Record misses that were found in S3 for possible pre-fetching
+            self.cache_state.add_cache_misses(itemgetter(*s3_key_idx)(all_keys))
+
+        # Add all cuboids (which have all time samples packed in already) to final cube of data
+        for cube in cache_cuboids + s3_cuboids + zero_cuboids:
+            # Compute offset so data inserted properly
+            curxyz = ndlib.MortonXYZ(cube.morton_id)
             offset = [curxyz[0] - lowxyz[0], curxyz[1] - lowxyz[1], curxyz[2] - lowxyz[2]]
-
-            # TODO: DMK commented out exception code since exceptions are not yet implemented.
-            # apply exceptions if it's an annotation project
-            #if annoids != None and ch.getChannelType() in ANNOTATION_CHANNELS:
-            #    in_cube.data = c_lib.filter_ctype_OMP(in_cube.data, annoids)
-            #    if ch.getExceptions() == EXCEPTION_TRUE:
-            #        self.applyCubeExceptions(ch, annoids, cutout_resolution, idx, in_cube)
 
             # add it to the output cube
             out_cube.add_data(cube, offset)
@@ -562,3 +699,15 @@ class SpatialDB:
 
                     # update in the database with the new merged cube
                     self.put_cubes(resource, resolution, [morton_idx], [cube])
+
+
+
+
+
+
+
+
+
+
+
+# TODO: Currently, since no S3 integration, if missing in cache generate just an all 0 cube
