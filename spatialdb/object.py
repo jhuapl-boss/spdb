@@ -15,6 +15,7 @@
 from abc import ABCMeta, abstractmethod
 import json
 import hashlib
+from .error import SpdbError, ErrorCodes
 
 import boto3
 
@@ -99,6 +100,13 @@ class AWSObjectStore(ObjectStore):
 
         Args:
             conf(dict): Dictionary containing configuration details for the object store
+
+
+        Params in the conf dictionary:
+            flush_topic_arn: ARN for the flush SNS topic
+            cuboid_bucket: Bucket for storage of cuboid objects in S3
+            page_in_lambda_function: name of lambda function for page in operation (e.g. page_in.handler)
+            s3_index_table: name of the dynamoDB table for storing the s3 cuboid index
         """
         # call the base class constructor
         ObjectStore.__init__(self, conf)
@@ -118,11 +126,11 @@ class AWSObjectStore(ObjectStore):
         for ii in range(0, len(object_keys), chunk_size):
             yield object_keys[ii:ii + chunk_size]
 
-    def cuboids_exist(self, key_list, cache_miss_key_idx=None, version=0):
+    def cuboids_exist(self, key_list, cache_miss_key_idx=None, version="a"):
         """
         Method to check if cuboids exist in S3 by checking the S3 Index table.
 
-        Currently versioning is not implemented, so a version of "0" is simply used
+        Currently versioning is not implemented, so a version of "a" is simply used
 
         Args:
             key_list (list(str)): A list of cached-cuboid keys to check for existence in the object store
@@ -140,9 +148,7 @@ class AWSObjectStore(ObjectStore):
         object_keys = self.cached_cuboid_to_object_keys(key_list)
 
         # TODO: Possibly could use batch read to speed up
-        # TODO: This needs tested for sure. Probably has bugs at the moment but working to get all code in the right place
         dynamodb = self.__session.client('dynamodb')
-        table = dynamodb.Table(self.config["aws"]["s3-index-table"])
 
         s3_key_index = []
         zero_key_index = []
@@ -150,16 +156,52 @@ class AWSObjectStore(ObjectStore):
             if idx not in cache_miss_key_idx:
                 continue
 
-            response = table.get_item(Key={'hash-key': key, 'version': version},
-                                      ConsistentRead=True,
-                                      ReturnConsumedCapacity='NONE')
-            if not response:
+            response = dynamodb.get_item(
+                TableName=self.config['s3_index_table'],
+                Key={'object-key': {'S': key}, 'version': {'S': version}},
+                ConsistentRead=True,
+                ReturnConsumedCapacity='NONE')
+
+            if "Item" not in response:
                 # Item not in S3
                 zero_key_index.append(idx)
             else:
                 s3_key_index.append(idx)
 
         return s3_key_index, zero_key_index
+
+    def add_cuboid_to_index(self, object_key, version="a"):
+        """
+        Method to add a cuboid's object_key to the S3 index table
+
+        Currently versioning is not implemented, so a version of "a" is simply used
+
+        Args:
+            object_key (str): An object-keys for a cuboid to add to the index
+            version: TBD version of the cuboid
+
+        Returns:
+            None
+        """
+        dynamodb = self.__session.client('dynamodb')
+
+        # Get lookup key and resolution from object key
+        vals = object_key.split("&")
+        lookup_key = "{}&{}&{}".format(vals[1], vals[2], vals[3])
+        resolution = vals[4]
+
+        response = dynamodb.put_item(
+            TableName=self.config['s3_index_table'],
+            Key={'object-key': {'S': object_key},
+                 'version': {'S': version},
+                 'ingest-job': {'S': "{}&{}&0".format(lookup_key, resolution)}},
+            ReturnConsumedCapacity='NONE',
+            ReturnItemCollectionMetrics='NONE',
+        )
+
+        if response['ResponseMetadata']['HTTPStatusCode'] != 200:
+            raise SpdbError("Error adding object-key to index.",
+                            ErrorCodes.SPDB_ERROR)
 
     def cached_cuboid_to_object_keys(self, keys):
         """
@@ -232,7 +274,7 @@ class AWSObjectStore(ObjectStore):
             params["object_key"] = key
 
             response = client.invoke(
-                FunctionName=self.config["lambda"]["page_in_function"],
+                FunctionName=self.config["page_in_lambda_function"],
                 InvocationType='Event',
                 Payload=json.dumps(params).encode())
 
@@ -254,11 +296,19 @@ class AWSObjectStore(ObjectStore):
         if not isinstance(key_list, list):
             key_list = [key_list]
 
-        client = self.__session.client('s3')
+        s3 = self.__session.client('s3')
 
         byte_arrays = []
         for key in key_list:
-            byte_arrays.append(client.get_object(Bucket=self.config["bucket"]))
+            response = s3.get_object(
+                Key=key,
+                Bucket=self.config["cuboid_bucket"],
+            )
+            if response['ResponseMetadata']['HTTPStatusCode'] != 200:
+                raise SpdbError("Error reading cuboid from S3.",
+                                ErrorCodes.OBJECT_STORE_ERROR)
+
+            byte_arrays.append(response['Body'].read())
 
         return byte_arrays
 
@@ -273,7 +323,17 @@ class AWSObjectStore(ObjectStore):
         Returns:
 
         """
-        return NotImplemented
+        s3 = self.__session.client('s3')
+
+        for key, cube in zip(key_list, cube_list):
+            response = s3.put_object(
+                Body=cube,
+                Key=key,
+                Bucket=self.config["cuboid_bucket"],
+            )
+            if response['ResponseMetadata']['HTTPStatusCode'] != 200:
+                raise SpdbError("Error writing cuboid to S3.",
+                                ErrorCodes.OBJECT_STORE_ERROR)
 
     def trigger_page_out(self, config_data, write_cuboid_key):
         """
@@ -286,17 +346,20 @@ class AWSObjectStore(ObjectStore):
         Returns:
             None
         """
-        # TODO Double check sns boto3 call
-        # TODO is target arn the same as topic arn?
         sns = self.__session.client('sns')
-        topic = sns.Topic(self.config["lambda"]["topic_arn"])
 
         msg_data = {"config": config_data,
                     "write_cuboid_key": write_cuboid_key}
 
-        response = topic.publish(
-                        TargetArn=self.config["lambda"]["target_arn"],
-                        Message=json.dumps({"default": msg_data}).encode(),
+        msg = {'default': json.dumps(msg_data),
+               'sqs': json.dumps(msg_data),
+               'lambda': json.dumps(msg_data)}
+
+        response = sns.publish(
+                        TargetArn=self.config["flush_topic_arn"],
+                        Message=json.dumps(msg),
                         MessageStructure='json')
 
-        # TODO: Need error handling here?
+        if response['ResponseMetadata']['HTTPStatusCode'] != 200:
+            raise SpdbError("Error sending SNS message to trigger page out operation.",
+                            ErrorCodes.SPDB_ERROR)

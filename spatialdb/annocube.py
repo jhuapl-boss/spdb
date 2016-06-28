@@ -20,7 +20,7 @@ from .cube import Cube
 
 from spdb.c_lib import ndlib
 
-from .error import SpdbError, ErrorCode
+from .error import SpdbError, ErrorCodes
 
 
 class AnnotateCube64(Cube):
@@ -62,8 +62,8 @@ class AnnotateCube64(Cube):
 
         """
         if self.data.dtype != input_data.dtype:
-            raise SpdbError("IO Error", "Conflicting data types for overwrite.",
-                            ErrorCode.IO_ERROR)
+            raise SpdbError("Conflicting data types for overwrite.",
+                            ErrorCodes.DATATYPE_MISMATCH)
 
         if not time_sample_range:
             # If no time sample range provided use default of 0

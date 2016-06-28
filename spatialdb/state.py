@@ -26,15 +26,22 @@ class CacheStateDB(object):
 
         Args:
             kv_conf(dict): Dictionary containing configuration details for the key-value store
+
+
+
+        Params in the kv_config dictionary:
+            state_client: Optional instance of a redis client that will be used directly
+            cache_state_host: If cache_client not provided, a string indicating the database host
+            cache_state_db: If cache_client not provided, an integer indicating the database to use
         """
-        self.kv_conf = kv_conf
+        self.config = kv_conf
 
         # Create client
-        if "state_client" in self.kv_conf:
-            self.status_client = self.kv_conf["state_client"]
+        if "state_client" in self.config:
+            self.status_client = self.config["state_client"]
         else:
-            self.status_client = redis.StrictRedis(host=self.kv_conf["cache_state_host"], port=6379,
-                                                   db=self.kv_conf["cache_state_db"])
+            self.status_client = redis.StrictRedis(host=self.config["cache_state_host"], port=6379,
+                                                   db=self.config["cache_state_db"])
 
         self.status_client_listener = None
 

@@ -27,7 +27,7 @@ class RedisKVIO(KVIO):
         Params in the kv_config dictionary:
             cache_client: Optional instance of a redis client that will be used directly
             cache_host: If cache_client not provided, a string indicating the database host
-            cache_host: If cache_client not provided, an integer indicating the database to use
+            cache_db: If cache_client not provided, an integer indicating the database to use
             read_timeout: Integer indicating number of seconds a read cache key expires
         """
         # call the base class constructor
@@ -83,7 +83,8 @@ class RedisKVIO(KVIO):
             morton_idx_list (list[int]): a list of Morton ID of the cuboids to get
 
         Returns:
-            (list[str], list[str], list[str): A list of cache-cuboid keys that are not present in the cache
+            (list(int), list(int), list(str)): A tuple of lists with the first being an index of missing keys
+            the second a list of keys in the cache, and the third being the cached-cuboid keys for the query
         """
         # Get the cached-cuboid keys
         all_cuboid_keys = self.generate_cached_cuboid_keys(resource, resolution, time_sample_list, morton_idx_list)
@@ -116,41 +117,6 @@ class RedisKVIO(KVIO):
 
         return missing_key_idx, cached_key_idx, all_cuboid_keys
 
-    #TODO: CHECK IF THIS METHOD CAN BE REMOVED AFTER REFACTOR
-    def index_to_time_and_morton(self, index_list):
-        """ Method to convert cuboid index values (time_sample&morton_id) to a list of time samples and morton ids
-        that are readily consumed by get_cubes
-
-        Args:
-            index_list (list(str)): A list of index values from the cache status db
-
-        Returns:
-            (list(int), list(int)): A tuple of two lists containing the time samples and morton ids
-        """
-        # Split index values into time samples and morton IDs
-        missing_time_samples, missing_morton_ids = zip(*(int(value.split("&")) for value in index_list))
-        missing_time_samples = list(set(missing_time_samples))
-        missing_morton_ids = list(set(missing_morton_ids))
-
-        return missing_time_samples, missing_morton_ids
-
-    # TODO: CHECK IF THIS METHOD CAN BE REMOVED AFTER UPDATES
-    def put_cube_index(self, resource, resolution, time_sample_list, morton_idx_list):
-        """Add cuboid indices that are loaded into the cache db
-
-        Don't need to do anything for the redis backend
-
-        Args:
-            resource (spdb.project.BossResource): Data model info based on the request or target resource
-            resolution (int): the resolution level
-            time_sample_list (list(int)): a list of time samples for the cubes that have that have been inserted
-            morton_idx_list (list(int)): a list of Morton IDs for the cubes that have that have been inserted
-
-        Returns:
-            None
-        """
-        pass
-
     def get_cubes(self, key_list):
         """Retrieve multiple cubes from the cache database
 
@@ -160,7 +126,7 @@ class RedisKVIO(KVIO):
             key_list (list(str)): the list of cuboid keys to read from the database
 
         Returns:
-            (str, str, bytes): A tuple of the morton id, time sample and the blosc compressed byte array using the
+            (int, int, bytes): A tuple of the morton id, time sample and the blosc compressed byte array using the
              numpy interface
         """
         try:
@@ -176,7 +142,7 @@ class RedisKVIO(KVIO):
                 raise SpdbError("Received unexpected empty cuboid. {}".format(e),
                                 ErrorCodes.REDIS_ERROR)
             vals = key.split("&")
-            result.append((vals[-1], vals[-2], data))
+            result.append((int(vals[-1]), int(vals[-2]), data))
 
         return result
 
@@ -226,3 +192,43 @@ class RedisKVIO(KVIO):
         except Exception as e:
             raise SpdbError("Error inserting cube into the write buffer. {}".format(e),
                             ErrorCodes.REDIS_ERROR)
+
+
+
+
+# TODO: CHECK IF THIS METHOD CAN BE REMOVED AFTER REFACTOR
+#    def index_to_time_and_morton(self, index_list):
+#        """ Method to convert cuboid index values (time_sample&morton_id) to a list of time samples and morton ids
+#        that are readily consumed by get_cubes
+#
+#        Args:
+#            index_list (list(str)): A list of index values from the cache status db
+#
+#        Returns:
+#            (list(int), list(int)): A tuple of two lists containing the time samples and morton ids
+#        """
+#        # Split index values into time samples and morton IDs
+#        missing_time_samples, missing_morton_ids = zip(*(int(value.split("&")) for value in index_list))
+#        missing_time_samples = list(set(missing_time_samples))
+#        missing_morton_ids = list(set(missing_morton_ids))
+#
+#        return missing_time_samples, missing_morton_ids
+#
+#        # TODO: CHECK IF THIS METHOD CAN BE REMOVED AFTER UPDATES
+#
+#
+#    def put_cube_index(self, resource, resolution, time_sample_list, morton_idx_list):
+#        """Add cuboid indices that are loaded into the cache db
+#
+#        Don't need to do anything for the redis backend
+#
+#        Args:
+#            resource (spdb.project.BossResource): Data model info based on the request or target resource
+#            resolution (int): the resolution level
+#            time_sample_list (list(int)): a list of time samples for the cubes that have that have been inserted
+#            morton_idx_list (list(int)): a list of Morton IDs for the cubes that have that have been inserted
+#
+#        Returns:
+#            None
+#        """
+#        pass

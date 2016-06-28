@@ -95,22 +95,17 @@ class KVIO(metaclass=ABCMeta):
             list[str]: A list of keys for each cuboid
 
         """
-        base_key = 'CACHED-CUBOID&{}&{}'.format(resource.get_lookup_key(), resolution)
+        base_key = 'WRITE-CUBOID&{}&{}'.format(resource.get_lookup_key(), resolution)
 
         # Get the combinations of time and morton, properly ordered
         key_suffix_list = itertools.product(time_sample_list, morton_idx_list)
 
         # Return a list of all keys
-        return ['{}&{}&{}'.format(base_key, s[0], s[1], uuid.uuid4().__str__()) for s in key_suffix_list]
+        return ['{}&{}&{}&{}'.format(base_key, s[0], s[1], uuid.uuid4().__str__()) for s in key_suffix_list]
 
     @abstractmethod
     def get_missing_read_cache_keys(self, resource, resolution, time_sample_list, morton_idx_list):
         """Return the cache-cuboid key list of cubes that are missing in the cache DB"""
-        return NotImplemented
-
-    @abstractmethod
-    def put_cube_index(self, resource, resolution, time_sample_list, morton_idx_list):
-        """Insert the index list of cubes that exist in teh read cache"""
         return NotImplemented
 
     @abstractmethod
@@ -123,7 +118,12 @@ class KVIO(metaclass=ABCMeta):
         """Store multiple cubes into the database"""
         return NotImplemented
 
-    # TODO: Add if needed.  DMK pretty sure this was from OCPBlaze and not needed at the moment
+    #    @abstractmethod
+    #    def put_cube_index(self, resource, resolution, time_sample_list, morton_idx_list):
+    #        """Insert the index list of cubes that exist in teh read cache"""
+    #        return NotImplemented
+
+        # TODO: Add if needed.  DMK pretty sure this was from OCPBlaze and not needed at the moment
     # @abstractmethod
     # def get_cube(self, resource, resolution, morton_idx, update=False):
     #    """Retrieve a single cube from the database"""

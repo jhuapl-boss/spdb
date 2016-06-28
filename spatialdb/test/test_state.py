@@ -14,10 +14,10 @@
 
 import unittest
 from unittest.mock import patch
+from mockredis import mock_strict_redis_client
 
 from spdb.project import BossResourceBasic
-from spdb.spatialdb import RedisKVIO
-from spdb.spatialdb.test import RedisKVIOTestMixin
+from spdb.spatialdb import CacheStateDB
 
 import redis
 
@@ -32,49 +32,30 @@ class MockBossConfig(bossutils.configuration.BossConfig):
     """Basic mock for BossConfig to contain the properties needed for this test"""
     def __init__(self):
         super().__init__()
-        self.config["aws"]["cache-db"] = 1
         self.config["aws"]["cache-state-db"] = 1
 
 
-@patch('bossutils.configuration.BossConfig', MockBossConfig)
-class TestIntegrationRedisKVIOImageData(RedisKVIOTestMixin, unittest.TestCase):
+class CacheStateDBTestMixin(object):
 
-    def test_param_constructor(self):
-        """Re-run a testing using the parameter based constructor"""
+    def test_generate_cached_cuboid_keys(self):
+        """Test if cache cuboid keys are formatted properly"""
         rkv = RedisKVIO(self.config_data)
+        keys = rkv.generate_cached_cuboid_keys(self.resource, 2, [0, 1, 2], [34, 35, 36])
+        assert len(keys) == 9
+        assert keys[0] == "CACHED-CUBOID&4&2&1&2&0&34"
+        assert keys[2] == "CACHED-CUBOID&4&2&1&2&0&36"
+        assert keys[5] == "CACHED-CUBOID&4&2&1&2&1&36"
+        assert keys[8] == "CACHED-CUBOID&4&2&1&2&2&36"
 
-        # Clean up data
-        self.cache_client.flushdb()
 
-        data1 = np.random.randint(50, size=[10, 15, 5])
-        data2 = np.random.randint(50, size=[10, 15, 5])
-        data3 = np.random.randint(50, size=[10, 15, 5])
-        data_packed1 = blosc.pack_array(data1)
-        data_packed2 = blosc.pack_array(data2)
-        data_packed3 = blosc.pack_array(data3)
-        data = [data_packed1, data_packed2, data_packed3]
 
-        # Add items
-        morton_id = [112, 125, 516]
-        keys = rkv.generate_cached_cuboid_keys(self.resource, 2, [0], morton_id)
-        rkv.put_cubes(keys, data)
-
-        # Get cube
-        cubes = rkv.get_cubes(keys)
-
-        cube = [x for x in cubes]
-
-        assert len(cube) == 3
-
-        for m, c, d in zip(morton_id, cube, data):
-            assert c[0] == m
-            assert c[1] == 0
-            data_retrieved = blosc.unpack_array(c[2])
-            np.testing.assert_array_equal(data_retrieved, blosc.unpack_array(d))
+@patch('redis.StrictRedis', mock_strict_redis_client)
+@patch('bossutils.configuration.BossConfig', MockBossConfig)
+class TestRedisKVIOImageData(CacheStateDBTestMixin, unittest.TestCase):
 
     def setUp(self):
         """ Create a diction of configuration values for the test resource. """
-        self.patcher = patch('configparser.ConfigParser', MockBossConfig)
+        self.patcher = patch('redis.StrictRedis', mock_strict_redis_client)
         self.mock_tests = self.patcher.start()
 
         self.data = {}
@@ -118,18 +99,12 @@ class TestIntegrationRedisKVIOImageData(RedisKVIOTestMixin, unittest.TestCase):
 
         self.config = configuration.BossConfig()
 
-        self.cache_client = redis.StrictRedis(host=self.config["aws"]["cache"], port=6379, db=1,
-                                              decode_responses=True)
-
-        self.cache_client.flushdb()
-
-        self.config_data = {"cache_client": self.cache_client, "read_timeout": 86400}
-
-    def tearDown(self):
-
-        # Flush the db after
-        self.cache_client.flushdb()
+        self.status_client = redis.StrictRedis(host=self.config["aws"]["cache-state"],
+                                               port=6379, db=self.config["aws"]["cache-state-db"],
+                                               decode_responses=True)
         self.status_client.flushdb()
 
-        # Stop patching
+        self.config_data = {"state_client": self.cache_client}
+
+    def tearDown(self):
         self.mock_tests = self.patcher.stop()

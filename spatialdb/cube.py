@@ -23,7 +23,7 @@ from abc import ABCMeta, abstractmethod
 import spdb.c_lib.ndtype as ndtype
 from spdb.c_lib import ndlib
 
-from .error import SpdbError, ErrorCode
+from .error import SpdbError, ErrorCodes
 
 """
 .. module:: Cube
@@ -126,8 +126,8 @@ class Cube(metaclass=ABCMeta):
             # Index into the data array with time
             return blosc.pack_array(self.data[:, :, :, :])
         except:
-            raise SpdbError("IO Error", "Failed to decompress database cube.  Data integrity concern.",
-                            ErrorCode.IO_ERROR)
+            raise SpdbError("Failed to decompress database cube.  Data integrity concern.",
+                            ErrorCodes.SERIALIZATION_ERROR)
 
     def get_blosc_numpy_by_time_index(self, time_index=0):
         """A method that packs data in this Cube instance using Blosc and the numpy array specific interface for a
@@ -146,8 +146,8 @@ class Cube(metaclass=ABCMeta):
             # Index into the data array with time
             return blosc.pack_array(self.data[time_index, :, :, :])
         except:
-            raise SpdbError("IO Error", "Failed to decompress database cube.  Data integrity concern.",
-                            ErrorCode.IO_ERROR)
+            raise SpdbError("Failed to decompress database cube.  Data integrity concern.",
+                            ErrorCodes.SERIALIZATION_ERROR)
 
     def get_all_blosc_numpy_arrays(self):
         """A generator that packs data in this Cube instance using Blosc and the numpy array specific interface.
@@ -213,8 +213,8 @@ class Cube(metaclass=ABCMeta):
                         self.data[idx, :, :, :] = blosc.unpack_array(byte_arrays[idx])
 
         except:
-            raise SpdbError("IO Error", "Failed to decompress database cube.  Data integrity concern.",
-                            ErrorCode.IO_ERROR)
+            raise SpdbError("Failed to decompress database cube.  Data integrity concern.",
+                            ErrorCodes.SERIALIZATION_ERROR)
 
         self._created_from_zeros = False
 
@@ -347,9 +347,3 @@ class Cube(metaclass=ABCMeta):
         else:
             return Cube(cube_size, time_range)
 
-
-# end cube
-
-# These need to be at the bottom because of the factory method
-# from spdb import  anncube
-# from spdb import timecube
