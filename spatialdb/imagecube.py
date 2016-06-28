@@ -91,7 +91,8 @@ class ImageCube8(Cube):
         Returns:
             Image
         """
-        z_dim, y_dim, x_dim = self.data.shape
+
+        time, z_dim, y_dim, x_dim = self.data.shape
         return Image.frombuffer('L', (x_dim, y_dim), self.data[t_index, z_index, :, :].flatten(), 'raw', 'L', 0, 1)
 
     def xz_image(self, z_scale=1, y_index=0, t_index=0):
@@ -105,7 +106,7 @@ class ImageCube8(Cube):
         Returns:
             Image
         """
-        z_dim, y_dim, x_dim = self.data.shape
+        time, z_dim, y_dim, x_dim = self.data.shape
         out_image = Image.frombuffer('L', (x_dim, z_dim), self.data[t_index, :, y_index, :].flatten(), 'raw', 'L', 0, 1)
         # TODO: DMK - ask KL about this comment:
         # if the image scales to 0 pixels it don't work
@@ -122,7 +123,7 @@ class ImageCube8(Cube):
         Returns:
             Image
         """
-        z_dim, y_dim, x_dim = self.data.shape
+        time, z_dim, y_dim, x_dim = self.data.shape
         out_image = Image.frombuffer('L', (y_dim, z_dim), self.data[:, :, x_index].flatten(), 'raw', 'L', 0, 1)
         # TODO: DMK - ask KL about this comment:
         # if the image scales to 0 pixels it don't work
