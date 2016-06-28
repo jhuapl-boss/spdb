@@ -124,7 +124,7 @@ class ImageCube8(Cube):
             Image
         """
         time, z_dim, y_dim, x_dim = self.data.shape
-        out_image = Image.frombuffer('L', (y_dim, z_dim), self.data[:, :, x_index].flatten(), 'raw', 'L', 0, 1)
+        out_image = Image.frombuffer('L', (y_dim, z_dim), self.data[t_index, :, :, x_index].flatten(), 'raw', 'L', 0, 1)
         # TODO: DMK - ask KL about this comment:
         # if the image scales to 0 pixels it don't work
         return out_image.resize([y_dim, int(z_dim * z_scale)])
