@@ -18,7 +18,6 @@ import hashlib
 
 import boto3
 
-import bossutils
 from bossutils.aws import *
 
 
@@ -30,7 +29,7 @@ class ObjectStore(metaclass=ABCMeta):
         Args:
             conf(dict): Dictionary containing configuration details for the object store
         """
-        self.conf = object_store_conf
+        self.config = object_store_conf
 
     @abstractmethod
     def cuboids_exist(self, key_list, version=None):
@@ -76,7 +75,7 @@ class ObjectStore(metaclass=ABCMeta):
         return NotImplemented
 
     @abstractmethod
-    def page_in_objects(self, key_list, page_in_chan, timeout):
+    def page_in_objects(self, key_list, page_in_chan, timeout, kv_config, state_config):
         """
         Method to page in objects from S3 to the Cache Database
 
@@ -84,6 +83,8 @@ class ObjectStore(metaclass=ABCMeta):
             key_list (list(str)): A list of cached-cuboid keys to retrieve from the object store
             page_in_chan (str): Redis channel used for sending status of page in operations
             timeout: Number of seconds page in which the operation should complete before an error should be raised
+            kv_config (dict): Configuration information for the key-value engine interface
+            state_config (dict): Configuration information for the state database interface
 
         Returns:
 
@@ -105,9 +106,6 @@ class AWSObjectStore(ObjectStore):
         # Get an authorized boto3 session
         aws_mngr = get_aws_manager()
         self.__session = aws_mngr.get_session()
-
-        # Get the function name from boss.config
-        self.config = bossutils.configuration.BossConfig()
 
     def __del__(self):
         # Clean up session by returning it to the pool
@@ -185,14 +183,35 @@ class AWSObjectStore(ObjectStore):
 
         return output_keys
 
-    def page_in_objects(self, key_list, page_in_chan, timeout):
+    def object_to_cached_cuboid_keys(self, keys):
         """
-        Method to page in objects from S3 to the Cache Database via Lambda
+        Method to convert object-keys to cached-cuboid keys
+        Args:
+            keys (list(str)): A list of object-keys
+
+        Returns:
+            (list(str)): A list of cached-cuboid keys
+        """
+        output_keys = []
+        for key in keys:
+            # Strip off hash
+            temp_key = key.split("&", 1)[1]
+
+            # Combine
+            output_keys.append("CACHED-CUBOID&{}".format(temp_key))
+
+        return output_keys
+
+    def page_in_objects(self, key_list, page_in_chan, timeout, kv_config, state_config):
+        """
+        Method to page in objects from S3 to the Cache Database via Lambda invocation directly
 
         Args:
             key_list (list(str)): A list of cached-cuboid keys to retrieve from the object store
             page_in_chan (str): Redis channel used for sending status of page in operations
             timeout (int): Number of seconds in which the operation should complete before an error should be raised
+            kv_config (dict): Configuration information for the key-value engine interface
+            state_config (dict): Configuration information for the state database interface
 
         Returns:
             key_list (list(str)): A list of object keys
@@ -205,10 +224,9 @@ class AWSObjectStore(ObjectStore):
         client = self.__session.client('lambda')
 
         params = {"page_in_channel": page_in_chan,
-                  "cache_host": self.config["cache_host"],
-                  "cache_db": self.config["cache_db"],
-                  "cache_state_host": self.config["cache_state_host"],
-                  "cache_state_db": self.config["cache_state_db"]}
+                  "kv_config": kv_config,
+                  "state_config": state_config,
+                  "object_store_config": self.config}
 
         for key in object_keys:
             params["object_key"] = key
@@ -233,7 +251,16 @@ class AWSObjectStore(ObjectStore):
             (list(bytes)): A list of blosc compressed cuboid data
 
         """
-        return NotImplemented
+        if not isinstance(key_list, list):
+            key_list = [key_list]
+
+        client = self.__session.client('s3')
+
+        byte_arrays = []
+        for key in key_list:
+            byte_arrays.append(client.get_object(Bucket=self.config["bucket"]))
+
+        return byte_arrays
 
     def put_objects(self, key_list, cube_list, version=None):
         """
@@ -247,3 +274,29 @@ class AWSObjectStore(ObjectStore):
 
         """
         return NotImplemented
+
+    def trigger_page_out(self, config_data, write_cuboid_key):
+        """
+        Method to trigger lambda function to page out via SNS message that is collected by SQS
+
+        Args:
+            config_data (dict): Dictionary of configuration dictionaries
+            write_cuboid_key (str): Unique write-cuboid to be flushed to S3
+
+        Returns:
+            None
+        """
+        # TODO Double check sns boto3 call
+        # TODO is target arn the same as topic arn?
+        sns = self.__session.client('sns')
+        topic = sns.Topic(self.config["lambda"]["topic_arn"])
+
+        msg_data = {"config": config_data,
+                    "write_cuboid_key": write_cuboid_key}
+
+        response = topic.publish(
+                        TargetArn=self.config["lambda"]["target_arn"],
+                        Message=json.dumps({"default": msg_data}).encode(),
+                        MessageStructure='json')
+
+        # TODO: Need error handling here?

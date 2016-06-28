@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import redis
+import uuid
 
 from .error import SpdbError, ErrorCodes
 from .kvio import KVIO
@@ -23,7 +24,7 @@ class RedisKVIO(KVIO):
     def __init__(self, kv_conf):
         """Connect to the Redis backend
 
-        Params in the kv_conf dictionary:
+        Params in the kv_config dictionary:
             cache_client: Optional instance of a redis client that will be used directly
             cache_host: If cache_client not provided, a string indicating the database host
             cache_host: If cache_client not provided, an integer indicating the database to use
@@ -133,6 +134,7 @@ class RedisKVIO(KVIO):
 
         return missing_time_samples, missing_morton_ids
 
+    # TODO: CHECK IF THIS METHOD CAN BE REMOVED AFTER UPDATES
     def put_cube_index(self, resource, resolution, time_sample_list, morton_idx_list):
         """Add cuboid indices that are loaded into the cache db
 
@@ -174,14 +176,14 @@ class RedisKVIO(KVIO):
                 raise SpdbError("Received unexpected empty cuboid. {}".format(e),
                                 ErrorCodes.REDIS_ERROR)
             vals = key.split("&")
-            result.append((vals[4], vals[3], data))
+            result.append((vals[-1], vals[-2], data))
 
         return result
 
     def put_cubes(self, key_list, cube_list):
         """Store multiple cubes in the cache database
 
-        The key_list values should coorespond to the cubes in cube_list
+        The key_list values should correspond to the cubes in cube_list
 
         Args:
             key_list (list(str)): a list of Morton ID of the cuboids to get
@@ -193,6 +195,34 @@ class RedisKVIO(KVIO):
         try:
             # Write data to redis
             self.cache_client.mset(dict(list(zip(key_list, cube_list))))
+
+            # Build check
+            for key in key_list:
+                self.cache_client.expire(key, self.kv_conf["read_timeout"])
+
         except Exception as e:
             raise SpdbError("Error inserting cubes into the cache database. {}".format(e),
+                            ErrorCodes.REDIS_ERROR)
+
+    def insert_cube_in_write_buffer(self, base_key, data):
+        """Store a single cube (single time point) in the write buffer
+
+        Args:
+            base_key (str): the base write-buffer key (does not include uuid)
+            data (bytes): cube in a blosc compressed byte arrays using the numpy interface
+
+        Returns:
+            (str): The complete write-buffer key
+        """
+        # Create write buffer key
+        key = "{}&{}".format(base_key, uuid.uuid4().hex)
+
+        try:
+            # Write data to redis
+            self.cache_client.set(key, data)
+
+            return key
+
+        except Exception as e:
+            raise SpdbError("Error inserting cube into the write buffer. {}".format(e),
                             ErrorCodes.REDIS_ERROR)

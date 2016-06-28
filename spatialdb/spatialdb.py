@@ -20,6 +20,7 @@ import itertools
 
 from operator import mod, floordiv
 from operator import itemgetter
+import uuid
 
 from spdb.c_lib import ndlib
 from spdb.c_lib.ndtype import CUBOIDSIZE
@@ -35,28 +36,40 @@ class SpatialDB:
     """
     Main interface class to the spatial database system/cache engine
 
+    kv_config = {
+                    "cache_client": Optional instance of actual redis client. Must either set database info or provide client
+                    "cache_host": If cache_client not provided, a string indicating the database host
+                    "cache_host": If cache_client not provided, an integer indicating the database to use
+                    "read_timeout": Integer indicating number of seconds a read cache key expires
+                }
+
+
     Args:
-      kv_conf (dict): Data model info based on the request or target resource
+      kv_conf (dict): Configuration information for the key-value engine interface
+      state_conf (dict): Configuration information for the state database interface
+      object_store_conf (dict): Configuration information for the object store
 
     Attributes:
-      resource (project.BossResource): Data model info based on the request or target resource
-      s3io (): FUTURE
+      kv_conf (dict): Configuration information for the key-value engine interface
+      state_conf (dict): Configuration information for the state database interface
+      object_store_conf (dict): Configuration information for the object store
       kvio (KVIO): A key-value store engine instance
+      objectio (spdb.rediskvio.RedisKVIO): An object storage engine instance
+      cache_state (spdb.state.CacheStateDB): A cache state interface
     """
-
-    def __init__(self, conf, object_store_conf=None):
-        self.kv_conf = conf
-        self.object_store_conf = object_store_conf
+    def __init__(self, kv_conf, state_conf, object_store_conf):
+        self.kv_config = kv_conf
+        self.state_conf = state_conf
+        self.object_store_config = object_store_conf
 
         # Currently only a AWS object store is supported, so create interface instance
-        if object_store_conf:
-            self.objectio = AWSObjectStore(object_store_conf)
+        self.objectio = AWSObjectStore(object_store_conf)
 
         # Currently only a redis based cache db is supported, so create interface instance
-        self.kvio = RedisKVIO(conf)
+        self.kvio = RedisKVIO(kv_conf)
 
         # Create interface instance for the cache state db (redis backed)
-        self.cache_state = CacheStateDB(conf)
+        self.cache_state = CacheStateDB(state_conf)
 
         # TODO: Add annotation support
         # self.annoIdx = annindex.AnnotateIndex(self.kvio, self.proj)
@@ -146,6 +159,26 @@ class SpatialDB:
 
         # If you got here everything successfully paged in!
         self.cache_state.delete_page_in_channel(page_in_chan)
+
+    def page_object_into_cache(self, object_key, page_in_channel):
+        """Move compressed byte array from the object store to the cache database
+
+        Args:
+            object_key (str): Object key for the cuboid that is being moved to the cache
+            page_in_channel (str): Page in channel for the current operation
+
+        Returns:
+            None
+        """
+        # Get Cube data from object store
+        data = self.objectio.get_objects([object_key])
+
+        # Write data to read-cache
+        key_list = self.objectio.object_to_cached_cuboid_keys([object_key])
+        self.kvio.put_cubes(key_list, [data])
+
+        # Notify complete
+        self.cache_state.notify_page_in_complete(page_in_channel, key_list[0])
 
 
     # TODO: MAYBE REMOVE
@@ -334,6 +367,19 @@ class SpatialDB:
 
         # Add cubes to cache index if successful
         self.kvio.put_cube_index(resource, resolution, time_points, [morton_idx])
+
+    # Status Methods
+    def project_locked(self, lookup_key):
+        """
+        Method to check if a given channel/layer is locked for writing due to an error
+
+        Args:
+            lookup_key (str): Lookup key for a channel/layer
+
+        Returns:
+            (bool): True if the channel/layer is locked, false if not
+        """
+        return self.cache_state.project_locked(lookup_key)
 
     # Private Cube Processing Methods
     def _up_sample_cutout(self, resource, corner, extent, resolution):
@@ -657,7 +703,7 @@ class SpatialDB:
             time_sample_stop = time_sample_start + 1
         else:
             raise SpdbError('Invalid Data Shape', 'Matrix must be 4D or 3D',
-                            ErrorCode.SPDB_ERROR)
+                            ErrorCodes.SPDB_ERROR)
 
         # Get the size of cuboids
         [x_cube_dim, y_cube_dim, z_cube_dim] = cube_dim = CUBOIDSIZE[resolution]
@@ -680,34 +726,65 @@ class SpatialDB:
                        y_offset:y_offset + dim[1],
                        x_offset:x_offset + dim[0]] = cuboid_data
 
+        # Get keys ready
+        base_write_cuboid_key = "WRITE-CUBOID&{}&{}".format(resource.get_lookup_key(), resolution)
+
         # Get current cube from db, merge with new cube, write back to the to db
+        # TODO: Move splitting up data and computing morton into c-lib as single method
         for z in range(z_num_cubes):
             for y in range(y_num_cubes):
                 for x in range(x_num_cubes):
                     # Get the morton ID for the cube
                     morton_idx = ndlib.XYZMorton([x + x_start, y + y_start, z + z_start])
+                    wc_key_base = "{}&{}".format(base_write_cuboid_key, morton_idx)
 
-                    # Get the existing cube from the cache. Put all time samples in a single cube instance
-                    cube = self.get_cubes(resource, resolution, [time_sample_start, time_sample_stop], [morton_idx])[0]
+                    # Get sub-cube
+                    temp_cube = Cube.create_cube(resource, [x_cube_dim, y_cube_dim, z_cube_dim],
+                                                 [time_sample_start, time_sample_stop])
+                    temp_cube.data = data_buffer[:,
+                                                 z * z_cube_dim:(z + 1) * z_cube_dim,
+                                                 y * y_cube_dim:(y + 1) * y_cube_dim,
+                                                 x * x_cube_dim:(x + 1) * x_cube_dim]
 
-                    # overwrite the cube
-                    cube.overwrite(data_buffer[:,
-                                               z * z_cube_dim:(z + 1) * z_cube_dim,
-                                               y * y_cube_dim:(y + 1) * y_cube_dim,
-                                               x * x_cube_dim:(x + 1) * x_cube_dim],
-                                   [time_sample_start - time_sample_start, time_sample_stop - time_sample_start])
+                    # For each time sample put cube into write-buffer and add to temp page out key
+                    for t in range(time_sample_start, time_sample_stop):
+                        # Add cuboid to write buffer
+                        write_cuboid_key = self.kvio.insert_cube_in_write_buffer(wc_key_base,
+                                                                                 temp_cube.get_blosc_numpy_by_time_index(t))
 
-                    # update in the database with the new merged cube
-                    self.put_cubes(resource, resolution, [morton_idx], [cube])
+                        # Page Out Attempt Loop
+                        temp_page_out_key = "TEMP&{}".format(uuid.uuid4().hex)
+                        while True:
+                            # Check for page out
+                            if self.cache_state.in_page_out(temp_page_out_key, resource.get_lookup_key(),
+                                                            resolution, morton_idx, time_sample_start):
+                                # Delay Write!
+                                self.cache_state.add_to_delayed_write(write_cuboid_key,
+                                                                      resource.get_lookup_key(),
+                                                                      resolution,
+                                                                      morton_idx,
+                                                                      t)
+                                # You are done. break out
+                                break
+                            else:
+                                # Attempt to get write slot by checking page out
+                                success, in_page_out = self.cache_state.add_to_page_out(temp_page_out_key,
+                                                                                        resource.get_lookup_key(),
+                                                                                        resolution,
+                                                                                        morton_idx,
+                                                                                        t)
+                                if not success:
+                                    # Watch fail, so try again in case another thread tried to write the same cube
+                                    continue
 
-
-
-
-
-
-
-
-
-
-
-# TODO: Currently, since no S3 integration, if missing in cache generate just an all 0 cube
+                                if not in_page_out:
+                                    # Good to trigger lambda!
+                                    self.objectio.trigger_page_out({"kv_config": self.kv_config,
+                                                                    "state_config": self.state_conf,
+                                                                    "object_store_config": self.object_store_config},
+                                                                   write_cuboid_key)
+                                    # All done. Break.
+                                    break
+                                else:
+                                    # Ended up in page out during transaction
+                                    continue

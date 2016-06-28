@@ -103,8 +103,151 @@ class CacheStateDB(object):
             # Sleep a bit
             time.sleep(0.05)
 
+    def notify_page_in_complete(self, page_in_channel, key):
+        """
+        Method to notify main API process that the async page-in operation for a given cuboid is complete
+        Args:
+            page_in_channel (str): Name of the subscription
+            key (str): cached-cuboid key for the cuboid that has been successfully paged in
 
+        Returns:
+            None
 
+        """
+        self.status_client.publish(page_in_channel, key)
 
+    def add_cache_misses(self, key_list):
+        """
+        Method to add cached-cuboid keys to the cache-miss list
 
-    add_cache_misses()
+        Args:
+            key_list (list(str)): List of object keys to wait for
+
+        Returns:
+            None
+
+        """
+        self.status_client.rpush('CACHE-MISS', *key_list)
+
+    def project_locked(self, lookup_key):
+        """
+        Method to check if a given channel/layer is locked for writing due to an error
+
+        Args:
+            lookup_key (str): Lookup key for a channel/layer
+
+        Returns:
+            (bool): True if the channel/layer is locked, false if not
+        """
+        key = "WRITE-LOCK&{}".format(lookup_key)
+        return bool(self.status_client.exists(key))
+
+    def in_page_out(self, temp_page_out_key, lookup_key, resolution, morton, time_sample):
+        """
+        Method to check if a cuboid is currently being written to S3 via page out key
+
+        Args:
+            temp_page_out_key (str): a temporary set used to check if cubes are in page out
+            lookup_key (str): Lookup key for a channel/layer
+            resolution (int): level in the resolution heirarchy
+            morton (int): morton id for the cuboid
+            time_sample (int): time sample for cuboid
+
+        Returns:
+            (bool): True if the key is in page out
+        """
+        try:
+            # Create temp set
+            pipe = self.status_client.pipeline()
+            pipe.sadd(temp_page_out_key, "{}&{}".format(morton, time_sample))
+            pipe.expire(temp_page_out_key, 30)
+            result = pipe.execute()
+        except Exception as e:
+            raise SpdbError("Failed to check page-out set. {}".format(e),
+                            ErrorCodes.REDIS_ERROR)
+
+        # Use set diff to check for key
+        result = self.status_client.sdiff(temp_page_out_key, "PAGE-OUT&{}&{}".format(lookup_key, resolution))
+
+        #TODO: double check output from sdiff
+        if result:
+            return False
+        else:
+            return True
+
+    def add_to_delayed_write(self, write_cuboid_key, lookup_key, resolution, morton, time_sample):
+        """
+        Method to add a write cuboid key to a delayed write queue
+
+        Args:
+            write_cuboid_key (str): write-cuboid key for the cuboid to delay write
+            lookup_key (str): Lookup key for a channel/layer
+            resolution (int): level in the resolution heirarchy
+            morton (int): morton id for the cuboid
+            time_sample (int): time sample for cuboid
+
+        Returns:
+            None
+        """
+        self.status_client.rpush("DELAYED-WRITE&{}&{}&{}&{}".format(lookup_key, resolution, time_sample, morton),
+                                 write_cuboid_key)
+
+    def get_delayed_write_keys(self):
+        """
+        Method to get delayed write-cuboid keys for processing
+
+        Returns:
+            list((str, str)): List of tuples where the first item is the delayed-write key and the second is the
+                                write-cuboid key
+        """
+        # TODO: Double check if key doesn't exist lpop returns nil
+        delayed_write_keys = self.status_client.get("DELAYED-WRITE*")
+        output = []
+        for key in delayed_write_keys:
+            write_cuboid_key = self.status_client.lpop(key)
+            if write_cuboid_key != "nil":
+                output.append((key, write_cuboid_key))
+
+        return output
+
+    def add_to_page_out(self, temp_page_out_key, lookup_key, resolution, morton, time_sample):
+        """
+        Method to add a key to the page-out tracking set
+
+        Args:
+            lookup_key (str): Lookup key for a channel/layer
+            resolution (int): level in the resolution heirarchy
+            morton (int): morton id for the cuboid
+            time_sample (int): time sample for cuboid
+
+        Returns:
+            (bool, bool): Tuple where first value is if the transaction succeeded and the second is if the key is in
+            page out already
+        """
+        # TODO: Validate output from pipe
+        page_out_key = "PAGE-OUT&{}&{}".format(lookup_key, resolution)
+        success = True
+        in_page_out = True
+        try:
+            # Create temp set
+            pipe = self.status_client.pipeline()
+            pipe.multi()
+            pipe.watch(page_out_key)
+            self.status_client.sdiff(temp_page_out_key, page_out_key)
+            self.status_client.sadd(page_out_key, "{}&{}".format(morton, time_sample))
+            result = pipe.execute()
+
+            if result[1]:
+                in_page_out = False
+            else:
+                in_page_out = True
+
+        except redis.WatchError:
+            # Watch error occurred
+            success = False
+
+        except Exception as e:
+            raise SpdbError("Failed to check page-out set. {}".format(e),
+                            ErrorCodes.REDIS_ERROR)
+
+        return success, in_page_out
