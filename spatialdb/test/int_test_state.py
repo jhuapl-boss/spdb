@@ -18,6 +18,8 @@ from mockredis import mock_strict_redis_client
 
 from spdb.project import BossResourceBasic
 from spdb.spatialdb import CacheStateDB
+from spdb.spatialdb.test import CacheStateDBTestMixin
+
 
 import redis
 
@@ -32,89 +34,20 @@ class MockBossConfig(bossutils.configuration.BossConfig):
         self.config["aws"]["cache-state-db"] = 1
 
 
-class CacheStateDBTestMixin(object):
+class IntegrationCacheStateDBTestMixin(object):
 
-    def test_add_cache_misses(self):
+    def test_create_page_in_channel(self):
         """Test if cache cuboid keys are formatted properly"""
         csdb = CacheStateDB(self.config_data)
-        assert not self.state_client.get("CACHE-MISS")
-
-        keys = ['key1', 'key2', 'key3']
-
-        csdb.add_cache_misses(keys)
-
-        for k in keys:
-            assert k == self.state_client.lpop("CACHE-MISS").decode()
-
-    def test_project_locked(self):
-        """Test if a channel/layer is locked"""
-        csdb = CacheStateDB(self.config_data)
-
-        assert csdb.project_locked("1&1&1") == False
-
-        self.state_client.set("WRITE-LOCK&1&1&1", 'true')
-
-        assert csdb.project_locked("1&1&1") == True
-
-    def test_add_to_page_out(self):
-        """Test if a cube is in page out"""
-        csdb = CacheStateDB(self.config_data)
-
-        temp_page_out_key = "temp"
-        lookup_key = "1&1&1"
-        resolution = 1
-        morton = 234
-        time_sample = 1
-
-        page_out_key = "PAGE-OUT&{}&{}".format(lookup_key, resolution)
-        assert not self.state_client.get(page_out_key)
-
-        assert not csdb.in_page_out(temp_page_out_key, lookup_key, resolution, morton, time_sample)
-
-        success, in_page_out = csdb.add_to_page_out(temp_page_out_key, lookup_key, resolution, morton, time_sample)
-        assert success
-        assert not in_page_out
-
-        assert csdb.in_page_out(temp_page_out_key, lookup_key, resolution, morton, time_sample)
-
-    def test_add_to_delayed_write(self):
-        """Test if a cube is in delayed write"""
-        csdb = CacheStateDB(self.config_data)
-
-        lookup_key = "1&1&1"
-        resolution = 1
-        time_sample = 1
-        morton = 234
-        write_cuboid_key1 = "WRITE-CUBOID&{}&{}&{}&daadsfjk".format(lookup_key,
-                                                                    resolution,
-                                                                    time_sample,
-                                                                    morton)
-        write_cuboid_key2 = "WRITE-CUBOID&{}&{}&{}&fghfghjg".format(lookup_key,
-                                                                    resolution,
-                                                                    time_sample,
-                                                                    morton)
-
-        keys = csdb.get_delayed_write_keys()
-        assert not keys
-
-        csdb.add_to_delayed_write(write_cuboid_key1, lookup_key, resolution, morton, time_sample)
-        csdb.add_to_delayed_write(write_cuboid_key2, lookup_key, resolution, morton, time_sample)
-
-        keys = csdb.get_delayed_write_keys()
-        assert len(keys) == 1
-        assert keys[0][1].decode() == write_cuboid_key1
-
-        keys = csdb.get_delayed_write_keys()
-        assert len(keys) == 1
-        assert keys[0][1].decode() == write_cuboid_key2
-
-        keys = csdb.get_delayed_write_keys()
-        assert not keys
+        ch1 = csdb.create_page_in_channel()
+        ch2 = csdb.create_page_in_channel()
+        assert ch1 != ch2
+        assert self.state_client.exists(ch1) == True
+        assert self.state_client.exists(ch2) == True
 
 
-@patch('redis.StrictRedis', mock_strict_redis_client)
 @patch('bossutils.configuration.BossConfig', MockBossConfig)
-class TestCacheStateDB(CacheStateDBTestMixin, unittest.TestCase):
+class TestCacheStateDB(CacheStateDBTestMixin, IntegrationCacheStateDBTestMixin, unittest.TestCase):
 
     def setUp(self):
         """ Create a diction of configuration values for the test resource. """
@@ -162,12 +95,12 @@ class TestCacheStateDB(CacheStateDBTestMixin, unittest.TestCase):
 
         self.config = configuration.BossConfig()
 
-        self.state_client = redis.StrictRedis(host=self.config["aws"]["cache-state"],
-                                              port=6379, db=self.config["aws"]["cache-state-db"],
-                                              decode_responses=True)
-        self.state_client.flushdb()
+        self.status_client = redis.StrictRedis(host=self.config["aws"]["cache-state"],
+                                               port=6379, db=self.config["aws"]["cache-state-db"],
+                                               decode_responses=True)
+        self.status_client.flushdb()
 
-        self.config_data = {"state_client": self.state_client}
+        self.config_data = {"state_client": self.status_client}
 
     def tearDown(self):
         self.mock_tests = self.patcher.stop()

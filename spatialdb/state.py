@@ -208,12 +208,13 @@ class CacheStateDB(object):
                                 write-cuboid key
         """
         # TODO: Double check if key doesn't exist lpop returns nil
-        delayed_write_keys = self.status_client.get("DELAYED-WRITE*")
+        delayed_write_keys = self.status_client.keys("DELAYED-WRITE*")
         output = []
-        for key in delayed_write_keys:
-            write_cuboid_key = self.status_client.lpop(key)
-            if write_cuboid_key != "nil":
-                output.append((key, write_cuboid_key))
+        if delayed_write_keys:
+            for key in delayed_write_keys:
+                write_cuboid_key = self.status_client.lpop(key)
+                if write_cuboid_key:
+                    output.append((key, write_cuboid_key))
 
         return output
 
@@ -238,10 +239,10 @@ class CacheStateDB(object):
         try:
             # Create temp set
             pipe = self.status_client.pipeline()
-            pipe.multi()
             pipe.watch(page_out_key)
-            self.status_client.sdiff(temp_page_out_key, page_out_key)
-            self.status_client.sadd(page_out_key, "{}&{}".format(morton, time_sample))
+            pipe.multi()
+            pipe.sdiff(temp_page_out_key, page_out_key)
+            pipe.sadd(page_out_key, "{}&{}".format(morton, time_sample))
             result = pipe.execute()
 
             if result[1]:
@@ -249,7 +250,7 @@ class CacheStateDB(object):
             else:
                 in_page_out = True
 
-        except redis.WatchError:
+        except redis.WatchError as e:
             # Watch error occurred
             success = False
 
