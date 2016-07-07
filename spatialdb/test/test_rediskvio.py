@@ -25,15 +25,6 @@ import numpy as np
 import blosc
 
 from bossutils import configuration
-import bossutils
-
-
-class MockBossConfig(bossutils.configuration.BossConfig):
-    """Basic mock for BossConfig to contain the properties needed for this test"""
-    def __init__(self):
-        super().__init__()
-        self.config["aws"]["cache-db"] = 1
-        self.config["aws"]["cache-state-db"] = 1
 
 
 class RedisKVIOTestMixin(object):
@@ -90,6 +81,10 @@ class RedisKVIOTestMixin(object):
         data1 = np.random.randint(50, size=[10, 15, 5])
         data2 = np.random.randint(50, size=[10, 15, 5])
         data3 = np.random.randint(50, size=[10, 15, 5])
+        data_packed1 = blosc.pack_array(data1)
+        data_packed2 = blosc.pack_array(data2)
+        data_packed3 = blosc.pack_array(data3)
+        data = [data_packed1, data_packed2, data_packed3]
 
         # Make sure there are no cuboids in the cache
         keys = self.cache_client.keys('CACHED-CUBOID&{}&{}*'.format(self.resource.get_lookup_key(), resolution))
@@ -97,7 +92,7 @@ class RedisKVIOTestMixin(object):
 
         # Add items
         keys = rkv.generate_cached_cuboid_keys(self.resource, 2, [0], [123, 124, 126])
-        rkv.put_cubes(keys, [data1, data2, data3])
+        rkv.put_cubes(keys, data)
 
         db_keys = self.cache_client.keys('CACHED-CUBOID*')
         db_keys = [x.decode() for x in db_keys]
@@ -128,12 +123,9 @@ class RedisKVIOTestMixin(object):
 
         # Get cube
         cubes = rkv.get_cubes(keys)
+        assert len(cubes) == 3
 
-        cube = [x for x in cubes]
-
-        assert len(cube) == 3
-
-        for m, c, d in zip(morton_id, cube, data):
+        for m, c, d in zip(morton_id, cubes, data):
             assert c[0] == m
             assert c[1] == 0
             data_retrieved = blosc.unpack_array(c[2])
@@ -141,7 +133,6 @@ class RedisKVIOTestMixin(object):
 
 
 @patch('redis.StrictRedis', mock_strict_redis_client)
-@patch('bossutils.configuration.BossConfig', MockBossConfig)
 class TestRedisKVIOImageData(RedisKVIOTestMixin, unittest.TestCase):
 
     def setUp(self):
@@ -191,11 +182,12 @@ class TestRedisKVIOImageData(RedisKVIOTestMixin, unittest.TestCase):
         self.config = configuration.BossConfig()
 
         self.cache_client = redis.StrictRedis(host=self.config["aws"]["cache"], port=6379,
-                                              db=self.config["aws"]["cache-db"],
-                                              decode_responses=True)
+                                              db=1,
+                                              decode_responses=False)
         self.cache_client.flushdb()
 
         self.config_data = {"cache_client": self.cache_client, "read_timeout": 86400}
 
     def tearDown(self):
         self.mock_tests = self.patcher.stop()
+

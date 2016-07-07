@@ -24,15 +24,17 @@ class CacheStateDB(object):
         """
         A class to implement the Boss cache state database and associated functionality
 
+        Database is a redis instance.
+
         Args:
             kv_conf(dict): Dictionary containing configuration details for the key-value store
-
 
 
         Params in the kv_config dictionary:
             state_client: Optional instance of a redis client that will be used directly
             cache_state_host: If cache_client not provided, a string indicating the database host
             cache_state_db: If cache_client not provided, an integer indicating the database to use
+
         """
         self.config = kv_conf
 

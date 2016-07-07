@@ -1,6 +1,6 @@
 Pillow==3.1.1
 redis==2.10.5
-mockredispy==2.9.0.12
+mockredispy==2.9.3
 blosc==1.2.8
 nose2
 numpy

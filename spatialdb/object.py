@@ -92,6 +92,43 @@ class ObjectStore(metaclass=ABCMeta):
         """
         return NotImplemented
 
+    @abstractmethod
+    def cached_cuboid_to_object_keys(self, keys):
+        """
+        Method to convert cached-cuboid keys to object-keys
+        Args:
+            keys (list(str)): A list of cached-cuboid keys
+
+        Returns:
+            (list(str)): A list of object keys
+        """
+        raise NotImplemented
+
+    @abstractmethod
+    def object_to_cached_cuboid_keys(self, keys):
+        """
+        Method to convert object-keys to cached-cuboid keys
+        Args:
+            keys (list(str)): A list of object-keys
+
+        Returns:
+            (list(str)): A list of cached-cuboid keys
+        """
+        raise NotImplemented
+
+    @abstractmethod
+    def trigger_page_out(self, config_data, write_cuboid_key):
+        """
+        Method to trigger an page out to the object storage system
+
+        Args:
+            config_data (dict): Dictionary of configuration information
+            write_cuboid_key (str): Unique write-cuboid to be flushed to S3
+
+        Returns:
+            None
+        """
+
 
 class AWSObjectStore(ObjectStore):
     def __init__(self, conf):
@@ -112,6 +149,7 @@ class AWSObjectStore(ObjectStore):
         ObjectStore.__init__(self, conf)
 
         # Get an authorized boto3 session
+        # TODO: Update once IAM user is assigned to instance
         aws_mngr = get_aws_manager()
         self.__session = aws_mngr.get_session()
 

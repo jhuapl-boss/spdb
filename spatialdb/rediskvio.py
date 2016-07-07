@@ -139,7 +139,7 @@ class RedisKVIO(KVIO):
         result = []
         for key, data in zip(key_list, rows):
             if not data:
-                raise SpdbError("Received unexpected empty cuboid. {}".format(e),
+                raise SpdbError("Received unexpected empty cuboid.",
                                 ErrorCodes.REDIS_ERROR)
             vals = key.split("&")
             result.append((int(vals[-1]), int(vals[-2]), data))
@@ -180,6 +180,7 @@ class RedisKVIO(KVIO):
         Returns:
             (str): The complete write-buffer key
         """
+        # TODO: Move to parent class if this method sticks after optimization of write_cuboid method
         # Create write buffer key
         key = "{}&{}".format(base_key, uuid.uuid4().hex)
 

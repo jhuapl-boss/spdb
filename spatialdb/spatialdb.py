@@ -16,7 +16,6 @@
 import numpy as np
 from collections import namedtuple
 import collections
-import itertools
 
 from operator import mod, floordiv
 from operator import itemgetter
@@ -36,18 +35,38 @@ class SpatialDB:
     """
     Main interface class to the spatial database system/cache engine
 
-    kv_config = {
+    Supported Key-Value databases: Redis
+    kv_conf:
+        RedisKVIO:{
                     "cache_client": Optional instance of actual redis client. Must either set database info or provide client
                     "cache_host": If cache_client not provided, a string indicating the database host
-                    "cache_host": If cache_client not provided, an integer indicating the database to use
+                    "cache_db": If cache_client not provided, an integer indicating the database to use
                     "read_timeout": Integer indicating number of seconds a read cache key expires
+                  }
+
+
+    Supported Object Stores: AWS S3+DynamoDB
+    object_store_conf:
+        AWSObjectStore:{
+                          "cache_client": Optional instance of actual redis client. Must either set database info or provide client
+                          "cache_host": If cache_client not provided, a string indicating the database host
+                          "cache_host": If cache_client not provided, an integer indicating the database to use
+                          "read_timeout": Integer indicating number of seconds a read cache key expires
+                        }
+
+
+    Cache State interface ONLY works with a redis backend:
+    state_conf = {
+                    "state_client": Optional instance of actual redis client. Must either set database info or provide client
+                    "cache_state_host": If cache_client not provided, a string indicating the database host
+                    "cache_state_db": If cache_client not provided, an integer indicating the database to use
                 }
 
 
     Args:
       kv_conf (dict): Configuration information for the key-value engine interface
       state_conf (dict): Configuration information for the state database interface
-      object_store_conf (dict): Configuration information for the object store
+      object_store_conf (dict): Configuration information for the object store interface
 
     Attributes:
       kv_conf (dict): Configuration information for the key-value engine interface
@@ -180,8 +199,7 @@ class SpatialDB:
         # Notify complete
         self.cache_state.notify_page_in_complete(page_in_channel, key_list[0])
 
-
-    # TODO: MAYBE REMOVE
+    # TODO: MAYBE CAN REMOVE
     def get_cached_cubes(self, resource, resolution, time_sample_range, morton_idx_list):
         """Load an array of cuboids from the cache key-value store as raw compressed byte arrays dealing with
         cache misses if necessary (future)
@@ -253,7 +271,7 @@ class SpatialDB:
 
         return output_cubes
 
-    # TODO: MAYBE REMOVE
+    # TODO: MAYBE CAN REMOVE
     def put_cached_cubes(self, resource, resolution, morton_idx_list, cube_list):
         """Insert a list of Cube instances into the cache key-value store.
 
@@ -297,7 +315,7 @@ class SpatialDB:
             # Add cubes to cache index if successful
             self.kvio.put_cube_index(resource, resolution, time, morton_idx_list)
 
-    # TODO: MAYBE REMOVE
+    # TODO: MAYBE CAN REMOVE
     def put_write_cubes(self, resource, resolution, morton_idx_list, cube_list):
         """Insert a list of Cube instances into the cache key-value store.
 
@@ -341,8 +359,7 @@ class SpatialDB:
             # Add cubes to cache index if successful
             self.kvio.put_cube_index(resource, resolution, time, morton_idx_list)
 
-
-    # TODO: MAYBE REMOVE
+    # TODO: MAYBE CAN REMOVE
     def put_single_cube(self, key, cube):
         """Insert a Cube into the cache key-value store. Supports time series and will put all time points in db.
 

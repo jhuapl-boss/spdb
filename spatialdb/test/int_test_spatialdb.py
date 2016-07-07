@@ -22,33 +22,22 @@ import copy
 import redis
 
 from bossutils import configuration
+import bossutils
 
-CONFIG_UNMOCKED = configuration.BossConfig()
-
-
-class MockBossIntegrationConfig:
+class MockBossIntegrationConfig(bossutils.configuration.BossConfig):
     """Mock the config to set the database to 1 instead of the default 0"""
     def __init__(self):
-        self.config = {}
-        self.config["aws"] = {}
-        self.config["aws"]["cache"] = CONFIG_UNMOCKED["aws"]["cache"]
-        self.config["aws"]["cache-state"] = CONFIG_UNMOCKED["aws"]["cache-state"]
-        self.config["aws"]["cache-db"] = 1
-        self.config["aws"]["cache-state-db"] = 1
-
-    def read(self, filename):
-        pass
-
-    def __getitem__(self, key):
-        return self.config[key]
+        super().__init__()
+        self.config["aws"]["cache-db"] = "1"
+        self.config["aws"]["cache-state-db"] = "1"
 
 
-@patch('configparser.ConfigParser', MockBossIntegrationConfig)
+@patch('bossutils.configuration.BossConfig', MockBossIntegrationConfig)
 class TestIntegrationSpatialDBImageData(SpatialDBImageDataTestMixin, unittest.TestCase):
 
     def setUp(self):
         """ Create a diction of configuration values for the test resource. """
-        self.patcher = patch('configparser.ConfigParser', MockBossIntegrationConfig)
+        self.patcher = patch('bossutils.configuration.BossConfig', MockBossIntegrationConfig)
         self.mock_tests = self.patcher.start()
 
         data = {}

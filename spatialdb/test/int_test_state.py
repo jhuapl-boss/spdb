@@ -13,47 +13,70 @@
 # limitations under the License.
 
 import unittest
-from unittest.mock import patch
-from mockredis import mock_strict_redis_client
+from datetime import datetime
 
 from spdb.project import BossResourceBasic
 from spdb.spatialdb import CacheStateDB
 from spdb.spatialdb.test import CacheStateDBTestMixin
-
+from spdb.spatialdb.error import SpdbError
 
 import redis
 
 from bossutils import configuration
-import bossutils
-
-
-class MockBossConfig(bossutils.configuration.BossConfig):
-    """Basic mock for BossConfig to contain the properties needed for this test"""
-    def __init__(self):
-        super().__init__()
-        self.config["aws"]["cache-state-db"] = 1
 
 
 class IntegrationCacheStateDBTestMixin(object):
 
-    def test_create_page_in_channel(self):
-        """Test if cache cuboid keys are formatted properly"""
-        csdb = CacheStateDB(self.config_data)
-        ch1 = csdb.create_page_in_channel()
-        ch2 = csdb.create_page_in_channel()
-        assert ch1 != ch2
-        assert self.state_client.exists(ch1) == True
-        assert self.state_client.exists(ch2) == True
+    def test_page_in_channel(self):
+        """Test Page in channel creation and basic message passing"""
+        # Create test instance
+        csdb1 = CacheStateDB(self.config_data)
+        csdb2 = CacheStateDB(self.config_data)
+
+        # Create page in channel in the first instance
+        ch = csdb1.create_page_in_channel()
+
+        # Publish a message
+        csdb2.notify_page_in_complete(ch, "MY_TEST_KEY")
+
+        # Get message
+        msg = csdb1.status_client_listener.get_message()
+
+        # TODO check data format and add assert
+        assert(1==0)
+
+    def test_wait_for_page_in_timeout(self):
+        """Test to make sure page in timeout works properly"""
+        start_time = datetime.now()
+        with self.assertRaises(SpdbError):
+            csdb = CacheStateDB(self.config_data)
+            ch = csdb.create_page_in_channel()
+
+            csdb.wait_for_page_in(["MY_TEST_KEY"], ch, 1)
+
+        assert (start_time - datetime.now()).seconds < 3
+
+    def test_wait_for_page_in(self):
+        """Test to make sure waiting for all the keys to be paged in works properly"""
+        # Create test instance
+        csdb1 = CacheStateDB(self.config_data)
+        csdb2 = CacheStateDB(self.config_data)
+
+        # Create page in channel in the first instance
+        ch = csdb1.create_page_in_channel()
+
+        # Publish a message
+        csdb2.notify_page_in_complete(ch, "MY_TEST_KEY1")
+        csdb2.notify_page_in_complete(ch, "MY_TEST_KEY2")
+
+        # Wait for page in
+        csdb1.wait_for_page_in(["MY_TEST_KEY1", "MY_TEST_KEY2"], ch, 5)
 
 
-@patch('bossutils.configuration.BossConfig', MockBossConfig)
 class TestCacheStateDB(CacheStateDBTestMixin, IntegrationCacheStateDBTestMixin, unittest.TestCase):
 
     def setUp(self):
         """ Create a diction of configuration values for the test resource. """
-        self.patcher = patch('redis.StrictRedis', mock_strict_redis_client)
-        self.mock_tests = self.patcher.start()
-
         self.data = {}
         self.data['collection'] = {}
         self.data['collection']['name'] = "col1"
@@ -95,12 +118,9 @@ class TestCacheStateDB(CacheStateDBTestMixin, IntegrationCacheStateDBTestMixin, 
 
         self.config = configuration.BossConfig()
 
-        self.status_client = redis.StrictRedis(host=self.config["aws"]["cache-state"],
-                                               port=6379, db=self.config["aws"]["cache-state-db"],
-                                               decode_responses=True)
-        self.status_client.flushdb()
+        self.state_client = redis.StrictRedis(host=self.config["aws"]["cache-state"],
+                                              port=6379, db=1,
+                                              decode_responses=False)
+        self.state_client.flushdb()
 
-        self.config_data = {"state_client": self.status_client}
-
-    def tearDown(self):
-        self.mock_tests = self.patcher.stop()
+        self.config_data = {"state_client": self.state_client}

@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import unittest
-from unittest.mock import patch
 
 from spdb.project import BossResourceBasic
 from spdb.spatialdb import RedisKVIO
@@ -25,23 +24,17 @@ import numpy as np
 import blosc
 
 from bossutils import configuration
-import bossutils
 
 
-class MockBossConfig(bossutils.configuration.BossConfig):
-    """Basic mock for BossConfig to contain the properties needed for this test"""
-    def __init__(self):
-        super().__init__()
-        self.config["aws"]["cache-db"] = 1
-        self.config["aws"]["cache-state-db"] = 1
-
-
-@patch('bossutils.configuration.BossConfig', MockBossConfig)
 class TestIntegrationRedisKVIOImageData(RedisKVIOTestMixin, unittest.TestCase):
 
     def test_param_constructor(self):
         """Re-run a testing using the parameter based constructor"""
-        rkv = RedisKVIO(self.config_data)
+        config = {
+                    "cache_host": self.config["aws"]["cache"],
+                    "cache_db": 1
+                }
+        rkv = RedisKVIO(config)
 
         # Clean up data
         self.cache_client.flushdb()
@@ -74,9 +67,6 @@ class TestIntegrationRedisKVIOImageData(RedisKVIOTestMixin, unittest.TestCase):
 
     def setUp(self):
         """ Create a diction of configuration values for the test resource. """
-        self.patcher = patch('configparser.ConfigParser', MockBossConfig)
-        self.mock_tests = self.patcher.start()
-
         self.data = {}
         self.data['collection'] = {}
         self.data['collection']['name'] = "col1"
@@ -119,17 +109,11 @@ class TestIntegrationRedisKVIOImageData(RedisKVIOTestMixin, unittest.TestCase):
         self.config = configuration.BossConfig()
 
         self.cache_client = redis.StrictRedis(host=self.config["aws"]["cache"], port=6379, db=1,
-                                              decode_responses=True)
+                                              decode_responses=False)
 
         self.cache_client.flushdb()
 
         self.config_data = {"cache_client": self.cache_client, "read_timeout": 86400}
 
     def tearDown(self):
-
-        # Flush the db after
-        self.cache_client.flushdb()
-        self.status_client.flushdb()
-
-        # Stop patching
-        self.mock_tests = self.patcher.stop()
+        pass
