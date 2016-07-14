@@ -19,8 +19,6 @@ from .error import SpdbError, ErrorCodes
 
 import boto3
 
-from bossutils.aws import *
-
 
 class ObjectStore(metaclass=ABCMeta):
     def __init__(self, object_store_conf):
@@ -140,23 +138,14 @@ class AWSObjectStore(ObjectStore):
 
 
         Params in the conf dictionary:
-            flush_topic_arn: ARN for the flush SNS topic
+            s3_flush_queue: URL for the SQS queue tracking flush tasks
             cuboid_bucket: Bucket for storage of cuboid objects in S3
             page_in_lambda_function: name of lambda function for page in operation (e.g. page_in.handler)
+            page_out_lambda_function: name of lambda function for page out operation (e.g. page_in.handler)
             s3_index_table: name of the dynamoDB table for storing the s3 cuboid index
         """
         # call the base class constructor
         ObjectStore.__init__(self, conf)
-
-        # Get an authorized boto3 session
-        # TODO: Update once IAM user is assigned to instance
-        aws_mngr = get_aws_manager()
-        self.__session = aws_mngr.get_session()
-
-    def __del__(self):
-        # Clean up session by returning it to the pool
-        aws_mngr = get_aws_manager()
-        aws_mngr.put_session(self.__session)
 
     @staticmethod
     def object_key_chunks(object_keys, chunk_size):
@@ -186,7 +175,7 @@ class AWSObjectStore(ObjectStore):
         object_keys = self.cached_cuboid_to_object_keys(key_list)
 
         # TODO: Possibly could use batch read to speed up
-        dynamodb = self.__session.client('dynamodb')
+        dynamodb = boto3.client('dynamodb')
 
         s3_key_index = []
         zero_key_index = []
@@ -221,23 +210,23 @@ class AWSObjectStore(ObjectStore):
         Returns:
             None
         """
-        dynamodb = self.__session.client('dynamodb')
+        dynamodb = boto3.client('dynamodb')
 
         # Get lookup key and resolution from object key
         vals = object_key.split("&")
         lookup_key = "{}&{}&{}".format(vals[1], vals[2], vals[3])
         resolution = vals[4]
 
-        response = dynamodb.put_item(
-            TableName=self.config['s3_index_table'],
-            Key={'object-key': {'S': object_key},
-                 'version': {'S': version},
-                 'ingest-job': {'S': "{}&{}&0".format(lookup_key, resolution)}},
-            ReturnConsumedCapacity='NONE',
-            ReturnItemCollectionMetrics='NONE',
-        )
-
-        if response['ResponseMetadata']['HTTPStatusCode'] != 200:
+        try:
+            dynamodb.put_item(
+                TableName=self.config['s3_index_table'],
+                Item={'object-key': {'S': object_key},
+                      'version': {'S': version},
+                      'ingest-job': {'S': "{}&{}&0".format(lookup_key, resolution)}},
+                ReturnConsumedCapacity='NONE',
+                ReturnItemCollectionMetrics='NONE',
+            )
+        except:
             raise SpdbError("Error adding object-key to index.",
                             ErrorCodes.SPDB_ERROR)
 
@@ -256,6 +245,7 @@ class AWSObjectStore(ObjectStore):
             temp_key = key.split("&", 1)[1]
 
             # Hash
+            # TODO: sha256 best hash to use?
             hash_str = hashlib.sha256(temp_key.encode()).hexdigest()
 
             # Combine
@@ -301,7 +291,7 @@ class AWSObjectStore(ObjectStore):
         object_keys = self.cached_cuboid_to_object_keys(key_list)
 
         # Trigger lambda for all keys
-        client = self.__session.client('lambda')
+        client = boto3.client('lambda')
 
         params = {"page_in_channel": page_in_chan,
                   "kv_config": kv_config,
@@ -334,7 +324,7 @@ class AWSObjectStore(ObjectStore):
         if not isinstance(key_list, list):
             key_list = [key_list]
 
-        s3 = self.__session.client('s3')
+        s3 = boto3.client('s3')
 
         byte_arrays = []
         for key in key_list:
@@ -361,7 +351,7 @@ class AWSObjectStore(ObjectStore):
         Returns:
 
         """
-        s3 = self.__session.client('s3')
+        s3 = boto3.client('s3')
 
         for key, cube in zip(key_list, cube_list):
             response = s3.put_object(
@@ -384,20 +374,25 @@ class AWSObjectStore(ObjectStore):
         Returns:
             None
         """
-        sns = self.__session.client('sns')
+        # Put page out job on the queue
+        sqs = boto3.client('sqs')
 
         msg_data = {"config": config_data,
                     "write_cuboid_key": write_cuboid_key}
 
-        msg = {'default': json.dumps(msg_data),
-               'sqs': json.dumps(msg_data),
-               'lambda': json.dumps(msg_data)}
-
-        response = sns.publish(
-                        TargetArn=self.config["flush_topic_arn"],
-                        Message=json.dumps(msg),
-                        MessageStructure='json')
+        response = sqs.send_message(QueueUrl=self.config["s3_flush_queue"],
+                                    Message=json.dumps(msg_data))
 
         if response['ResponseMetadata']['HTTPStatusCode'] != 200:
             raise SpdbError("Error sending SNS message to trigger page out operation.",
                             ErrorCodes.SPDB_ERROR)
+
+        # Trigger lambda to handle it
+        client = boto3.client('lambda')
+
+        response = client.invoke(
+            FunctionName=self.config["page_out_lambda_function"],
+            InvocationType='Event',
+            Payload=json.dumps(msg_data).encode())
+
+        # TODO: Add Error handling
