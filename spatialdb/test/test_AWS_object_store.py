@@ -23,6 +23,7 @@ import boto3
 from moto import mock_s3
 from moto import mock_dynamodb2
 from moto import mock_sqs
+from moto import mock_lambda
 
 
 class AWSObjectStoreTestMixin(object):
@@ -128,27 +129,38 @@ class AWSObjectStoreTestMixin(object):
         """Test method for paging in objects from S3"""
         os = AWSObjectStore(self.object_store_config)
 
-        expected_keys = ["1&1&1&0&0&12", "1&1&1&0&0&13", "1&1&1&0&0&14"]
-        test_keys = ["1&1&1&0&0&100", "1&1&1&0&0&13", "1&1&1&0&0&14",
-                     "1&1&1&0&0&15"]
+        cached_cuboid_keys = ["CACHED-CUBOID&1&1&1&0&0&12", "CACHED-CUBOID&1&1&1&0&0&13"]
+        page_in_channel = "dummy_channel"
+        kv_config = {"param1": 1, "param2": 2}
+        state_config = {"param1": 1, "param2": 2}
+        assert 1==0
 
-        expected_object_keys = os.cached_cuboid_to_object_keys(expected_keys)
+        #object_keys = os.page_in_objects(cached_cuboid_keys,
+        #                                 page_in_channel,
+        #                                 kv_config,
+        #                                 state_config)
 
-        # Populate table
-        for k in expected_object_keys:
-            os.add_cuboid_to_index(k)
+    def test_put_get_objects(self):
+        """Method to test putting and getting objects to and from S3"""
+        os = AWSObjectStore(self.object_store_config)
 
-        # Check for keys
-        exist_keys, missing_keys = os.cuboids_exist(test_keys, [1, 2])
+        cached_cuboid_keys = ["CACHED-CUBOID&1&1&1&0&0&12", "CACHED-CUBOID&1&1&1&0&0&13"]
+        fake_data = [b"aaaadddffffaadddfffaadddfff", b"fffddaaffddffdfffaaa"]
 
-        assert exist_keys == [1, 2]
-        assert missing_keys == []
+        object_keys = os.cached_cuboid_to_object_keys(cached_cuboid_keys)
 
+        os.put_objects(object_keys, fake_data)
+
+        returned_data = os.get_objects(object_keys)
+
+        for rdata, sdata in zip(returned_data, fake_data):
+            assert rdata == sdata
 
 
 class TestAWSObjectStore(AWSObjectStoreTestMixin, unittest.TestCase):
     table_created = False
 
+    @mock_dynamodb2
     def create_dynamodb_table(self):
         """Create the s3 index table"""
         client = boto3.client('dynamodb')
@@ -205,14 +217,45 @@ class TestAWSObjectStore(AWSObjectStoreTestMixin, unittest.TestCase):
 
         self.table_created = True
 
+    @mock_s3
+    def create_bucket(self):
+        client = boto3.client('s3')
+        response = client.create_bucket(
+            ACL='private',
+            Bucket=self.object_store_config['cuboid_bucket']
+        )
+
+    @mock_lambda
+    def create_lambda_page_in(self):
+        client = boto3.client('lambda')
+        response = client.create_function(
+            FunctionName=self.object_store_config['page_in_lambda_function'],
+            Runtime='python2.7',
+            Role='somerole',
+            Handler='test.handler',
+            Code={
+                'ZipFile': b'bytes',
+                'S3Bucket': 'string',
+                'S3Key': 'string',
+                'S3ObjectVersion': 'string'
+            },
+            Description='string',
+            Timeout=123,
+            MemorySize=123,
+            Publish=True | False,
+        )
+        print(response)
+
     def setUp(self):
         """ Create a diction of configuration values for the test resource. """
         self.mock_s3 = mock_s3()
         self.mock_dynamodb = mock_dynamodb2()
         self.mock_sqs = mock_sqs()
+        self.mock_lambda = mock_lambda()
         self.mock_s3.start()
         self.mock_dynamodb.start()
         self.mock_sqs.start()
+        self.mock_lambda.start()
 
         self.data = {}
         self.data['collection'] = {}
@@ -265,9 +308,11 @@ class TestAWSObjectStore(AWSObjectStoreTestMixin, unittest.TestCase):
         # Create AWS Resources needed for tests
         if not self.table_created:
             self.create_dynamodb_table()
+            self.create_bucket()
 
 
 def tearDown(self):
     self.mock_s3.stop()
     self.mock_dynamodb.stop()
     self.mock_sqs.stop()
+    self.mock_lambda.stop()

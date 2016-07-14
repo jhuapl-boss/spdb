@@ -171,7 +171,7 @@ class SpatialDB:
         page_in_chan = self.cache_state.create_page_in_channel()
 
         # Trigger page in operations
-        object_keys = self.objectio.page_in_objects(key_list, page_in_chan, timeout)
+        object_keys = self.objectio.page_in_objects(key_list, page_in_chan, self.kv_config, self.state_conf)
 
         # Wait for page in operation to complete
         self.cache_state.wait_for_page_in(object_keys, page_in_chan, timeout)

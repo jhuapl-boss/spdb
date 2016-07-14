@@ -4,3 +4,4 @@ mockredispy==2.9.3
 blosc==1.2.8
 nose2
 numpy
+moto

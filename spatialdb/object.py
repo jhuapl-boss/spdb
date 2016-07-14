@@ -272,14 +272,13 @@ class AWSObjectStore(ObjectStore):
 
         return output_keys
 
-    def page_in_objects(self, key_list, page_in_chan, timeout, kv_config, state_config):
+    def page_in_objects(self, key_list, page_in_chan, kv_config, state_config):
         """
         Method to page in objects from S3 to the Cache Database via Lambda invocation directly
 
         Args:
             key_list (list(str)): A list of cached-cuboid keys to retrieve from the object store
             page_in_chan (str): Redis channel used for sending status of page in operations
-            timeout (int): Number of seconds in which the operation should complete before an error should be raised
             kv_config (dict): Configuration information for the key-value engine interface
             state_config (dict): Configuration information for the state database interface
 
@@ -344,7 +343,7 @@ class AWSObjectStore(ObjectStore):
         """
 
         Args:
-            key_list (list(str)): A list of cached-cuboid keys to retrieve from the object store
+            key_list (list(str)): A list of object keys to put into the object store
             cube_list (list(bytes)): A list of blosc compressed cuboid data
             version: TBD version of the cuboid
 
