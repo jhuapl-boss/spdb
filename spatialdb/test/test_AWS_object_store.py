@@ -78,8 +78,6 @@ class AWSObjectStoreTestMixin(object):
             ReturnConsumedCapacity='NONE'
         )
 
-        # Test
-        assert len(response) == 1
         assert response['Item']['object-key']['S'] == dummy_key
         assert response['Item']['version']['S'] == 'a'
         assert response['Item']['ingest-job']['S'] == '1&1&1&0&0'
@@ -125,22 +123,21 @@ class AWSObjectStoreTestMixin(object):
         assert exist_keys == [1, 2]
         assert missing_keys == []
 
-    def test_page_in_objects(self):
-        """Test method for paging in objects from S3"""
+    def test_put_get_single_object(self):
+        """Method to test putting and getting objects to and from S3"""
         os = AWSObjectStore(self.object_store_config)
 
-        cached_cuboid_keys = ["CACHED-CUBOID&1&1&1&0&0&12", "CACHED-CUBOID&1&1&1&0&0&13"]
-        page_in_channel = "dummy_channel"
-        kv_config = {"param1": 1, "param2": 2}
-        state_config = {"param1": 1, "param2": 2}
-        assert 1==0
+        cached_cuboid_keys = ["CACHED-CUBOID&1&1&1&0&0&12"]
+        fake_data = [b"aaaadddffffaadddfffaadddfff"]
 
-        #object_keys = os.page_in_objects(cached_cuboid_keys,
-        #                                 page_in_channel,
-        #                                 kv_config,
-        #                                 state_config)
+        object_keys = os.cached_cuboid_to_object_keys(cached_cuboid_keys)
 
-    def test_put_get_objects(self):
+        os.put_objects(object_keys, fake_data)
+
+        returned_data = os.get_single_object(object_keys[0])
+        assert fake_data[0] == returned_data
+
+    def test_put_get_objects_syncronous(self):
         """Method to test putting and getting objects to and from S3"""
         os = AWSObjectStore(self.object_store_config)
 
@@ -152,14 +149,11 @@ class AWSObjectStoreTestMixin(object):
         os.put_objects(object_keys, fake_data)
 
         returned_data = os.get_objects(object_keys)
-
         for rdata, sdata in zip(returned_data, fake_data):
             assert rdata == sdata
 
 
 class TestAWSObjectStore(AWSObjectStoreTestMixin, unittest.TestCase):
-    table_created = False
-
     @mock_dynamodb2
     def create_dynamodb_table(self):
         """Create the s3 index table"""
@@ -225,37 +219,14 @@ class TestAWSObjectStore(AWSObjectStoreTestMixin, unittest.TestCase):
             Bucket=self.object_store_config['cuboid_bucket']
         )
 
-    @mock_lambda
-    def create_lambda_page_in(self):
-        client = boto3.client('lambda')
-        response = client.create_function(
-            FunctionName=self.object_store_config['page_in_lambda_function'],
-            Runtime='python2.7',
-            Role='somerole',
-            Handler='test.handler',
-            Code={
-                'ZipFile': b'bytes',
-                'S3Bucket': 'string',
-                'S3Key': 'string',
-                'S3ObjectVersion': 'string'
-            },
-            Description='string',
-            Timeout=123,
-            MemorySize=123,
-            Publish=True | False,
-        )
-        print(response)
-
     def setUp(self):
         """ Create a diction of configuration values for the test resource. """
         self.mock_s3 = mock_s3()
         self.mock_dynamodb = mock_dynamodb2()
         self.mock_sqs = mock_sqs()
-        self.mock_lambda = mock_lambda()
         self.mock_s3.start()
         self.mock_dynamodb.start()
         self.mock_sqs.start()
-        self.mock_lambda.start()
 
         self.data = {}
         self.data['collection'] = {}
@@ -306,13 +277,11 @@ class TestAWSObjectStore(AWSObjectStoreTestMixin, unittest.TestCase):
 
 
         # Create AWS Resources needed for tests
-        if not self.table_created:
-            self.create_dynamodb_table()
-            self.create_bucket()
+        self.create_dynamodb_table()
+        self.create_bucket()
 
+    def tearDown(self):
+        self.mock_s3.stop()
+        self.mock_dynamodb.stop()
+        self.mock_sqs.stop()
 
-def tearDown(self):
-    self.mock_s3.stop()
-    self.mock_dynamodb.stop()
-    self.mock_sqs.stop()
-    self.mock_lambda.stop()

@@ -32,7 +32,8 @@ class TestIntegrationRedisKVIOImageData(RedisKVIOTestMixin, unittest.TestCase):
         """Re-run a testing using the parameter based constructor"""
         config = {
                     "cache_host": self.config["aws"]["cache"],
-                    "cache_db": 1
+                    "cache_db": 1,
+                    "read_timeout": 86400
                 }
         rkv = RedisKVIO(config)
 

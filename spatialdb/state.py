@@ -88,29 +88,42 @@ class CacheStateDB(object):
         keys_set = set(keys)
 
         while True:
+            # Check if too much time has passed
+            if (datetime.now() - start_time).seconds > timeout:
+                # Took too long! Something must have crashed
+                self.delete_page_in_channel(page_in_channel)
+                raise SpdbError('All data failed to page in before timeout elapsed.',
+                                ErrorCodes.ASYNC_ERROR)
+
+            # If not, get a message
             msg = self.status_client_listener.get_message()
 
-            # Parse message
-            if msg["channel"] != page_in_channel:
+            # If message is not there, continue
+            if not msg:
+                continue
+
+            # Verify the message was from the correct channel
+            if msg["channel"].decode() != page_in_channel:
                 raise SpdbError('Message from incorrect channel received. Read operation aborted.',
                                 ErrorCodes.ASYNC_ERROR)
 
-            keys_set.remove(msg["data"])
+            # If you didn't get a message (e.g. a subscribe) continue
+            if msg["type"] != 'message':
+                continue
+
+            # Remove the key from the set you are waiting for
+            keys_set.remove(msg["data"].decode())
 
             # Check if you have completed
             if len(keys_set) == 0:
                 # Done!
                 break
 
-            # Check if too much time has passed
-            if (start_time - datetime.now()).seconds > timeout:
-                # Took too long! Something must have crashed
-                self.delete_page_in_channel(page_in_channel)
-                raise SpdbError('All data failed to page in before timeout elapsed.',
-                                ErrorCodes.ASYNC_ERROR)
-
-            # Sleep a bit
+            # Sleep a bit so you don't kill the DB
             time.sleep(0.05)
+
+        # If you get here you got everything! Clean up
+        self.delete_page_in_channel(page_in_channel)
 
     def notify_page_in_complete(self, page_in_channel, key):
         """
