@@ -5,3 +5,4 @@ blosc==1.2.8
 nose2
 numpy
 moto
+boto3
