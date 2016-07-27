@@ -16,8 +16,6 @@ from abc import ABCMeta, abstractmethod
 import json
 import hashlib
 from .error import SpdbError, ErrorCodes
-import asyncio
-import operator
 
 import boto3
 
@@ -300,7 +298,7 @@ class AWSObjectStore(ObjectStore):
                   "state_config": state_config,
                   "object_store_config": self.config}
 
-        # TODO: Make parallel
+        # TODO: Make concurrent
         for key in object_keys:
             params["object_key"] = key
 
@@ -335,47 +333,6 @@ class AWSObjectStore(ObjectStore):
                             ErrorCodes.OBJECT_STORE_ERROR)
 
         return response['Body'].read()
-
-    async def _get_single_object_async(self, key, version, idx):
-        """ Method to get multiple objects in parallel using coroutines
-
-        Args:
-            key_list (list(str)): A list of cached-cuboid keys to retrieve from the object store
-            version: TBD version of the cuboid
-
-        Returns:
-            (list(bytes)): A list of blosc compressed cuboid data
-
-        """
-        data = self.get_single_object(key, version)
-        return idx, data
-
-    def get_objects_async(self, key_list, version=None):
-        """ Method to get multiple objects asyncronously using coroutines
-
-        Args:
-            key_list (list(str)): A list of cached-cuboid keys to retrieve from the object store
-            version: TBD version of the cuboid
-
-        Returns:
-            (list(bytes)): A list of blosc compressed cuboid data
-
-        """
-        loop = asyncio.get_event_loop()
-
-        tasks = []
-        for idx, key in enumerate(key_list):
-            task = asyncio.ensure_future(self._get_single_object_async(key, version, idx))
-            tasks.append(task)
-
-        loop.run_until_complete(asyncio.wait(tasks))
-        loop.close()
-
-        # Sort and cleanup results
-        data = [x.result() for x in tasks]
-        data.sort(key=operator.itemgetter(0))
-        _, data = zip(*data)
-        return data
 
     def get_objects(self, key_list, version=None):
         """ Method to get multiple objects serially in a loop

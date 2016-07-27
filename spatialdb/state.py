@@ -32,8 +32,8 @@ class CacheStateDB(object):
 
         Params in the kv_config dictionary:
             state_client: Optional instance of a redis client that will be used directly
-            cache_state_host: If cache_client not provided, a string indicating the database host
-            cache_state_db: If cache_client not provided, an integer indicating the database to use
+            cache_state_host: If state_client not provided, a string indicating the database host
+            cache_state_db: If state_client not provided, an integer indicating the database to use
 
         """
         self.config = kv_conf
@@ -191,7 +191,6 @@ class CacheStateDB(object):
         # Use set diff to check for key
         result = self.status_client.sdiff(temp_page_out_key, "PAGE-OUT&{}&{}".format(lookup_key, resolution))
 
-        #TODO: double check output from sdiff
         if result:
             return False
         else:
