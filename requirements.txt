@@ -6,3 +6,4 @@ nose2
 numpy
 moto
 boto3
+hvac
