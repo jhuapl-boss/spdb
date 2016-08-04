@@ -146,6 +146,42 @@ class RedisKVIO(KVIO):
 
         return result
 
+    def cube_exists(self, key):
+        """Check if a cube exists in the cache by checking it's key
+
+        Args:
+            key (str): the cuboid key to check
+
+        Returns:
+            (bool): A boolean indicating if they key exists
+        """
+        try:
+            # Get the data from the DB
+            result = self.cache_client.exists(key)
+        except Exception as e:
+            raise SpdbError("Error retrieving cuboid status from cache database. {}".format(e),
+                            ErrorCodes.REDIS_ERROR)
+
+        return result
+
+    def delete_cube(self, key):
+        """Delete a cube from the cache db
+
+        Args:
+            key (str): the cuboid key to remove
+
+        Returns:
+            None
+        """
+        try:
+            # Get the data from the DB
+            result = self.cache_client.delete(key)
+        except Exception as e:
+            raise SpdbError("Error deleting cuboids from the cache database. {}".format(e),
+                            ErrorCodes.REDIS_ERROR)
+
+        return result
+
     def put_cubes(self, key_list, cube_list):
         """Store multiple cubes in the cache database
 
@@ -162,7 +198,7 @@ class RedisKVIO(KVIO):
             # Write data to redis
             self.cache_client.mset(dict(list(zip(key_list, cube_list))))
 
-            # Build check
+            # Set expire times
             for key in key_list:
                 self.cache_client.expire(key, self.kv_conf["read_timeout"])
 
@@ -233,3 +269,4 @@ class RedisKVIO(KVIO):
 #            None
 #        """
 #        pass
+

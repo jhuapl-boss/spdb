@@ -69,6 +69,31 @@ class CacheStateDBTestMixin(object):
 
         assert csdb.in_page_out(temp_page_out_key, lookup_key, resolution, morton, time_sample)
 
+    def test_remove_from_page_out(self):
+        """Test removing a cube from the page out list"""
+        csdb = CacheStateDB(self.config_data)
+
+        temp_page_out_key = "temp"
+        lookup_key = "1&2&3"
+        resolution = 4
+        morton = 1000
+        time_sample = 5
+
+        page_out_key = "PAGE-OUT&{}&{}".format(lookup_key, resolution)
+        assert not self.state_client.get(page_out_key)
+
+        assert not csdb.in_page_out(temp_page_out_key, lookup_key, resolution, morton, time_sample)
+
+        success, in_page_out = csdb.add_to_page_out(temp_page_out_key, lookup_key, resolution, morton, time_sample)
+        assert success
+        assert not in_page_out
+
+        assert csdb.in_page_out(temp_page_out_key, lookup_key, resolution, morton, time_sample)
+
+        # Fake the write-cuboid key
+        csdb.remove_from_page_out("WRITE-CUBOID&{}&{}&{}&{}&adsf34adsf49sdfj".format(lookup_key, resolution, time_sample, morton))
+        assert not csdb.in_page_out(temp_page_out_key, lookup_key, resolution, morton, time_sample)
+
     def test_add_to_delayed_write(self):
         """Test if a cube is in delayed write"""
         csdb = CacheStateDB(self.config_data)

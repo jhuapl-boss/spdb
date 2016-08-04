@@ -14,6 +14,7 @@
 
 
 from .resource import BossResource, Collection, CoordinateFrame, Experiment, Channel, Layer
+import json
 
 
 class BossResourceBasic(BossResource):
@@ -27,11 +28,25 @@ class BossResourceBasic(BossResource):
     Attributes:
       data (dict): a dictionary containing all the values to configure the resource
     """
-    def __init__(self, data):
+    def __init__(self, data=None):
         # call the base class constructor
         BossResource.__init__(self)
 
         self.data = data
+
+    def from_json(self, json_str):
+        """
+        Static method to populate a basic resource from a json string
+        Args:
+            json_str (str): JSON encoded resource
+
+        Returns:
+           (BossResourceBasic): An instantiated basic resource
+
+        """
+        self.data = json.loads(json_str)
+        self._boss_key = self.data['boss_key']
+        self._lookup_key = self.data['lookup_key']
 
     # Methods to populate class properties
     def populate_collection(self):
@@ -86,7 +101,7 @@ class BossResourceBasic(BossResource):
                                 self.data['channel_layer']['description'],
                                 self.data['channel_layer']['datatype'],
                                 self.data['channel_layer']['base_resolution'],
-                                self.data['channel_layer']['layer_map'])
+                                self.data['channel_layer']['parent_channels'])
 
     def populate_boss_key(self):
         """

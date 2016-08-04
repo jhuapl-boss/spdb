@@ -14,6 +14,7 @@
 
 from abc import ABCMeta, abstractmethod
 import numpy as np
+import json
 
 
 class Collection:
@@ -176,7 +177,6 @@ class BossResource(metaclass=ABCMeta):
       _experiment (spdb.project.resource.Experiment): A experiment instance for the resource
       _channel (spdb.project.resource.Channel): A channel instance for the resource (if a channel)
       _layer (spdb.project.resource.Layer): A layer instance for the resource (if a layer)
-      _time_samples (list): The time sample index for the resource
       _boss_key (str): The unique, plain text key identifying the resource - used to query for the lookup key
       _lookup_key (str): The unique key identifying the resource that enables renaming resources and physically used to
       ID data in databases
@@ -187,9 +187,40 @@ class BossResource(metaclass=ABCMeta):
         self._experiment = None
         self._channel = None
         self._layer = None
-        self._time_samples = []
         self._boss_key = None
         self._lookup_key = None
+
+    def to_json(self):
+        """
+        Method to serialize a resource to a JSON object
+        Returns:
+            (str): a JSON encoded string
+        """
+        # Populate everything
+        self.populate_collection()
+        self.populate_coord_frame()
+        self.populate_experiment()
+        self.populate_channel_or_layer()
+        self.populate_boss_key()
+        self.populate_lookup_key()
+
+        # Collect Data
+        data = {"collection": self._collection.__dict__,
+                "coord_frame": self._coord_frame.__dict__,
+                "experiment": self._experiment.__dict__,
+                "boss_key": self._boss_key,
+                "lookup_key": self._lookup_key,
+                }
+
+        if self._channel:
+            data['channel_layer'] = self._channel.__dict__
+            data['channel_layer']['is_channel'] = True
+        else:
+            data['channel_layer'] = self._layer.__dict__
+            data['channel_layer']['is_channel'] = False
+
+        # Serialize and return
+        return json.dumps(data)
 
     # Methods to populate class properties
     @abstractmethod
@@ -434,25 +465,25 @@ class BossResource(metaclass=ABCMeta):
     # TODO: Add delete support
     def delete_collection(self):
         """Delete the Collection"""
-        pass
+        return NotImplemented
 
     def delete_experiment(self):
         """Delete the experiment"""
-        pass
+        return NotImplemented
 
     def delete_coordinate_frame(self):
         """Delete the coordinate frame"""
-        pass
+        return NotImplemented
 
     def delete_channel(self):
         """Delete a channel"""
-        pass
+        return NotImplemented
 
     def delete_layer(self):
         """Delete a channel"""
-        pass
+        return NotImplemented
 
     def delete_time_sample(self, time_sample=None):
         """Delete the time sample"""
-        pass
+        return NotImplemented
 

@@ -319,7 +319,7 @@ class AWSObjectStore(ObjectStore):
             version: TBD version of the cuboid
 
         Returns:
-            (list(bytes)): A list of blosc compressed cuboid data
+            (bytes): A list of blosc compressed cuboid data
 
         """
         s3 = boto3.client('s3')
@@ -385,13 +385,14 @@ class AWSObjectStore(ObjectStore):
                 raise SpdbError("Error writing cuboid to S3.",
                                 ErrorCodes.OBJECT_STORE_ERROR)
 
-    def trigger_page_out(self, config_data, write_cuboid_key):
+    def trigger_page_out(self, config_data, write_cuboid_key, resource):
         """
-        Method to trigger lambda function to page out via SNS message that is collected by SQS
+        Method to invoke lambda function to page out via data in an SQS message
 
         Args:
             config_data (dict): Dictionary of configuration dictionaries
             write_cuboid_key (str): Unique write-cuboid to be flushed to S3
+            resource (str): json encoded resource for the given write cuboid key
 
         Returns:
             None
@@ -400,7 +401,8 @@ class AWSObjectStore(ObjectStore):
         sqs = boto3.client('sqs')
 
         msg_data = {"config": config_data,
-                    "write_cuboid_key": write_cuboid_key}
+                    "write_cuboid_key": write_cuboid_key,
+                    "resource": resource.to_json()}
 
         response = sqs.send_message(QueueUrl=self.config["s3_flush_queue"],
                                     Message=json.dumps(msg_data))

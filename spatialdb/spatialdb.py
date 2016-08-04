@@ -156,6 +156,7 @@ class SpatialDB:
 
         return output_cubes
 
+    # Lambda Page In Methods
     def page_in_cubes(self, key_list, timeout=60):
         """
         Method to trigger the page-in of cubes from the object store, waiting until all are available
@@ -199,194 +200,8 @@ class SpatialDB:
         # Notify complete
         self.cache_state.notify_page_in_complete(page_in_channel, key_list[0])
 
-    # TODO: MAYBE CAN REMOVE
-    def get_cached_cubes(self, resource, resolution, time_sample_range, morton_idx_list):
-        """Load an array of cuboids from the cache key-value store as raw compressed byte arrays dealing with
-        cache misses if necessary (future)
-
-        Args:
-            resource (spdb.project.BossResource): Data model info based on the request or target resource
-            resolution (int): the resolution level
-            time_sample_range (list(int)): a range of time samples to get [start, stop)
-            morton_idx_list (list(int)): a list of Morton ID of the cuboids to get
-
-        Returns:
-            list(cube.Cube): The cuboid data with time-series support, packed into Cube instances, sorted by morton id
-        """
-        if self.s3io:
-            raise SpdbError('Not Supported', 'S3 backend not yet supported',
-                            ErrorCodes.FUTURE)
-            #TODO: Insert S3 integration here
-            ## Get the ids of the cuboids you need - only gives ids to be fetched
-            #ids_to_fetch = self.kvio.get_cube_index(resource, resolution, morton_idx_list)
-
-            ## Check if the index exists inside the cache database or if you must fetch from S3
-            #if ids_to_fetch:
-            #    logger.info("Cache miss on get_cubes. Loading from S3: {}".format(morton_idx_list))
-            #    super_cuboids = self.s3io.get_cubes(resource, ids_to_fetch, resolution)
-
-            #    # Iterating over super cuboids and load into the cache kv-stores
-            #    for supercuboid_idx_list, supercuboid_list in super_cuboids:
-            #        # call put_cubes and update index in the table before returning data
-            #        self.put_cubes(resource, supercuboid_idx_list, resolution, supercuboid_list, update=True)
-
-        # Get all cuboids
-        cuboids = [x for x in self.kvio.get_cubes(resource, resolution, range(*time_sample_range), morton_idx_list)]
-
-        # Group by morton
-        cuboids = sorted(cuboids, key=lambda element: (element[1], element[0]))
-
-        # Unpack to lists
-        time, morton, cube_bytes = zip(*cuboids)
-
-        # Get groups of time samples by morton ID
-        morton = np.array(morton)
-        morton_boundaries = np.where(morton[:-1] != morton[1:])[0]
-        morton_boundaries += 1
-        morton_boundaries = np.append(morton_boundaries, len(morton))
-
-        if len(morton_boundaries) == len(morton):
-            # Single time samples only!
-            not_time_series = True
-        else:
-            not_time_series = False
-
-        start = 0
-        output_cubes = []
-        for end in morton_boundaries:
-            # Create a temporary cube instance
-            temp_cube = Cube.create_cube(resource)
-            temp_cube.morton_id = morton[start]
-
-            # populate with all the time samples
-            if not_time_series:
-                temp_cube.from_blosc_numpy(cube_bytes[start:end])
-            else:
-                temp_cube.from_blosc_numpy(cube_bytes[start:end], [time[start], time[end - 1] + 1])
-
-            # Save for output
-            output_cubes.append(temp_cube)
-
-            start = end
-
-        return output_cubes
-
-    # TODO: MAYBE CAN REMOVE
-    def put_cached_cubes(self, resource, resolution, morton_idx_list, cube_list):
-        """Insert a list of Cube instances into the cache key-value store.
-
-        ALL TIME SAMPLES IN THE CUBE WILL BE INSERTED
-
-        Args:
-            resource (project.BossResource): Data model info based on the request or target resource
-            resolution (int): the resolution level
-            morton_idx_list (list(int)): a list of Morton ID with 1-1 mapping to the cube_list
-            cube_list (list[cube.Cube]): list of Cube instances to store in the cache key-value store
-
-        Returns:
-
-        """
-        # If cubes are time-series, insert 1 cube at a time, but all time points. If not, insert all cubes at once
-        if cube_list[0].is_time_series:
-            for m, c in zip(morton_idx_list, cube_list):
-                byte_arrays = []
-                time = []
-                for cnt, t in enumerate(range(*c.time_range)):
-                    time.append(t)
-                    byte_arrays.append(c.get_blosc_numpy_by_time_index(cnt))
-
-                # Add cubes to cache
-                self.kvio.put_cubes(resource, resolution, time, [m], byte_arrays)
-
-                # Add cubes to cache index if successful
-                self.kvio.put_cube_index(resource, resolution, time, [m])
-        else:
-            # Collect all cubes and insert at once
-            byte_arrays = []
-            time = []
-            for c in cube_list:
-                for t in range(*c.time_range):
-                    time.append(0)
-                    byte_arrays.append(c.get_blosc_numpy_by_time_index(0))
-
-            # Add cubes to cache
-            self.kvio.put_cubes(resource, resolution, time, morton_idx_list, byte_arrays)
-
-            # Add cubes to cache index if successful
-            self.kvio.put_cube_index(resource, resolution, time, morton_idx_list)
-
-    # TODO: MAYBE CAN REMOVE
-    def put_write_cubes(self, resource, resolution, morton_idx_list, cube_list):
-        """Insert a list of Cube instances into the cache key-value store.
-
-        ALL TIME SAMPLES IN THE CUBE WILL BE INSERTED
-
-        Args:
-            resource (project.BossResource): Data model info based on the request or target resource
-            resolution (int): the resolution level
-            morton_idx_list (list(int)): a list of Morton ID with 1-1 mapping to the cube_list
-            cube_list (list[cube.Cube]): list of Cube instances to store in the cache key-value store
-
-        Returns:
-
-        """
-        # If cubes are time-series, insert 1 cube at a time, but all time points. If not, insert all cubes at once
-        if cube_list[0].is_time_series:
-            for m, c in zip(morton_idx_list, cube_list):
-                byte_arrays = []
-                time = []
-                for cnt, t in enumerate(range(*c.time_range)):
-                    time.append(t)
-                    byte_arrays.append(c.get_blosc_numpy_by_time_index(cnt))
-
-                # Add cubes to cache
-                self.kvio.put_cubes(resource, resolution, time, [m], byte_arrays)
-
-                # Add cubes to cache index if successful
-                self.kvio.put_cube_index(resource, resolution, time, [m])
-        else:
-            # Collect all cubes and insert at once
-            byte_arrays = []
-            time = []
-            for c in cube_list:
-                for t in range(*c.time_range):
-                    time.append(0)
-                    byte_arrays.append(c.get_blosc_numpy_by_time_index(0))
-
-            # Add cubes to cache
-            self.kvio.put_cubes(resource, resolution, time, morton_idx_list, byte_arrays)
-
-            # Add cubes to cache index if successful
-            self.kvio.put_cube_index(resource, resolution, time, morton_idx_list)
-
-    # TODO: MAYBE CAN REMOVE
-    def put_single_cube(self, key, cube):
-        """Insert a Cube into the cache key-value store. Supports time series and will put all time points in db.
-
-        ALL TIME SAMPLES IN THE CUBE WILL BE INSERTED
-
-        Args:
-            resource (project.BossResource): Data model info based on the request or target resource
-            resolution (int): the resolution level
-            morton_idx (int): Morton ID of the cube
-            cube (cube.Cube): Cube instance to store in the cache key-value store
-
-
-        Returns:
-
-        """
-        time_points = range(*cube.time_range)
-
-        t, byte_arrays = zip(*collections.deque(cube.get_all_blosc_numpy_arrays()))
-
-        # Add cube to cache
-        self.kvio.put_cubes(resource, resolution, time_points, [morton_idx], byte_arrays)
-
-        # Add cubes to cache index if successful
-        self.kvio.put_cube_index(resource, resolution, time_points, [morton_idx])
-
     # Status Methods
-    def project_locked(self, lookup_key):
+    def resource_locked(self, lookup_key):
         """
         Method to check if a given channel/layer is locked for writing due to an error
 
@@ -805,3 +620,204 @@ class SpatialDB:
                                 else:
                                     # Ended up in page out during transaction
                                     continue
+
+
+
+
+
+
+
+
+
+
+
+
+    # TODO: MAYBE CAN REMOVE
+
+    def get_cached_cubes(self, resource, resolution, time_sample_range, morton_idx_list):
+        """Load an array of cuboids from the cache key-value store as raw compressed byte arrays dealing with
+        cache misses if necessary (future)
+
+        Args:
+            resource (spdb.project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            time_sample_range (list(int)): a range of time samples to get [start, stop)
+            morton_idx_list (list(int)): a list of Morton ID of the cuboids to get
+
+        Returns:
+            list(cube.Cube): The cuboid data with time-series support, packed into Cube instances, sorted by morton id
+        """
+        if self.s3io:
+            raise SpdbError('Not Supported', 'S3 backend not yet supported',
+                            ErrorCodes.FUTURE)
+            # TODO: Insert S3 integration here
+            ## Get the ids of the cuboids you need - only gives ids to be fetched
+            # ids_to_fetch = self.kvio.get_cube_index(resource, resolution, morton_idx_list)
+
+            ## Check if the index exists inside the cache database or if you must fetch from S3
+            # if ids_to_fetch:
+            #    logger.info("Cache miss on get_cubes. Loading from S3: {}".format(morton_idx_list))
+            #    super_cuboids = self.s3io.get_cubes(resource, ids_to_fetch, resolution)
+
+            #    # Iterating over super cuboids and load into the cache kv-stores
+            #    for supercuboid_idx_list, supercuboid_list in super_cuboids:
+            #        # call put_cubes and update index in the table before returning data
+            #        self.put_cubes(resource, supercuboid_idx_list, resolution, supercuboid_list, update=True)
+
+        # Get all cuboids
+        cuboids = [x for x in self.kvio.get_cubes(resource, resolution, range(*time_sample_range), morton_idx_list)]
+
+        # Group by morton
+        cuboids = sorted(cuboids, key=lambda element: (element[1], element[0]))
+
+        # Unpack to lists
+        time, morton, cube_bytes = zip(*cuboids)
+
+        # Get groups of time samples by morton ID
+        morton = np.array(morton)
+        morton_boundaries = np.where(morton[:-1] != morton[1:])[0]
+        morton_boundaries += 1
+        morton_boundaries = np.append(morton_boundaries, len(morton))
+
+        if len(morton_boundaries) == len(morton):
+            # Single time samples only!
+            not_time_series = True
+        else:
+            not_time_series = False
+
+        start = 0
+        output_cubes = []
+        for end in morton_boundaries:
+            # Create a temporary cube instance
+            temp_cube = Cube.create_cube(resource)
+            temp_cube.morton_id = morton[start]
+
+            # populate with all the time samples
+            if not_time_series:
+                temp_cube.from_blosc_numpy(cube_bytes[start:end])
+            else:
+                temp_cube.from_blosc_numpy(cube_bytes[start:end], [time[start], time[end - 1] + 1])
+
+            # Save for output
+            output_cubes.append(temp_cube)
+
+            start = end
+
+        return output_cubes
+
+        # TODO: MAYBE CAN REMOVE
+
+    def put_cached_cubes(self, resource, resolution, morton_idx_list, cube_list):
+        """Insert a list of Cube instances into the cache key-value store.
+
+        ALL TIME SAMPLES IN THE CUBE WILL BE INSERTED
+
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            morton_idx_list (list(int)): a list of Morton ID with 1-1 mapping to the cube_list
+            cube_list (list[cube.Cube]): list of Cube instances to store in the cache key-value store
+
+        Returns:
+
+        """
+        # If cubes are time-series, insert 1 cube at a time, but all time points. If not, insert all cubes at once
+        if cube_list[0].is_time_series:
+            for m, c in zip(morton_idx_list, cube_list):
+                byte_arrays = []
+                time = []
+                for cnt, t in enumerate(range(*c.time_range)):
+                    time.append(t)
+                    byte_arrays.append(c.get_blosc_numpy_by_time_index(cnt))
+
+                # Add cubes to cache
+                self.kvio.put_cubes(resource, resolution, time, [m], byte_arrays)
+
+                # Add cubes to cache index if successful
+                self.kvio.put_cube_index(resource, resolution, time, [m])
+        else:
+            # Collect all cubes and insert at once
+            byte_arrays = []
+            time = []
+            for c in cube_list:
+                for t in range(*c.time_range):
+                    time.append(0)
+                    byte_arrays.append(c.get_blosc_numpy_by_time_index(0))
+
+            # Add cubes to cache
+            self.kvio.put_cubes(resource, resolution, time, morton_idx_list, byte_arrays)
+
+            # Add cubes to cache index if successful
+            self.kvio.put_cube_index(resource, resolution, time, morton_idx_list)
+
+            # TODO: MAYBE CAN REMOVE
+
+    def put_write_cubes(self, resource, resolution, morton_idx_list, cube_list):
+        """Insert a list of Cube instances into the cache key-value store.
+
+        ALL TIME SAMPLES IN THE CUBE WILL BE INSERTED
+
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            morton_idx_list (list(int)): a list of Morton ID with 1-1 mapping to the cube_list
+            cube_list (list[cube.Cube]): list of Cube instances to store in the cache key-value store
+
+        Returns:
+
+        """
+        # If cubes are time-series, insert 1 cube at a time, but all time points. If not, insert all cubes at once
+        if cube_list[0].is_time_series:
+            for m, c in zip(morton_idx_list, cube_list):
+                byte_arrays = []
+                time = []
+                for cnt, t in enumerate(range(*c.time_range)):
+                    time.append(t)
+                    byte_arrays.append(c.get_blosc_numpy_by_time_index(cnt))
+
+                # Add cubes to cache
+                self.kvio.put_cubes(resource, resolution, time, [m], byte_arrays)
+
+                # Add cubes to cache index if successful
+                self.kvio.put_cube_index(resource, resolution, time, [m])
+        else:
+            # Collect all cubes and insert at once
+            byte_arrays = []
+            time = []
+            for c in cube_list:
+                for t in range(*c.time_range):
+                    time.append(0)
+                    byte_arrays.append(c.get_blosc_numpy_by_time_index(0))
+
+            # Add cubes to cache
+            self.kvio.put_cubes(resource, resolution, time, morton_idx_list, byte_arrays)
+
+            # Add cubes to cache index if successful
+            self.kvio.put_cube_index(resource, resolution, time, morton_idx_list)
+
+            # TODO: MAYBE CAN REMOVE
+
+    def put_single_cube(self, key, cube):
+        """Insert a Cube into the cache key-value store. Supports time series and will put all time points in db.
+
+        ALL TIME SAMPLES IN THE CUBE WILL BE INSERTED
+
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            morton_idx (int): Morton ID of the cube
+            cube (cube.Cube): Cube instance to store in the cache key-value store
+
+
+        Returns:
+
+        """
+        time_points = range(*cube.time_range)
+
+        t, byte_arrays = zip(*collections.deque(cube.get_all_blosc_numpy_arrays()))
+
+        # Add cube to cache
+        self.kvio.put_cubes(resource, resolution, time_points, [morton_idx], byte_arrays)
+
+        # Add cubes to cache index if successful
+        self.kvio.put_cube_index(resource, resolution, time_points, [morton_idx])

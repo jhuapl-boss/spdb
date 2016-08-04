@@ -385,7 +385,7 @@ class TestAnnotateCube64(unittest.TestCase):
         data['channel_layer']['datatype'] = 'uint64'
         data['channel_layer']['max_time_step'] = 0
         data['channel_layer']['base_resolution'] = 0
-        data['channel_layer']['layer_map'] = [0]
+        data['channel_layer']['parent_channels'] = [0]
 
         resource = BossResourceBasic(data)
 
@@ -434,7 +434,7 @@ class TestAnnotateCube64(unittest.TestCase):
         data['channel_layer']['datatype'] = 'uint64'
         data['channel_layer']['max_time_step'] = 0
         data['channel_layer']['base_resolution'] = 0
-        data['channel_layer']['layer_map'] = [0]
+        data['channel_layer']['parent_channels'] = [0]
 
         resource = BossResourceBasic(data)
 

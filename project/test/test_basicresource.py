@@ -14,6 +14,7 @@
 
 import unittest
 import numpy as np
+import json
 
 from spdb.project import BossResourceBasic
 
@@ -27,8 +28,8 @@ class TestBasicResource(unittest.TestCase):
 
         """
         data = {}
-        data['boss_key'] = ['col1&exp1&ch1&0']
-        data['lookup_key'] = ['1&1&1&0']
+        data['boss_key'] = ['col1&exp1&ch1']
+        data['lookup_key'] = ['1&1&1']
         data['collection'] = {}
         data['collection']['name'] = "col1"
         data['collection']['description'] = "Test collection 1"
@@ -154,7 +155,7 @@ class TestBasicResource(unittest.TestCase):
         setup_data['channel_layer']['name'] = "layer1"
         setup_data['channel_layer']['description'] = "Test layer 1"
         setup_data['channel_layer']['is_channel'] = False
-        setup_data['channel_layer']['layer_map'] = ['ch1']
+        setup_data['channel_layer']['parent_channels'] = ['ch1']
         setup_data['channel_layer']['base_resolution'] = 2
         resource = BossResourceBasic(setup_data)
 
@@ -166,7 +167,7 @@ class TestBasicResource(unittest.TestCase):
         assert channel.name == setup_data['channel_layer']['name']
         assert channel.description == setup_data['channel_layer']['description']
         assert channel.datatype == setup_data['channel_layer']['datatype']
-        assert channel.parent_channels == setup_data['channel_layer']['layer_map']
+        assert channel.parent_channels == setup_data['channel_layer']['parent_channels']
         assert channel.base_resolution == setup_data['channel_layer']['base_resolution']
 
     def test_basic_resource_get_boss_key(self):
@@ -217,7 +218,6 @@ class TestBasicResource(unittest.TestCase):
 
         assert resource.get_bit_depth() == 8
 
-
     def test_basic_resource_numpy_data_type(self):
         """Test basic get bit depth interface
 
@@ -230,3 +230,145 @@ class TestBasicResource(unittest.TestCase):
 
         assert resource.get_numpy_data_type() == np.uint8
 
+    def test_basic_resource_to_json(self):
+        """Test basic to json serialization method
+
+        Returns:
+            None
+
+        """
+        setup_data = self.get_image_dict()
+        resource = BossResourceBasic(setup_data)
+
+        data = resource.to_json()
+
+        data = json.loads(data)
+
+        assert data['channel_layer']['description'] == 'Test channel 1'
+        assert data['channel_layer']['datatype'] == 'uint8'
+        assert data['channel_layer']['name'] == 'ch1'
+        assert data['channel_layer']['is_channel'] == True
+
+        assert data['collection']['description'] == 'Test collection 1'
+        assert data['collection']['name'] == 'col1'
+
+        assert data['experiment']['name'] == 'exp1'
+        assert data['experiment']['max_time_sample'] == 0
+
+        assert data['lookup_key'] == ['1&1&1']
+        assert data['boss_key'] == ['col1&exp1&ch1']
+
+    def test_basic_resource_from_json(self):
+        """Test basic to json deserialization method
+
+        Returns:
+            None
+
+        """
+        setup_data = self.get_image_dict()
+        resource1 = BossResourceBasic(setup_data)
+
+        resource2 = BossResourceBasic()
+        resource2.from_json(resource1.to_json())
+
+        # Check Collection
+        col = resource2.get_collection()
+        assert col.name == setup_data['collection']['name']
+        assert col.description == setup_data['collection']['description']
+
+        # Check coord frame
+        coord = resource2.get_coord_frame()
+        assert coord.name == setup_data['coord_frame']['name']
+        assert coord.description == setup_data['coord_frame']['description']
+        assert coord.x_start == setup_data['coord_frame']['x_start']
+        assert coord.x_stop == setup_data['coord_frame']['x_stop']
+        assert coord.y_start == setup_data['coord_frame']['y_start']
+        assert coord.y_stop == setup_data['coord_frame']['y_stop']
+        assert coord.z_start == setup_data['coord_frame']['z_start']
+        assert coord.z_stop == setup_data['coord_frame']['z_stop']
+        assert coord.x_voxel_size == setup_data['coord_frame']['x_voxel_size']
+        assert coord.y_voxel_size == setup_data['coord_frame']['y_voxel_size']
+        assert coord.z_voxel_size == setup_data['coord_frame']['z_voxel_size']
+        assert coord.voxel_unit == setup_data['coord_frame']['voxel_unit']
+        assert coord.time_step == setup_data['coord_frame']['time_step']
+        assert coord.time_step_unit == setup_data['coord_frame']['time_step_unit']
+
+        # Check exp
+        exp = resource2.get_experiment()
+        assert exp.name == setup_data['experiment']['name']
+        assert exp.description == setup_data['experiment']['description']
+        assert exp.num_hierarchy_levels == setup_data['experiment']['num_hierarchy_levels']
+        assert exp.hierarchy_method == setup_data['experiment']['hierarchy_method']
+        assert exp.max_time_sample == setup_data['experiment']['max_time_sample']
+
+        # Check channel
+        channel = resource2.get_channel()
+        assert channel.name == setup_data['channel_layer']['name']
+        assert channel.description == setup_data['channel_layer']['description']
+        assert channel.datatype == setup_data['channel_layer']['datatype']
+
+        # check keys
+        assert resource2.get_lookup_key() == setup_data['lookup_key']
+        assert resource2.get_boss_key() == setup_data['boss_key']
+
+    def test_basic_resource_from_json_layer(self):
+        """Test basic to json deserialization method
+
+        Returns:
+            None
+
+        """
+        setup_data = self.get_image_dict()
+        setup_data['channel_layer']['name'] = "layer1"
+        setup_data['channel_layer']['description'] = "Test layer 1"
+        setup_data['channel_layer']['is_channel'] = False
+        setup_data['channel_layer']['parent_channels'] = ['ch1']
+        setup_data['channel_layer']['base_resolution'] = 2
+        resource1 = BossResourceBasic(setup_data)
+
+        resource2 = BossResourceBasic()
+        resource2.from_json(resource1.to_json())
+
+        # Check Collection
+        col = resource2.get_collection()
+        assert col.name == setup_data['collection']['name']
+        assert col.description == setup_data['collection']['description']
+
+        # Check coord frame
+        coord = resource2.get_coord_frame()
+        assert coord.name == setup_data['coord_frame']['name']
+        assert coord.description == setup_data['coord_frame']['description']
+        assert coord.x_start == setup_data['coord_frame']['x_start']
+        assert coord.x_stop == setup_data['coord_frame']['x_stop']
+        assert coord.y_start == setup_data['coord_frame']['y_start']
+        assert coord.y_stop == setup_data['coord_frame']['y_stop']
+        assert coord.z_start == setup_data['coord_frame']['z_start']
+        assert coord.z_stop == setup_data['coord_frame']['z_stop']
+        assert coord.x_voxel_size == setup_data['coord_frame']['x_voxel_size']
+        assert coord.y_voxel_size == setup_data['coord_frame']['y_voxel_size']
+        assert coord.z_voxel_size == setup_data['coord_frame']['z_voxel_size']
+        assert coord.voxel_unit == setup_data['coord_frame']['voxel_unit']
+        assert coord.time_step == setup_data['coord_frame']['time_step']
+        assert coord.time_step_unit == setup_data['coord_frame']['time_step_unit']
+
+        # Check exp
+        exp = resource2.get_experiment()
+        assert exp.name == setup_data['experiment']['name']
+        assert exp.description == setup_data['experiment']['description']
+        assert exp.num_hierarchy_levels == setup_data['experiment']['num_hierarchy_levels']
+        assert exp.hierarchy_method == setup_data['experiment']['hierarchy_method']
+        assert exp.max_time_sample == setup_data['experiment']['max_time_sample']
+
+        # Check channel
+        assert not resource2.get_channel()
+
+        layer = resource2.get_layer()
+        assert layer.name == setup_data['channel_layer']['name']
+        assert layer.description == setup_data['channel_layer']['description']
+        assert layer.datatype == setup_data['channel_layer']['datatype']
+        assert layer.parent_channels == setup_data['channel_layer']['parent_channels']
+        assert layer.base_resolution == setup_data['channel_layer']['base_resolution']
+
+        # check keys
+        assert resource2.get_lookup_key() == setup_data['lookup_key']
+        assert resource2.get_boss_key() == setup_data['boss_key']

@@ -70,6 +70,15 @@ class RedisKVIOTestMixin(object):
         assert all_keys[cached[0]] == "CACHED-CUBOID&4&2&1&2&0&34"
         assert all_keys[cached[1]] == "CACHED-CUBOID&4&2&1&2&0&35"
 
+    def test_write_cuboid_to_cache_key(self):
+        """Test converting from write cuboid keys to cache keys"""
+        # Put some keys in the cache
+        rkv = RedisKVIO(self.config_data)
+        write_cuboid_keys = rkv.generate_write_cuboid_keys(self.resource, 2, [0], [34])
+        cache_cuboid_key = rkv.write_cuboid_to_cache_key(write_cuboid_keys[0])
+
+        assert cache_cuboid_key == "CACHED-CUBOID&4&2&1&2&0&34"
+
     def test_put_cubes(self):
         """Test adding cubes to the cache"""
         resolution = 1
@@ -130,6 +139,59 @@ class RedisKVIOTestMixin(object):
             assert c[1] == 0
             data_retrieved = blosc.unpack_array(c[2])
             np.testing.assert_array_equal(data_retrieved, blosc.unpack_array(d))
+
+    def test_cube_exists(self):
+        """Test checking if cubes exist"""
+        resolution = 1
+        rkv = RedisKVIO(self.config_data)
+
+        # Clean up data
+        self.cache_client.flushdb()
+
+        data1 = np.random.randint(50, size=[10, 15, 5])
+        data_packed1 = blosc.pack_array(data1)
+        data = [data_packed1]
+
+        # Add items
+        morton_id = [112]
+        keys = rkv.generate_cached_cuboid_keys(self.resource, 2, [0], morton_id)
+
+        result = rkv.cube_exists(keys[0])
+        assert not result
+
+        rkv.put_cubes(keys, data)
+
+        result = rkv.cube_exists(keys[0])
+        assert result
+
+    def test_delete_cube(self):
+        """Test cube delete method"""
+        resolution = 1
+        rkv = RedisKVIO(self.config_data)
+
+        # Clean up data
+        self.cache_client.flushdb()
+
+        data1 = np.random.randint(50, size=[10, 15, 5])
+        data_packed1 = blosc.pack_array(data1)
+        data = [data_packed1]
+
+        # Add items
+        morton_id = [112]
+        keys = rkv.generate_cached_cuboid_keys(self.resource, 2, [0], morton_id)
+
+        result = rkv.cube_exists(keys[0])
+        assert not result
+
+        rkv.put_cubes(keys, data)
+
+        result = rkv.cube_exists(keys[0])
+        assert result
+
+        rkv.delete_cube(keys[0])
+
+        result = rkv.cube_exists(keys[0])
+        assert not result
 
 
 @patch('redis.StrictRedis', mock_strict_redis_client)

@@ -20,14 +20,14 @@ from .error import SpdbError, ErrorCodes
 
 
 class CacheStateDB(object):
-    def __init__(self, kv_conf):
+    def __init__(self, config):
         """
         A class to implement the Boss cache state database and associated functionality
 
         Database is a redis instance.
 
         Args:
-            kv_conf(dict): Dictionary containing configuration details for the key-value store
+            config(dict): Dictionary containing configuration details for the key-value store
 
 
         Params in the kv_config dictionary:
@@ -36,7 +36,7 @@ class CacheStateDB(object):
             cache_state_db: If state_client not provided, an integer indicating the database to use
 
         """
-        self.config = kv_conf
+        self.config = config
 
         # Create client
         if "state_client" in self.config:
@@ -181,7 +181,7 @@ class CacheStateDB(object):
         try:
             # Create temp set
             pipe = self.status_client.pipeline()
-            pipe.sadd(temp_page_out_key, "{}&{}".format(morton, time_sample))
+            pipe.sadd(temp_page_out_key, "{}&{}".format(time_sample, morton))
             pipe.expire(temp_page_out_key, 30)
             result = pipe.execute()
         except Exception as e:
@@ -256,7 +256,7 @@ class CacheStateDB(object):
             pipe.watch(page_out_key)
             pipe.multi()
             pipe.sdiff(temp_page_out_key, page_out_key)
-            pipe.sadd(page_out_key, "{}&{}".format(morton, time_sample))
+            pipe.sadd(page_out_key, "{}&{}".format(time_sample, morton))
             result = pipe.execute()
 
             if result[1]:
@@ -273,3 +273,22 @@ class CacheStateDB(object):
                             ErrorCodes.REDIS_ERROR)
 
         return success, in_page_out
+
+    def remove_from_page_out(self, write_cuboid_key):
+        """
+        Method to remove a key to from page-out tracking set
+
+        Args:
+            write_cuboid_key (str): the write cuboid key you want removed
+
+        Returns:
+            None
+        """
+        _, parts = write_cuboid_key.split("&", 1)
+        parts, _ = parts.rsplit("&", 1)
+        parts, morton = parts.rsplit("&", 1)
+        parts, time_sample = parts.rsplit("&", 1)
+        lookup, res = parts.rsplit("&", 1)
+
+        page_out_key = "PAGE-OUT&{}&{}".format(lookup, res)
+        self.status_client.srem(page_out_key, "{}&{}".format(time_sample, morton))
