@@ -1,0 +1,48 @@
+{
+    "AttributeDefinitions": [
+        {
+            "AttributeName": "object-key",
+            "AttributeType": "S"
+        },
+        {
+            "AttributeName": "version",
+            "AttributeType": "S"
+        },
+        {
+            "AttributeName": "ingest-job",
+            "AttributeType": "S"
+        }
+    ],
+    "KeySchema": [
+        {
+            "AttributeName": "object-key",
+            "KeyType": "HASH"
+        },
+        {
+            "AttributeName": "version",
+            "KeyType": "RANGE"
+        }
+    ],
+    "GlobalSecondaryIndexes": [
+        {
+            "IndexName": "ingest-job-index",
+            "KeySchema": [
+                {
+                    "AttributeName": "ingest-job",
+                    "KeyType": "HASH"
+                }
+            ],
+            "Projection": {
+                "ProjectionType": "KEYS_ONLY"
+            },
+            "ProvisionedThroughput": {
+                "ReadCapacityUnits": 5,
+                "WriteCapacityUnits": 5
+            }
+        }
+    ],
+    "ProvisionedThroughput": {
+        "ReadCapacityUnits": 10,
+        "WriteCapacityUnits": 10
+    }
+}
