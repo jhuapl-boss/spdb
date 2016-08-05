@@ -164,6 +164,23 @@ class CacheStateDB(object):
         key = "WRITE-LOCK&{}".format(lookup_key)
         return bool(self.status_client.exists(key))
 
+    def set_project_lock(self, lookup_key, locked):
+        """
+        Method to modify the lock status of a channel/layer
+
+        Args:
+            lookup_key (str): Lookup key for a channel/layer
+            locked (bool): boolean indicating lock state. True=locked, False=unloacked
+
+        Returns:
+            None
+        """
+        key = "WRITE-LOCK&{}".format(lookup_key)
+        if locked:
+            self.status_client.set(key, True)
+        else:
+            self.status_client.delete(key)
+
     def in_page_out(self, temp_page_out_key, lookup_key, resolution, morton, time_sample):
         """
         Method to check if a cuboid is currently being written to S3 via page out key
@@ -178,15 +195,15 @@ class CacheStateDB(object):
         Returns:
             (bool): True if the key is in page out
         """
-        try:
-            # Create temp set
-            pipe = self.status_client.pipeline()
-            pipe.sadd(temp_page_out_key, "{}&{}".format(time_sample, morton))
-            pipe.expire(temp_page_out_key, 30)
-            result = pipe.execute()
-        except Exception as e:
-            raise SpdbError("Failed to check page-out set. {}".format(e),
-                            ErrorCodes.REDIS_ERROR)
+        with self.status_client.pipeline() as pipe:
+            try:
+                # Create temp set
+                pipe.sadd(temp_page_out_key, "{}&{}".format(time_sample, morton))
+                pipe.expire(temp_page_out_key, 30)
+                pipe.execute()
+            except Exception as e:
+                raise SpdbError("Failed to check page-out set. {}".format(e),
+                                ErrorCodes.REDIS_ERROR)
 
         # Use set diff to check for key
         result = self.status_client.sdiff(temp_page_out_key, "PAGE-OUT&{}&{}".format(lookup_key, resolution))
@@ -248,31 +265,33 @@ class CacheStateDB(object):
         """
         # TODO: Validate output from pipe
         page_out_key = "PAGE-OUT&{}&{}".format(lookup_key, resolution)
-        success = True
         in_page_out = True
-        try:
-            # Create temp set
-            pipe = self.status_client.pipeline()
-            pipe.watch(page_out_key)
-            pipe.multi()
-            pipe.sdiff(temp_page_out_key, page_out_key)
-            pipe.sadd(page_out_key, "{}&{}".format(time_sample, morton))
-            result = pipe.execute()
+        with self.status_client.pipeline() as pipe:
+            while 1:
+                try:
+                    # Create temp set
+                    pipe = self.status_client.pipeline()
+                    pipe.watch(page_out_key)
+                    pipe.multi()
+                    pipe.sdiff(temp_page_out_key, page_out_key)
+                    pipe.sadd(page_out_key, "{}&{}".format(time_sample, morton))
+                    result = pipe.execute()
 
-            if result[1]:
-                in_page_out = False
-            else:
-                in_page_out = True
+                    if result[0]:
+                        in_page_out = False
+                    else:
+                        in_page_out = True
 
-        except redis.WatchError as e:
-            # Watch error occurred
-            success = False
+                    break
+                except redis.WatchError as e:
+                    # Watch error occurred, try again!
+                    continue
 
-        except Exception as e:
-            raise SpdbError("Failed to check page-out set. {}".format(e),
-                            ErrorCodes.REDIS_ERROR)
+                except Exception as e:
+                    raise SpdbError("Failed to check page-out set. {}".format(e),
+                                    ErrorCodes.REDIS_ERROR)
 
-        return success, in_page_out
+        return in_page_out
 
     def remove_from_page_out(self, write_cuboid_key):
         """

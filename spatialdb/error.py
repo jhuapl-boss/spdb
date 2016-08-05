@@ -30,6 +30,7 @@ class ErrorCodes(IntEnum):
     SERIALIZATION_ERROR = 105
     DATATYPE_MISMATCH = 106
     OBJECT_STORE_ERROR = 107
+    RESOURCE_LOCKED = 108
 
 
 class SpdbError(Exception):

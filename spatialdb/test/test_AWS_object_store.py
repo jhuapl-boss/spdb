@@ -19,11 +19,9 @@ from spdb.spatialdb import AWSObjectStore
 
 from bossutils import configuration
 
+from spdb.spatialdb.test.setup import SetupTests
+
 import boto3
-from moto import mock_s3
-from moto import mock_dynamodb2
-from moto import mock_sqs
-from moto import mock_lambda
 
 
 class AWSObjectStoreTestMixin(object):
@@ -154,134 +152,27 @@ class AWSObjectStoreTestMixin(object):
 
 
 class TestAWSObjectStore(AWSObjectStoreTestMixin, unittest.TestCase):
-    @mock_dynamodb2
-    def create_dynamodb_table(self):
-        """Create the s3 index table"""
-        client = boto3.client('dynamodb')
-
-        response = client.create_table(
-            AttributeDefinitions=[
-                {
-                    'AttributeName': 'object-key',
-                    'AttributeType': 'S'
-                },
-                {
-                    'AttributeName': 'version',
-                    'AttributeType': 'S'
-                },
-                {
-                    'AttributeName': 'ingest-job',
-                    'AttributeType': 'S'
-                }
-            ],
-            TableName=self.object_store_config['s3_index_table'],
-            KeySchema=[
-                {
-                    'AttributeName': 'object-key',
-                    'KeyType': 'HASH'
-                },
-                {
-                    'AttributeName': 'version',
-                    'KeyType': 'RANGE'
-                }
-            ],
-            GlobalSecondaryIndexes=[
-                {
-                    'IndexName': 'ingest-job-index',
-                    'KeySchema': [
-                        {
-                            'AttributeName': 'ingest-job',
-                            'KeyType': 'HASH'
-                        },
-                    ],
-                    'Projection': {
-                        'ProjectionType': 'KEYS_ONLY',
-                    },
-                    'ProvisionedThroughput': {
-                        'ReadCapacityUnits': 5,
-                        'WriteCapacityUnits': 5
-                    }
-                },
-            ],
-            ProvisionedThroughput={
-                'ReadCapacityUnits': 5,
-                'WriteCapacityUnits': 5
-            }
-        )
-
-        self.table_created = True
-
-    @mock_s3
-    def create_bucket(self):
-        client = boto3.client('s3')
-        response = client.create_bucket(
-            ACL='private',
-            Bucket=self.object_store_config['cuboid_bucket']
-        )
 
     def setUp(self):
         """ Create a diction of configuration values for the test resource. """
-        self.mock_s3 = mock_s3()
-        self.mock_dynamodb = mock_dynamodb2()
-        self.mock_sqs = mock_sqs()
-        self.mock_s3.start()
-        self.mock_dynamodb.start()
-        self.mock_sqs.start()
-
-        self.data = {}
-        self.data['collection'] = {}
-        self.data['collection']['name'] = "col1"
-        self.data['collection']['description'] = "Test collection 1"
-
-        self.data['coord_frame'] = {}
-        self.data['coord_frame']['name'] = "coord_frame_1"
-        self.data['coord_frame']['description'] = "Test coordinate frame"
-        self.data['coord_frame']['x_start'] = 0
-        self.data['coord_frame']['x_stop'] = 2000
-        self.data['coord_frame']['y_start'] = 0
-        self.data['coord_frame']['y_stop'] = 5000
-        self.data['coord_frame']['z_start'] = 0
-        self.data['coord_frame']['z_stop'] = 200
-        self.data['coord_frame']['x_voxel_size'] = 4
-        self.data['coord_frame']['y_voxel_size'] = 4
-        self.data['coord_frame']['z_voxel_size'] = 35
-        self.data['coord_frame']['voxel_unit'] = "nanometers"
-        self.data['coord_frame']['time_step'] = 0
-        self.data['coord_frame']['time_step_unit'] = "na"
-
-        self.data['experiment'] = {}
-        self.data['experiment']['name'] = "exp1"
-        self.data['experiment']['description'] = "Test experiment 1"
-        self.data['experiment']['num_hierarchy_levels'] = 7
-        self.data['experiment']['hierarchy_method'] = 'slice'
-
-        self.data['channel_layer'] = {}
-        self.data['channel_layer']['name'] = "ch1"
-        self.data['channel_layer']['description'] = "Test channel 1"
-        self.data['channel_layer']['is_channel'] = True
-        self.data['channel_layer']['datatype'] = 'uint8'
-        self.data['channel_layer']['max_time_step'] = 0
-
-        self.data['boss_key'] = 'col1&exp1&ch1'
-        self.data['lookup_key'] = '4&2&1'
-
+        # Create resource
+        self.setup_helper = SetupTests()
+        self.data = self.setup_helper.get_image8_dict()
         self.resource = BossResourceBasic(self.data)
 
+        # Load config
         self.config = configuration.BossConfig()
-
         self.object_store_config = {"s3_flush_queue": 'https://mytestqueue.com',
                                     "cuboid_bucket": "test_bucket",
                                     "page_in_lambda_function": "page_in.test.boss",
                                     "page_out_lambda_function": "page_out.test.boss",
                                     "s3_index_table": "test_table"}
 
-
         # Create AWS Resources needed for tests
-        self.create_dynamodb_table()
-        self.create_bucket()
+        self.setup_helper.start_mocking()
+        self.setup_helper.create_s3_index_table(self.object_store_config["s3_index_table"])
+        self.setup_helper.create_cuboid_bucket(self.object_store_config["cuboid_bucket"])
 
     def tearDown(self):
-        self.mock_s3.stop()
-        self.mock_dynamodb.stop()
-        self.mock_sqs.stop()
+        self.setup_helper.stop_mocking()
 

@@ -70,7 +70,7 @@ class RedisKVIO(KVIO):
         No rollback with redis"""
         pass
 
-    def get_missing_read_cache_keys(self, resource, resolution, time_sample_list, morton_idx_list):
+    def get_missing_read_cache_keys(self, resource, resolution, time_sample_range, morton_idx_list):
         """Retrieve the indexes of missing cubes in the cache db based on a morton ID list and time samples
 
         When using redis as the cache backend, you don't need to keep a secondary index and can get this info
@@ -79,7 +79,7 @@ class RedisKVIO(KVIO):
         Args:
             resource (spdb.project.BossResource): Data model info based on the request or target resource
             resolution (int): the resolution level
-            time_sample_list (list[int]): a list of time samples
+            time_sample_range (list[int]): the start and stop index of the time samples
             morton_idx_list (list[int]): a list of Morton ID of the cuboids to get
 
         Returns:
@@ -87,7 +87,8 @@ class RedisKVIO(KVIO):
             the second a list of keys in the cache, and the third being the cached-cuboid keys for the query
         """
         # Get the cached-cuboid keys
-        all_cuboid_keys = self.generate_cached_cuboid_keys(resource, resolution, time_sample_list, morton_idx_list)
+        all_cuboid_keys = self.generate_cached_cuboid_keys(resource, resolution,
+                                                           list(range(*time_sample_range)), morton_idx_list)
 
         # Query Redis for key existence, refreshing the cache timeout if exists
         try:
@@ -194,6 +195,11 @@ class RedisKVIO(KVIO):
         Returns:
 
         """
+        if not isinstance(key_list, list):
+            t_list = []
+            t_list.append(key_list)
+            key_list = t_list
+
         try:
             # Write data to redis
             self.cache_client.mset(dict(list(zip(key_list, cube_list))))
@@ -230,7 +236,32 @@ class RedisKVIO(KVIO):
             raise SpdbError("Error inserting cube into the write buffer. {}".format(e),
                             ErrorCodes.REDIS_ERROR)
 
+    def is_dirty(self, cache_key_list):
+        """
+        Check if a cuboid is dirty based on its cache key
+        Args:
+            cache_key_list (list(str)): A list of cached-cuboid keys
 
+        Returns:
+            (list(bool)): A list of booleans, indicating if each key is dirty or not
+        """
+        if not isinstance(cache_key_list, list):
+            t_list = []
+            t_list.append(cache_key_list)
+            cache_key_list = t_list
+
+        # Convert cached-keys to write-cuboid keys without UUID
+        # (we can't recreate UUIDs and want to check for ALL write-cuboid keys for a given cuboid anyway)
+        result = None
+        with self.cache_client.pipeline() as pipe:
+            for key in cache_key_list:
+                parts = key.split("&", 1)
+                pipe.keys('WRITE-CUBOID&{}*'.format(parts[1]))
+
+            result = pipe.execute()
+
+        # Check all keys in a pipelined command
+        return [len(x) > 0 for x in result]
 
 
 # TODO: CHECK IF THIS METHOD CAN BE REMOVED AFTER REFACTOR

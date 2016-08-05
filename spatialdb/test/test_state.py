@@ -44,9 +44,13 @@ class CacheStateDBTestMixin(object):
 
         assert csdb.project_locked("1&1&1") == False
 
-        self.state_client.set("WRITE-LOCK&1&1&1", 'true')
+        csdb.set_project_lock("1&1&1", True)
 
         assert csdb.project_locked("1&1&1") == True
+
+        csdb.set_project_lock("1&1&1", False)
+
+        assert csdb.project_locked("1&1&1") == False
 
     def test_add_to_page_out(self):
         """Test if a cube is in page out"""
@@ -63,8 +67,7 @@ class CacheStateDBTestMixin(object):
 
         assert not csdb.in_page_out(temp_page_out_key, lookup_key, resolution, morton, time_sample)
 
-        success, in_page_out = csdb.add_to_page_out(temp_page_out_key, lookup_key, resolution, morton, time_sample)
-        assert success
+        in_page_out = csdb.add_to_page_out(temp_page_out_key, lookup_key, resolution, morton, time_sample)
         assert not in_page_out
 
         assert csdb.in_page_out(temp_page_out_key, lookup_key, resolution, morton, time_sample)
@@ -84,8 +87,7 @@ class CacheStateDBTestMixin(object):
 
         assert not csdb.in_page_out(temp_page_out_key, lookup_key, resolution, morton, time_sample)
 
-        success, in_page_out = csdb.add_to_page_out(temp_page_out_key, lookup_key, resolution, morton, time_sample)
-        assert success
+        in_page_out = csdb.add_to_page_out(temp_page_out_key, lookup_key, resolution, morton, time_sample)
         assert not in_page_out
 
         assert csdb.in_page_out(temp_page_out_key, lookup_key, resolution, morton, time_sample)

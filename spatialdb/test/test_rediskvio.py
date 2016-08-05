@@ -62,7 +62,7 @@ class RedisKVIOTestMixin(object):
         for k in keys:
             self.cache_client.set(k, "dummy")
 
-        missing, cached, all_keys = rkv.get_missing_read_cache_keys(self.resource, 2, [0, 1], [33, 34, 35])
+        missing, cached, all_keys = rkv.get_missing_read_cache_keys(self.resource, 2, [0, 2], [33, 34, 35])
 
         assert len(missing) == 4
         assert len(cached) == 2
@@ -75,7 +75,7 @@ class RedisKVIOTestMixin(object):
         # Put some keys in the cache
         rkv = RedisKVIO(self.config_data)
         write_cuboid_keys = rkv.generate_write_cuboid_keys(self.resource, 2, [0], [34])
-        cache_cuboid_key = rkv.write_cuboid_to_cache_key(write_cuboid_keys[0])
+        cache_cuboid_key = rkv.write_cuboid_key_to_cache_key(write_cuboid_keys[0])
 
         assert cache_cuboid_key == "CACHED-CUBOID&4&2&1&2&0&34"
 
@@ -192,6 +192,33 @@ class RedisKVIOTestMixin(object):
 
         result = rkv.cube_exists(keys[0])
         assert not result
+
+    def test_is_dirty(self):
+        """Test cube delete method"""
+        resolution = 1
+        rkv = RedisKVIO(self.config_data)
+
+        # Clean up data
+        self.cache_client.flushdb()
+
+        data1 = np.random.randint(50, size=[10, 15, 5])
+        data_packed1 = blosc.pack_array(data1)
+        data = [data_packed1]
+
+        # Add item to cached-cuboid
+        morton_id = [112]
+        keys = rkv.generate_cached_cuboid_keys(self.resource, 2, [0], morton_id)
+        rkv.put_cubes(keys, data)
+
+        result = rkv.is_dirty(keys)
+        assert not result[0]
+
+        # Fake a write
+        write_cuboid_key = "WRITE-CUBOID&{}".format(keys[0].split('&', 1)[1])
+        rkv.insert_cube_in_write_buffer(write_cuboid_key, data[0])
+
+        result = rkv.is_dirty(keys)
+        assert result[0]
 
 
 @patch('redis.StrictRedis', mock_strict_redis_client)

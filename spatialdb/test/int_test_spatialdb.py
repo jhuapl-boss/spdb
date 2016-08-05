@@ -13,90 +13,145 @@
 # limitations under the License.
 
 import unittest
-from unittest.mock import patch
+import numpy as np
 
 from spdb.project import BossResourceBasic
-from spdb.spatialdb.test import SpatialDBImageDataTestMixin
+from spdb.spatialdb.test.test_spatialdb import SpatialDBImageDataTestMixin
+from spdb.spatialdb import Cube, SpatialDB
+from spdb.spatialdb.test.setup import SetupTests
 
-import copy
 import redis
+import time
+from botocore.exceptions import ClientError
 
 from bossutils import configuration
-import bossutils
-
-class MockBossIntegrationConfig(bossutils.configuration.BossConfig):
-    """Mock the config to set the database to 1 instead of the default 0"""
-    def __init__(self):
-        super().__init__()
-        self.config["aws"]["cache-db"] = "1"
-        self.config["aws"]["cache-state-db"] = "1"
 
 
-@patch('bossutils.configuration.BossConfig', MockBossIntegrationConfig)
-class TestIntegrationSpatialDBImageData(SpatialDBImageDataTestMixin, unittest.TestCase):
+class SpatialDBImageDataIntegrationTestMixin(object):
 
-    def setUp(self):
+    def test_cutout_no_time_single_aligned_zero(self):
+        """Test the get_cubes method - no time - single"""
+        db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        cube = db.cutout(self.resource, (0, 0, 0), (128, 128, 16), 0)
+
+        np.testing.assert_array_equal(np.sum(cube.data), 0)
+
+    def test_cutout_no_time_single_aligned_hit(self):
+        """Test the get_cubes method - no time - single"""
+        # Generate random data
+        cube1 = Cube.create_cube(self.resource, [128, 128, 16])
+        cube1.data = np.random.randint(0, 254, (1, 16, 128, 128))
+        cube1.morton_id = 0
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data)
+
+        cube2 = sp.cutout(self.resource, (0, 0, 0), (128, 128, 16), 0)
+
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+
+    def test_cutout_no_time_single_aligned_miss(self):
+        """Test the get_cubes method - no time - single"""
+        # Generate random data
+        #cube1 = Cube.create_cube(self.resource, [128, 128, 16])
+        #cube1.data = np.random.randint(0, 254, (1, 16, 128, 128))
+        #cube1.morton_id = 0
+#
+        #db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+#
+        ## populate dummy data
+        #self.write_test_cube(db, self.resource, 0, cube1, cache=False, s3=True)
+#
+        #cube2 = db.cutout(self.resource, (0, 0, 0), (128, 128, 16), 0)
+#
+        #np.testing.assert_array_equal(cube1.data, cube2.data)
+        assert 1==0
+
+
+class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
+                                         SpatialDBImageDataIntegrationTestMixin, unittest.TestCase):
+
+    def setUpParams(self):
         """ Create a diction of configuration values for the test resource. """
-        self.patcher = patch('bossutils.configuration.BossConfig', MockBossIntegrationConfig)
-        self.mock_tests = self.patcher.start()
+        # setup resources
+        self.setup_helper = SetupTests()
+        self.setup_helper.mock = False
 
-        data = {}
-        data['collection'] = {}
-        data['collection']['name'] = "col1"
-        data['collection']['description'] = "Test collection 1"
+        self.data = self.setup_helper.get_image8_dict()
+        self.resource = BossResourceBasic(self.data)
 
-        data['coord_frame'] = {}
-        data['coord_frame']['name'] = "coord_frame_1"
-        data['coord_frame']['description'] = "Test coordinate frame"
-        data['coord_frame']['x_start'] = 0
-        data['coord_frame']['x_stop'] = 2000
-        data['coord_frame']['y_start'] = 0
-        data['coord_frame']['y_stop'] = 5000
-        data['coord_frame']['z_start'] = 0
-        data['coord_frame']['z_stop'] = 200
-        data['coord_frame']['x_voxel_size'] = 4
-        data['coord_frame']['y_voxel_size'] = 4
-        data['coord_frame']['z_voxel_size'] = 35
-        data['coord_frame']['voxel_unit'] = "nanometers"
-        data['coord_frame']['time_step'] = 0
-        data['coord_frame']['time_step_unit'] = "na"
+        self.config = configuration.BossConfig()
 
-        data['experiment'] = {}
-        data['experiment']['name'] = "exp1"
-        data['experiment']['description'] = "Test experiment 1"
-        data['experiment']['num_hierarchy_levels'] = 7
-        data['experiment']['hierarchy_method'] = 'slice'
-        data['experiment']['base_resolution'] = 0
+        # kvio settings
+        self.cache_client = redis.StrictRedis(host=self.config['aws']['cache'], port=6379,
+                                              db=1,
+                                              decode_responses=False)
+        self.kvio_config = {"cache_client": self.cache_client, "read_timeout": 86400}
 
-        data['channel_layer'] = {}
-        data['channel_layer']['name'] = "ch1"
-        data['channel_layer']['description'] = "Test channel 1"
-        data['channel_layer']['is_channel'] = True
-        data['channel_layer']['datatype'] = 'uint8'
-        data['channel_layer']['max_time_sample'] = 0
+        # state settings
+        self.state_client = redis.StrictRedis(host=self.config['aws']['cache_state'],
+                                              port=6379, db=1,
+                                              decode_responses=False)
+        self.state_config = {"state_client": self.state_client}
 
-        data['boss_key'] = 'col1&exp1&ch1'
-        data['lookup_key'] = '4&2&1'
+        # object store settings
+        self.object_store_config = {"s3_flush_queue": self.config['aws']['flush_topic_arn'],
+                                    "cuboid_bucket": "intTest.{}".format(self.config['aws']['s3-bucket']),
+                                    "page_in_lambda_function": self.config['lambda']['page_in_function'],
+                                    "page_out_lambda_function": self.config['lambda']['flush_function'],
+                                    "s3_index_table": "intTest.{}".format(self.config['aws']['s3-index-table'])}
 
-        self.resource8 = BossResourceBasic(data)
+        # Create AWS Resources needed for tests
+        self.setup_helper.create_s3_index_table(self.object_store_config["s3_index_table"])
+        self.setup_helper.create_cuboid_bucket(self.object_store_config["cuboid_bucket"])
 
-        data16 = copy.deepcopy(data)
-        data16['channel_layer']['datatype'] = 'uint16'
-        self.resource16 = BossResourceBasic(data16)
+    @classmethod
+    def setUpClass(cls):
+        """ get_some_resource() is slow, to avoid calling it for each test use setUpClass()
+            and store the result as class variable
+        """
+        super(TestIntegrationSpatialDBImage8Data, cls).setUpClass()
+        cls.setUpParams(cls)
+        try:
+            cls.setup_helper.create_s3_index_table(cls.object_store_config["s3_index_table"])
+        except ClientError:
+            cls.setup_helper.delete_s3_index_table(cls.object_store_config["s3_index_table"])
+            cls.setup_helper.create_s3_index_table(cls.object_store_config["s3_index_table"])
 
-        # Get direct clients to redis to make sure data is getting written properly
-        config = configuration.BossConfig()
-        self.cache_client = redis.StrictRedis(host=config["aws"]["cache"], port=6379,
-                                              db=config["aws"]["cache-db"])
+        try:
+            cls.setup_helper.create_cuboid_bucket(cls.object_store_config["cuboid_bucket"])
+        except ClientError:
+            cls.setup_helper.delete_cuboid_bucket(cls.object_store_config["cuboid_bucket"])
+            cls.setup_helper.create_cuboid_bucket(cls.object_store_config["cuboid_bucket"])
 
-        self.status_client = redis.StrictRedis(host=config["aws"]["cache-state"], port=6379,
-                                               db=config["aws"]["cache-state-db"])
+        try:
+            cls.object_store_config["s3_flush_queue"] = cls.setup_helper.create_flush_queue(
+                "intTest.{}".format(cls.config['aws']['flush_topic_arn']))
+        except ClientError:
+            cls.setup_helper.delete_flush_queue(cls.object_store_config["cuboid_bucket"])
+            time.sleep(60)
+            cls.object_store_config["s3_flush_queue"] = cls.setup_helper.create_flush_queue(
+                "intTest.{}".format(cls.config['aws']['flush_topic_arn']))
 
-    def tearDown(self):
-        # Stop mocking
-        self.mock_tests = self.patcher.stop()
-        self.cache_client.flushdb()
-        self.status_client.flushdb()
+    @classmethod
+    def tearDownClass(cls):
+        super(TestIntegrationSpatialDBImage8Data, cls).tearDownClass()
+        try:
+            cls.setup_helper.delete_s3_index_table(cls.object_store_config["s3_index_table"])
+        except:
+            pass
+
+        try:
+            cls.setup_helper.delete_cuboid_bucket(cls.object_store_config["cuboid_bucket"])
+        except:
+            pass
+
+        try:
+            cls.setup_helper.delete_flush_queue(cls.object_store_config["s3_flush_queue"])
+        except:
+            pass
 
     def get_num_cache_keys(self, spdb):
         return len(self.cache_client.keys("*"))

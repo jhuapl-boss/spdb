@@ -103,14 +103,14 @@ class KVIO(metaclass=ABCMeta):
         # Return a list of all keys
         return ['{}&{}&{}&{}'.format(base_key, s[0], s[1], uuid.uuid4().__str__()) for s in key_suffix_list]
 
-    def write_cuboid_to_cache_key(self, write_cuboid_key):
+    def write_cuboid_key_to_cache_key(self, write_cuboid_key):
         """Converts a write cuboid key to a cache key
 
         The key contains the base lookup key with the time samples and morton ids appended with the format:
 
-            WRITE-CUBOID&{lookup_key}&time_sample&morton_id&UUID
+            WRITE-CUBOID&{lookup_key}&res&time_sample&morton_id&UUID
                                     to
-            CACHED-CUBOID&{lookup_key}&time_sample&morton_id
+            CACHED-CUBOID&{lookup_key}&res&time_sample&morton_id
 
         Args:
             write_cuboid_key (str): the write cuboid key to convert
@@ -122,7 +122,6 @@ class KVIO(metaclass=ABCMeta):
         parts = write_cuboid_key.split("&", 1)
         base = parts[1].rsplit("&", 1)[0]
         return 'CACHED-CUBOID&{}'.format(base)
-
 
     @abstractmethod
     def get_missing_read_cache_keys(self, resource, resolution, time_sample_list, morton_idx_list):
@@ -137,6 +136,11 @@ class KVIO(metaclass=ABCMeta):
     @abstractmethod
     def put_cubes(self, key_list, cube_list):
         """Store multiple cubes into the database"""
+        return NotImplemented
+
+    @abstractmethod
+    def is_dirty(self, cache_key_list):
+        """Check if a cuboid is dirty based on its cache key"""
         return NotImplemented
 
     #    @abstractmethod

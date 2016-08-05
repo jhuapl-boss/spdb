@@ -239,6 +239,11 @@ class AWSObjectStore(ObjectStore):
         Returns:
             (list(str)): A list of object keys
         """
+        if not isinstance(keys, list):
+            t_list = []
+            t_list.append(keys)
+            keys = t_list
+
         output_keys = []
         for key in keys:
             # Strip off front
@@ -262,6 +267,11 @@ class AWSObjectStore(ObjectStore):
         Returns:
             (list(str)): A list of cached-cuboid keys
         """
+        if not isinstance(keys, list):
+            t_list = []
+            t_list.append(keys)
+            keys = t_list
+
         output_keys = []
         for key in keys:
             # Strip off hash
@@ -338,7 +348,7 @@ class AWSObjectStore(ObjectStore):
         """ Method to get multiple objects serially in a loop
 
         Args:
-            key_list (list(str)): A list of cached-cuboid keys to retrieve from the object store
+            key_list (list(str)): A list of object keys to retrieve from the object store
             version: TBD version of the cuboid
 
         Returns:
@@ -392,7 +402,7 @@ class AWSObjectStore(ObjectStore):
         Args:
             config_data (dict): Dictionary of configuration dictionaries
             write_cuboid_key (str): Unique write-cuboid to be flushed to S3
-            resource (str): json encoded resource for the given write cuboid key
+            resource (spdb.project.resource.BossResource): resource for the given write cuboid key
 
         Returns:
             None
