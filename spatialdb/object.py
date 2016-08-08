@@ -17,6 +17,8 @@ import json
 import hashlib
 from .error import SpdbError, ErrorCodes
 
+from bossutils.aws import get_region
+
 import boto3
 
 
@@ -175,7 +177,7 @@ class AWSObjectStore(ObjectStore):
         object_keys = self.cached_cuboid_to_object_keys(key_list)
 
         # TODO: Possibly could use batch read to speed up
-        dynamodb = boto3.client('dynamodb')
+        dynamodb = boto3.client('dynamodb', region_name=get_region())
 
         s3_key_index = []
         zero_key_index = []
@@ -210,7 +212,7 @@ class AWSObjectStore(ObjectStore):
         Returns:
             None
         """
-        dynamodb = boto3.client('dynamodb')
+        dynamodb = boto3.client('dynamodb', region_name=get_region())
 
         # Get lookup key and resolution from object key
         vals = object_key.split("&")
@@ -301,7 +303,7 @@ class AWSObjectStore(ObjectStore):
         object_keys = self.cached_cuboid_to_object_keys(key_list)
 
         # Trigger lambda for all keys
-        client = boto3.client('lambda')
+        client = boto3.client('lambda', region_name=get_region())
 
         params = {"page_in_channel": page_in_chan,
                   "kv_config": kv_config,
@@ -332,7 +334,7 @@ class AWSObjectStore(ObjectStore):
             (bytes): A list of blosc compressed cuboid data
 
         """
-        s3 = boto3.client('s3')
+        s3 = boto3.client('s3', region_name=get_region())
 
         response = s3.get_object(
             Key=key,
@@ -355,7 +357,7 @@ class AWSObjectStore(ObjectStore):
             (list(bytes)): A list of blosc compressed cuboid data
 
         """
-        s3 = boto3.client('s3')
+        s3 = boto3.client('s3', region_name=get_region())
 
         results = []
 
@@ -383,7 +385,7 @@ class AWSObjectStore(ObjectStore):
         Returns:
 
         """
-        s3 = boto3.client('s3')
+        s3 = boto3.client('s3', region_name=get_region())
 
         for key, cube in zip(key_list, cube_list):
             response = s3.put_object(
@@ -408,7 +410,7 @@ class AWSObjectStore(ObjectStore):
             None
         """
         # Put page out job on the queue
-        sqs = boto3.client('sqs')
+        sqs = boto3.client('sqs', region_name=get_region())
 
         msg_data = {"config": config_data,
                     "write_cuboid_key": write_cuboid_key,
@@ -422,7 +424,7 @@ class AWSObjectStore(ObjectStore):
                             ErrorCodes.SPDB_ERROR)
 
         # Trigger lambda to handle it
-        client = boto3.client('lambda')
+        client = boto3.client('lambda', region_name=get_region())
 
         response = client.invoke(
             FunctionName=self.config["page_out_lambda_function"],

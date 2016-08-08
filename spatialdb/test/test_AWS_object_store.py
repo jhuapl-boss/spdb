@@ -22,6 +22,7 @@ from bossutils import configuration
 from spdb.spatialdb.test.setup import SetupTests
 
 import boto3
+from bossutils.aws import get_region
 
 
 class AWSObjectStoreTestMixin(object):
@@ -68,7 +69,7 @@ class AWSObjectStoreTestMixin(object):
         os.add_cuboid_to_index(dummy_key)
 
         # Get item
-        dynamodb = boto3.client('dynamodb')
+        dynamodb = boto3.client('dynamodb', region_name=get_region())
         response = dynamodb.get_item(
             TableName=self.object_store_config['s3_index_table'],
             Key={'object-key': {'S': dummy_key},

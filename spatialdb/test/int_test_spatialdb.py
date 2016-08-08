@@ -29,14 +29,6 @@ from bossutils import configuration
 
 class SpatialDBImageDataIntegrationTestMixin(object):
 
-    def test_cutout_no_time_single_aligned_zero(self):
-        """Test the get_cubes method - no time - single"""
-        db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
-
-        cube = db.cutout(self.resource, (0, 0, 0), (128, 128, 16), 0)
-
-        np.testing.assert_array_equal(np.sum(cube.data), 0)
-
     def test_cutout_no_time_single_aligned_hit(self):
         """Test the get_cubes method - no time - single"""
         # Generate random data
@@ -97,15 +89,11 @@ class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
         self.state_config = {"state_client": self.state_client}
 
         # object store settings
-        self.object_store_config = {"s3_flush_queue": self.config['aws']['flush_topic_arn'],
+        self.object_store_config = {"s3_flush_queue": self.config['aws']['s3-flush-queue'],
                                     "cuboid_bucket": "intTest.{}".format(self.config['aws']['s3-bucket']),
                                     "page_in_lambda_function": self.config['lambda']['page_in_function'],
                                     "page_out_lambda_function": self.config['lambda']['flush_function'],
                                     "s3_index_table": "intTest.{}".format(self.config['aws']['s3-index-table'])}
-
-        # Create AWS Resources needed for tests
-        self.setup_helper.create_s3_index_table(self.object_store_config["s3_index_table"])
-        self.setup_helper.create_cuboid_bucket(self.object_store_config["cuboid_bucket"])
 
     @classmethod
     def setUpClass(cls):
@@ -128,12 +116,12 @@ class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
 
         try:
             cls.object_store_config["s3_flush_queue"] = cls.setup_helper.create_flush_queue(
-                "intTest.{}".format(cls.config['aws']['flush_topic_arn']))
+                "intTest.{}".format(cls.config['aws']['s3-flush-queue']))
         except ClientError:
-            cls.setup_helper.delete_flush_queue(cls.object_store_config["cuboid_bucket"])
+            cls.setup_helper.delete_flush_queue(cls.object_store_config['aws']['s3-flush-queue'])
             time.sleep(60)
             cls.object_store_config["s3_flush_queue"] = cls.setup_helper.create_flush_queue(
-                "intTest.{}".format(cls.config['aws']['flush_topic_arn']))
+                "intTest.{}".format(cls.config['aws']['s3-flush-queue']))
 
     @classmethod
     def tearDownClass(cls):
@@ -149,7 +137,7 @@ class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
             pass
 
         try:
-            cls.setup_helper.delete_flush_queue(cls.object_store_config["s3_flush_queue"])
+            cls.setup_helper.delete_flush_queue(cls.object_store_config["s3-flush-queue"])
         except:
             pass
 

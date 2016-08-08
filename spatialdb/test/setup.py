@@ -15,6 +15,8 @@
 from pkg_resources import resource_filename
 import json
 
+from bossutils.aws import get_region
+
 import boto3
 from moto import mock_s3
 from moto import mock_sqs
@@ -28,7 +30,6 @@ class SetupTests(object):
     """ Class to handle setting up tests, including support for mocking
 
     """
-
     def __init__(self):
         self.mock = True
         self.mock_s3 = None
@@ -63,7 +64,7 @@ class SetupTests(object):
             table_params = json.loads(json_str)
 
         # Create table
-        client = boto3.client('dynamodb')
+        client = boto3.client('dynamodb', region_name=get_region())
         _ = client.create_table(TableName=table_name, **table_params)
 
         return client.get_waiter('table_exists')
@@ -80,7 +81,7 @@ class SetupTests(object):
 
     def _delete_s3_index_table(self, table_name):
         """Method to delete the S3 index table"""
-        client = boto3.client('dynamodb')
+        client = boto3.client('dynamodb', region_name=get_region())
         client.delete_table(TableName=table_name)
 
     def delete_s3_index_table(self, table_name):
@@ -91,7 +92,7 @@ class SetupTests(object):
             self._delete_s3_index_table(table_name)
 
             # Wait for table to be deleted (since this is real)
-            client = boto3.resource('dynamodb')
+            client = boto3.resource('dynamodb', region_name=get_region())
             table = client.Table(table_name)
             table.wait_until_not_exists()
     # ***** END Cuboid Index Table END *****
@@ -99,7 +100,7 @@ class SetupTests(object):
     # ***** Cuboid Bucket *****
     def _create_cuboid_bucket(self, bucket_name):
         """Method to create the S3 bucket for cuboid storage"""
-        client = boto3.client('s3')
+        client = boto3.client('s3', region_name=get_region())
         _ = client.create_bucket(
             ACL='private',
             Bucket=bucket_name
@@ -118,7 +119,7 @@ class SetupTests(object):
 
     def _delete_cuboid_bucket(self, bucket_name):
         """Method to delete the S3 bucket for cuboid storage"""
-        s3 = boto3.resource('s3')
+        s3 = boto3.resource('s3', region_name=get_region())
         bucket = s3.Bucket(bucket_name)
         for obj in bucket.objects.all():
             obj.delete()
@@ -140,7 +141,7 @@ class SetupTests(object):
     # ***** Flush SQS Queue *****
     def _create_flush_queue(self, queue_name):
         """Method to create a test sqs for flushing cubes"""
-        client = boto3.client('sqs')
+        client = boto3.client('sqs', region_name=get_region())
         url = client.create_queue(QueueName=queue_name)
         return url
 
@@ -151,11 +152,11 @@ class SetupTests(object):
         else:
             url = self._create_flush_queue(queue_name)
             time.sleep(60)
-            return url
+        return url
 
     def _delete_flush_queue(self, queue_url):
         """Method to delete a test sqs for flushing cubes"""
-        client = boto3.client('sqs')
+        client = boto3.client('sqs', region_name=get_region())
         client.delete_queue(QueueUrl=queue_url)
 
     def delete_flush_queue(self, queue_name):
