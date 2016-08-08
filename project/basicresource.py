@@ -48,6 +48,20 @@ class BossResourceBasic(BossResource):
         self._boss_key = self.data['boss_key']
         self._lookup_key = self.data['lookup_key']
 
+    def from_dict(self, dict_data):
+        """
+        Static method to populate a basic resource from a dictionary
+        Args:
+            dict_data (dict): dictionary encoded resource
+
+        Returns:
+           (BossResourceBasic): An instantiated basic resource
+
+        """
+        self.data = dict_data
+        self._boss_key = self.data['boss_key']
+        self._lookup_key = self.data['lookup_key']
+
     # Methods to populate class properties
     def populate_collection(self):
         """

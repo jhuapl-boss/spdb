@@ -414,10 +414,11 @@ class AWSObjectStore(ObjectStore):
 
         msg_data = {"config": config_data,
                     "write_cuboid_key": write_cuboid_key,
-                    "resource": resource.to_json()}
+                    "lambda-name": "s3_flush",
+                    "resource": resource.to_dict()}
 
         response = sqs.send_message(QueueUrl=self.config["s3_flush_queue"],
-                                    Message=json.dumps(msg_data))
+                                    MessageBody=json.dumps(msg_data))
 
         if response['ResponseMetadata']['HTTPStatusCode'] != 200:
             raise SpdbError("Error sending SNS message to trigger page out operation.",
@@ -431,4 +432,4 @@ class AWSObjectStore(ObjectStore):
             InvocationType='Event',
             Payload=json.dumps(msg_data).encode())
 
-        # TODO: Add Error handling
+        # TODO: Add Error handling?

@@ -44,6 +44,8 @@ class IntegrationCacheStateDBTestMixin(object):
         # Get message (ignore first message which is the subscribe)
         while True:
             msg = csdb1.status_client_listener.get_message()
+            if not msg:
+                break
             if msg['type'] == "message":
                 break
 

@@ -92,9 +92,10 @@ class SetupTests(object):
             self._delete_s3_index_table(table_name)
 
             # Wait for table to be deleted (since this is real)
-            client = boto3.resource('dynamodb', region_name=get_region())
-            table = client.Table(table_name)
-            table.wait_until_not_exists()
+            client = boto3.client('dynamodb', region_name=get_region())
+            waiter = client.get_waiter('table_not_exists')
+            waiter.wait(TableName=table_name)
+
     # ***** END Cuboid Index Table END *****
 
     # ***** Cuboid Bucket *****
@@ -142,7 +143,8 @@ class SetupTests(object):
     def _create_flush_queue(self, queue_name):
         """Method to create a test sqs for flushing cubes"""
         client = boto3.client('sqs', region_name=get_region())
-        url = client.create_queue(QueueName=queue_name)
+        response = client.create_queue(QueueName=queue_name)
+        url = response['QueueUrl']
         return url
 
     def create_flush_queue(self, queue_name):
@@ -196,13 +198,13 @@ class SetupTests(object):
         data['experiment']['num_hierarchy_levels'] = 7
         data['experiment']['hierarchy_method'] = 'slice'
         data['experiment']['base_resolution'] = 0
+        data['experiment']['max_time_sample'] = 0
 
         data['channel_layer'] = {}
         data['channel_layer']['name'] = "ch1"
         data['channel_layer']['description'] = "Test channel 1"
         data['channel_layer']['is_channel'] = True
         data['channel_layer']['datatype'] = 'uint8'
-        data['channel_layer']['max_time_sample'] = 0
 
         data['boss_key'] = 'col1&exp1&ch1'
         data['lookup_key'] = '4&2&1'

@@ -26,6 +26,8 @@ import uuid
 from spdb.c_lib import ndlib
 from spdb.c_lib.ndtype import CUBOIDSIZE
 
+from bossutils.logger import BossLogger
+
 from .error import SpdbError, ErrorCodes
 from .rediskvio import RedisKVIO
 from .cube import Cube
@@ -339,6 +341,11 @@ class SpatialDB:
         Returns:
             cube.Cube: The cutout data stored in a Cube instance
         """
+        boss_logger = BossLogger()
+        boss_logger.setLevel("debug")
+        blog = boss_logger.logger
+        blog.debug("In cutout")
+
         # TODO: DMK move CUBOIDSIZE into Resource
 
         if not time_sample_range:
@@ -425,6 +432,27 @@ class SpatialDB:
                                                                                           cutout_resolution,
                                                                                           time_sample_range,
                                                                                           list_of_idxs)
+        # Wait for cuboids that are currently being written to finish
+        start_time = datetime.now()
+        dirty_keys = all_keys
+        while dirty_keys:
+            blog.debug("Waiting for writes to finish before read can complete")
+
+            dirty_flags = self.kvio.is_dirty(dirty_keys)
+            dirty_keys_temp, clean_keys = [], []
+            for key, flag in zip(dirty_keys, dirty_flags):
+                blog.debug("Waiting on: {}, dirty: {}".format(key, flag))
+                (dirty_keys_temp if flag else clean_keys).append(key)
+            dirty_keys = dirty_keys_temp
+
+            if (datetime.now() - start_time).seconds > self.dirty_read_timeout:
+                # Took too long! Something must have crashed
+                raise SpdbError('{} second timeout reached while waiting for dirty cubes to be flushed.'.format(
+                    self.dirty_read_timeout),
+                                ErrorCodes.ASYNC_ERROR)
+            # Sleep a bit so you don't kill the DB
+            time.sleep(0.05)
+
         s3_key_idx = []
         cache_cuboids = []
         s3_cuboids = []
@@ -435,12 +463,15 @@ class SpatialDB:
             s3_key_idx, zero_key_idx = self.objectio.cuboids_exist(all_keys, missing_key_idx)
 
             if len(s3_key_idx) > 0:
+                blog.debug("Data missing from cache, but in S3")
+
                 if len(s3_key_idx) > self.read_lambda_threshold:
                     # Trigger page-in of available blocks from object store and wait for completion
                     self.page_in_cubes(list(itemgetter(*s3_key_idx)(all_keys)))
                 else:
                     # Read cuboids from S3 into cache directly
                     # Convert cuboid-cache keys to object keys
+                    blog.debug("Paging In Keys Directly")
                     temp_keys = self.objectio.cached_cuboid_to_object_keys(itemgetter(*s3_key_idx)(all_keys))
 
                     # Get objects
@@ -450,6 +481,8 @@ class SpatialDB:
                     self.kvio.put_cubes(itemgetter(*s3_key_idx)(all_keys), temp_cubes)
 
             if len(zero_key_idx) > 0:
+                blog.debug("Data missing in cache, but not in S3")
+
                 # Keys that don't exist in object store render as zeros
                 [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
                 for idx in zero_key_idx:
@@ -463,6 +496,8 @@ class SpatialDB:
         # Get cubes from the cache database (either already there or freshly paged in)
         # TODO: Optimize access to cache data and checking for dirty cubes
         if len(s3_key_idx) > 0:
+            blog.debug("Get cubes from cache that were paged in from S3")
+
             s3_cuboids = self.get_cubes(resource, itemgetter(*s3_key_idx)(all_keys))
 
             # Record misses that were found in S3 for possible pre-fetching
@@ -470,6 +505,8 @@ class SpatialDB:
 
         # Get previously cached cubes, waiting for dirty cubes to be updated if needed
         if len(cached_key_idx) > 0:
+            blog.debug("Get cubes that were already present in the cache")
+
             # Get the cached keys once in list form
             cached_keys_list = itemgetter(*cached_key_idx)(all_keys)
             if not isinstance(cached_keys_list, list):
@@ -491,6 +528,7 @@ class SpatialDB:
             # Get the dirty ones when you can with a timeout
             start_time = datetime.now()
             while dirty_keys:
+                blog.debug("Waiting for writes to finish before read can complete")
                 dirty_flags = self.kvio.is_dirty(cached_keys_list)
                 dirty_keys, clean_keys = [], []
                 for key, flag in zip(cached_keys_list, dirty_flags):
@@ -587,6 +625,12 @@ class SpatialDB:
         Returns:
             None
         """
+        boss_logger = BossLogger()
+        boss_logger.setLevel("debug")
+        blog = boss_logger.logger
+        blog.debug("In write_cuboid")
+        blog.error("In write_cuboid2")
+
         # Check if the resource is locked
         if self.resource_locked(resource.get_lookup_key()):
             raise SpdbError('Resource Locked',
@@ -632,6 +676,8 @@ class SpatialDB:
         # Get keys ready
         base_write_cuboid_key = "WRITE-CUBOID&{}&{}".format(resource.get_lookup_key(), resolution)
 
+        blog.debug("Writing Cuboid - Base Key: {}".format(base_write_cuboid_key))
+
         # Get current cube from db, merge with new cube, write back to the to db
         # TODO: Move splitting up data and computing morton into c-lib as single method
         for z in range(z_num_cubes):
@@ -639,7 +685,6 @@ class SpatialDB:
                 for x in range(x_num_cubes):
                     # Get the morton ID for the cube
                     morton_idx = ndlib.XYZMorton([x + x_start, y + y_start, z + z_start])
-                    wc_key_base = "{}&{}".format(base_write_cuboid_key, morton_idx)
 
                     # Get sub-cube
                     temp_cube = Cube.create_cube(resource, [x_cube_dim, y_cube_dim, z_cube_dim],
@@ -652,7 +697,7 @@ class SpatialDB:
                     # For each time sample put cube into write-buffer and add to temp page out key
                     for t in range(time_sample_start, time_sample_stop):
                         # Add cuboid to write buffer
-                        write_cuboid_key = self.kvio.insert_cube_in_write_buffer(wc_key_base,
+                        write_cuboid_key = self.kvio.insert_cube_in_write_buffer(base_write_cuboid_key, t, morton_idx,
                                                                                  temp_cube.get_blosc_numpy_by_time_index(t))
 
                         # Page Out Attempt Loop
@@ -660,6 +705,7 @@ class SpatialDB:
                         # Check for page out
                         if self.cache_state.in_page_out(temp_page_out_key, resource.get_lookup_key(),
                                                         resolution, morton_idx, time_sample_start):
+                            blog.debug("Writing Cuboid - Delayed Write: {}".format(write_cuboid_key))
                             # Delay Write!
                             self.cache_state.add_to_delayed_write(write_cuboid_key,
                                                                   resource.get_lookup_key(),
@@ -678,15 +724,18 @@ class SpatialDB:
 
                             if not in_page_out:
                                 # Good to trigger lambda!
+                                blog.debug("Writing Cuboid - Trying to trigger page out")
                                 self.objectio.trigger_page_out({"kv_config": self.kv_config,
                                                                 "state_config": self.state_conf,
                                                                 "object_store_config": self.object_store_config},
                                                                write_cuboid_key,
                                                                resource)
+                                blog.debug("Writing Cuboid - Triggered Page Out: {}".format(write_cuboid_key))
                                 # All done. Break.
                                 break
                             else:
                                 # Ended up in page out during transaction. Make delayed write.
+                                blog.debug("Writing Cuboid - Delayed Write: {}".format(write_cuboid_key))
                                 self.cache_state.add_to_delayed_write(write_cuboid_key,
                                                                       resource.get_lookup_key(),
                                                                       resolution,

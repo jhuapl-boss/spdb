@@ -196,6 +196,15 @@ class BossResource(metaclass=ABCMeta):
         Returns:
             (str): a JSON encoded string
         """
+        # Serialize and return
+        return json.dumps(self.to_dict())
+
+    def to_dict(self):
+        """
+        Method to convert a resource to a dictionary
+        Returns:
+            (dict): a dict of all the parameters
+        """
         # Populate everything
         self.populate_collection()
         self.populate_coord_frame()
@@ -220,7 +229,7 @@ class BossResource(metaclass=ABCMeta):
             data['channel_layer']['is_channel'] = False
 
         # Serialize and return
-        return json.dumps(data)
+        return data
 
     # Methods to populate class properties
     @abstractmethod

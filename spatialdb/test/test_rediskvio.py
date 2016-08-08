@@ -215,7 +215,8 @@ class RedisKVIOTestMixin(object):
 
         # Fake a write
         write_cuboid_key = "WRITE-CUBOID&{}".format(keys[0].split('&', 1)[1])
-        rkv.insert_cube_in_write_buffer(write_cuboid_key, data[0])
+        write_cuboid_key, time_sample, morton = write_cuboid_key.rsplit('&', 2)
+        rkv.insert_cube_in_write_buffer(write_cuboid_key, time_sample, morton, data[0])
 
         result = rkv.is_dirty(keys)
         assert result[0]

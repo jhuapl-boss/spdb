@@ -212,7 +212,7 @@ class RedisKVIO(KVIO):
             raise SpdbError("Error inserting cubes into the cache database. {}".format(e),
                             ErrorCodes.REDIS_ERROR)
 
-    def insert_cube_in_write_buffer(self, base_key, data):
+    def insert_cube_in_write_buffer(self, base_key, time_sample, morton_id, data):
         """Store a single cube (single time point) in the write buffer
 
         Args:
@@ -224,7 +224,7 @@ class RedisKVIO(KVIO):
         """
         # TODO: Move to parent class if this method sticks after optimization of write_cuboid method
         # Create write buffer key
-        key = "{}&{}".format(base_key, uuid.uuid4().hex)
+        key = "{}&{}&{}&{}".format(base_key, time_sample, morton_id, uuid.uuid4().hex)
 
         try:
             # Write data to redis

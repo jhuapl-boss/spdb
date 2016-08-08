@@ -62,9 +62,9 @@ class SpatialDBImageDataIntegrationTestMixin(object):
         assert 1==0
 
 
-class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
-                                         SpatialDBImageDataIntegrationTestMixin, unittest.TestCase):
-
+#class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
+#                                         SpatialDBImageDataIntegrationTestMixin, unittest.TestCase):
+class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataIntegrationTestMixin, unittest.TestCase):
     def setUpParams(self):
         """ Create a diction of configuration values for the test resource. """
         # setup resources
@@ -77,20 +77,18 @@ class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
         self.config = configuration.BossConfig()
 
         # kvio settings
-        self.cache_client = redis.StrictRedis(host=self.config['aws']['cache'], port=6379,
-                                              db=1,
-                                              decode_responses=False)
-        self.kvio_config = {"cache_client": self.cache_client, "read_timeout": 86400}
+        self.kvio_config = {"cache_host": self.config['aws']['cache'],
+                            "cache_db": 1,
+                            "read_timeout": 86400}
 
         # state settings
-        self.state_client = redis.StrictRedis(host=self.config['aws']['cache_state'],
-                                              port=6379, db=1,
-                                              decode_responses=False)
-        self.state_config = {"state_client": self.state_client}
+        self.state_config = {"cache_state_host": self.config['aws']['cache-state'], "cache_state_db": 1}
 
         # object store settings
-        self.object_store_config = {"s3_flush_queue": self.config['aws']['s3-flush-queue'],
-                                    "cuboid_bucket": "intTest.{}".format(self.config['aws']['s3-bucket']),
+        _, domain = self.config['aws']['cuboid_bucket'].split('.', 1)
+        self.s3_flush_queue_name = "intTest.S3FlushQueue.{}".format(domain).replace('.', '-')
+        self.object_store_config = {"s3_flush_queue": "",
+                                    "cuboid_bucket": "intTest.{}".format(self.config['aws']['cuboid_bucket']),
                                     "page_in_lambda_function": self.config['lambda']['page_in_function'],
                                     "page_out_lambda_function": self.config['lambda']['flush_function'],
                                     "s3_index_table": "intTest.{}".format(self.config['aws']['s3-index-table'])}
@@ -115,13 +113,11 @@ class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
             cls.setup_helper.create_cuboid_bucket(cls.object_store_config["cuboid_bucket"])
 
         try:
-            cls.object_store_config["s3_flush_queue"] = cls.setup_helper.create_flush_queue(
-                "intTest.{}".format(cls.config['aws']['s3-flush-queue']))
+            cls.object_store_config["s3_flush_queue"] = cls.setup_helper.create_flush_queue(cls.s3_flush_queue_name)
         except ClientError:
-            cls.setup_helper.delete_flush_queue(cls.object_store_config['aws']['s3-flush-queue'])
+            cls.setup_helper.delete_flush_queue(cls.object_store_config["s3_flush_queue"])
             time.sleep(60)
-            cls.object_store_config["s3_flush_queue"] = cls.setup_helper.create_flush_queue(
-                "intTest.{}".format(cls.config['aws']['s3-flush-queue']))
+            cls.object_store_config["s3_flush_queue"] = cls.setup_helper.create_flush_queue(cls.s3_flush_queue_name)
 
     @classmethod
     def tearDownClass(cls):
@@ -137,7 +133,7 @@ class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
             pass
 
         try:
-            cls.setup_helper.delete_flush_queue(cls.object_store_config["s3-flush-queue"])
+            cls.setup_helper.delete_flush_queue(cls.object_store_config["s3_flush_queue"])
         except:
             pass
 
