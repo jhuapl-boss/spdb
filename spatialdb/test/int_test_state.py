@@ -45,7 +45,7 @@ class IntegrationCacheStateDBTestMixin(object):
         while True:
             msg = csdb1.status_client_listener.get_message()
             if not msg:
-                break
+                continue
             if msg['type'] == "message":
                 break
 

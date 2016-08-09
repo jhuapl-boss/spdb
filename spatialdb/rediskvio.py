@@ -236,6 +236,22 @@ class RedisKVIO(KVIO):
             raise SpdbError("Error inserting cube into the write buffer. {}".format(e),
                             ErrorCodes.REDIS_ERROR)
 
+    def get_cube_from_write_buffer(self, write_cuboid_key):
+        """Retrieve a single cube from the write buffer
+
+        Args:
+            write_cuboid_key (str): the list of cuboid keys to read from the database
+
+        Returns:
+            (bytes): The blosc compressed byte array using the numpy interface
+        """
+        try:
+            # Get the data from the DB
+            return self.cache_client.get(write_cuboid_key)
+        except Exception as e:
+            raise SpdbError("Error retrieving cuboid from the write buffer. {}".format(e),
+                            ErrorCodes.REDIS_ERROR)
+
     def is_dirty(self, cache_key_list):
         """
         Check if a cuboid is dirty based on its cache key

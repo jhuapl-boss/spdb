@@ -230,6 +230,81 @@ class TestBasicResource(unittest.TestCase):
 
         assert resource.get_numpy_data_type() == np.uint8
 
+    def test_basic_resource_to_dict(self):
+        """Test basic to dict serialization method
+
+        Returns:
+            None
+
+        """
+        setup_data = self.get_image_dict()
+        resource = BossResourceBasic(setup_data)
+
+        data = resource.to_dict()
+
+        assert data['channel_layer'] == setup_data['channel_layer']
+
+        assert data['collection'] == setup_data['collection']
+
+        assert data['experiment'] == setup_data['experiment']
+
+        assert data['lookup_key'] == ['1&1&1']
+        assert data['boss_key'] == ['col1&exp1&ch1']
+
+    def test_basic_resource_from_dict(self):
+        """Test basic to dict deserialization method
+
+        Returns:
+            None
+
+        """
+        setup_data = self.get_image_dict()
+        resource1 = BossResourceBasic(setup_data)
+
+        resource2 = BossResourceBasic()
+        resource2.from_dict(resource1.to_dict())
+
+        # Check Collection
+        col = resource2.get_collection()
+        assert col.name == setup_data['collection']['name']
+        assert col.description == setup_data['collection']['description']
+
+        # Check coord frame
+        coord = resource2.get_coord_frame()
+        assert coord.name == setup_data['coord_frame']['name']
+        assert coord.description == setup_data['coord_frame']['description']
+        assert coord.x_start == setup_data['coord_frame']['x_start']
+        assert coord.x_stop == setup_data['coord_frame']['x_stop']
+        assert coord.y_start == setup_data['coord_frame']['y_start']
+        assert coord.y_stop == setup_data['coord_frame']['y_stop']
+        assert coord.z_start == setup_data['coord_frame']['z_start']
+        assert coord.z_stop == setup_data['coord_frame']['z_stop']
+        assert coord.x_voxel_size == setup_data['coord_frame']['x_voxel_size']
+        assert coord.y_voxel_size == setup_data['coord_frame']['y_voxel_size']
+        assert coord.z_voxel_size == setup_data['coord_frame']['z_voxel_size']
+        assert coord.voxel_unit == setup_data['coord_frame']['voxel_unit']
+        assert coord.time_step == setup_data['coord_frame']['time_step']
+        assert coord.time_step_unit == setup_data['coord_frame']['time_step_unit']
+
+        # Check exp
+        exp = resource2.get_experiment()
+        assert exp.name == setup_data['experiment']['name']
+        assert exp.description == setup_data['experiment']['description']
+        assert exp.num_hierarchy_levels == setup_data['experiment']['num_hierarchy_levels']
+        assert exp.hierarchy_method == setup_data['experiment']['hierarchy_method']
+        assert exp.max_time_sample == setup_data['experiment']['max_time_sample']
+
+        # Check channel
+        channel = resource2.get_channel()
+        assert channel.name == setup_data['channel_layer']['name']
+        assert channel.description == setup_data['channel_layer']['description']
+        assert channel.datatype == setup_data['channel_layer']['datatype']
+
+        # check keys
+        assert resource2.get_lookup_key() == setup_data['lookup_key']
+        assert resource2.get_boss_key() == setup_data['boss_key']
+
+
     def test_basic_resource_to_json(self):
         """Test basic to json serialization method
 

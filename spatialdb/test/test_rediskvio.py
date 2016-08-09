@@ -221,6 +221,23 @@ class RedisKVIOTestMixin(object):
         result = rkv.is_dirty(keys)
         assert result[0]
 
+    def test_write_buffer_io(self):
+        """Test methods specific to single cube write buffer io"""
+        resolution = 1
+        rkv = RedisKVIO(self.config_data)
+
+        # Clean up data
+        self.cache_client.flushdb()
+
+        data1 = np.random.randint(50, size=[10, 15, 5])
+        data_packed = blosc.pack_array(data1)
+
+        key = rkv.insert_cube_in_write_buffer("WRITE-CUBOID&4&1&1&1", 3, 234, data_packed)
+
+        data_rx = rkv.get_cube_from_write_buffer(key)
+
+        assert data_packed == data_rx
+
 
 @patch('redis.StrictRedis', mock_strict_redis_client)
 class TestRedisKVIOImageData(RedisKVIOTestMixin, unittest.TestCase):
