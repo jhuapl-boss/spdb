@@ -260,6 +260,35 @@ class AWSObjectStore(ObjectStore):
 
         return output_keys
 
+    def write_cuboid_to_object_keys(self, keys):
+        """
+        Method to convert write-cuboid keys to object-keys
+        Args:
+            keys (list(str)): A list of cached-cuboid keys
+
+        Returns:
+            (list(str)): A list of object keys
+        """
+        if not isinstance(keys, list):
+            t_list = []
+            t_list.append(keys)
+            keys = t_list
+
+        output_keys = []
+        for key in keys:
+            # Strip off front
+            temp_key = key.split("&", 1)[1]
+            temp_key = temp_key.rsplit("&", 1)[0]
+
+            # Hash
+            # TODO: sha256 best hash to use?
+            hash_str = hashlib.sha256(temp_key.encode()).hexdigest()
+
+            # Combine
+            output_keys.append("{}&{}".format(hash_str, temp_key))
+
+        return output_keys
+
     def object_to_cached_cuboid_keys(self, keys):
         """
         Method to convert object-keys to cached-cuboid keys

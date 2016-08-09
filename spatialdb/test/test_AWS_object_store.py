@@ -49,6 +49,19 @@ class AWSObjectStoreTestMixin(object):
         assert object_keys[0] == 'a4931d58076dc47773957809380f206e4228517c9fa6daed536043782024e480&1&1&1&0&0&12'
         assert object_keys[1] == 'f2b449f7e247c8aec6ecf754388a65ee6ea9dc245cd5ef149aebb2e0d20b4251&1&1&1&0&0&13'
 
+    def test_write_cuboid_to_object_keys(self):
+        """Test to check key conversion from cached cuboid to object"""
+
+        write_cuboid_keys = ["WRITE-CUBOID&1&1&1&0&0&12&SDFJlskDJasdfniasdf",
+                             "WRITE-CUBOID&1&1&1&0&0&13&KJHDLFHjsdhfshdfhsdfdsf"]
+
+        os = AWSObjectStore(self.object_store_config)
+        object_keys = os.write_cuboid_to_object_keys(write_cuboid_keys)
+
+        assert len(object_keys) == 2
+        assert object_keys[0] == 'a4931d58076dc47773957809380f206e4228517c9fa6daed536043782024e480&1&1&1&0&0&12'
+        assert object_keys[1] == 'f2b449f7e247c8aec6ecf754388a65ee6ea9dc245cd5ef149aebb2e0d20b4251&1&1&1&0&0&13'
+
     def test_object_to_cached_cuboid_keys(self):
         """Test to check key conversion from cached cuboid to object"""
 
