@@ -241,10 +241,8 @@ class AWSObjectStore(ObjectStore):
         Returns:
             (list(str)): A list of object keys
         """
-        if not isinstance(keys, list):
-            t_list = []
-            t_list.append(keys)
-            keys = t_list
+        if isinstance(keys, str):
+            keys = [keys]
 
         output_keys = []
         for key in keys:
@@ -269,10 +267,8 @@ class AWSObjectStore(ObjectStore):
         Returns:
             (list(str)): A list of object keys
         """
-        if not isinstance(keys, list):
-            t_list = []
-            t_list.append(keys)
-            keys = t_list
+        if isinstance(keys, str):
+            keys = [keys]
 
         output_keys = []
         for key in keys:
@@ -298,10 +294,8 @@ class AWSObjectStore(ObjectStore):
         Returns:
             (list(str)): A list of cached-cuboid keys
         """
-        if not isinstance(keys, list):
-            t_list = []
-            t_list.append(keys)
-            keys = t_list
+        if isinstance(keys, str):
+            keys = [keys]
 
         output_keys = []
         for key in keys:

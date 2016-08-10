@@ -435,13 +435,11 @@ class SpatialDB:
         # Wait for cuboids that are currently being written to finish
         start_time = datetime.now()
         dirty_keys = all_keys
+        blog.debug("Waiting for {} writes to finish before read can complete".format(len(dirty_keys)))
         while dirty_keys:
-            blog.debug("Waiting for writes to finish before read can complete")
-
             dirty_flags = self.kvio.is_dirty(dirty_keys)
             dirty_keys_temp, clean_keys = [], []
             for key, flag in zip(dirty_keys, dirty_flags):
-                blog.debug("Waiting on: {}, dirty: {}".format(key, flag))
                 (dirty_keys_temp if flag else clean_keys).append(key)
             dirty_keys = dirty_keys_temp
 
@@ -463,15 +461,16 @@ class SpatialDB:
             s3_key_idx, zero_key_idx = self.objectio.cuboids_exist(all_keys, missing_key_idx)
 
             if len(s3_key_idx) > 0:
-                blog.debug("Data missing from cache, but in S3")
+                blog.debug("Data missing from cache, but present in S3")
 
                 if len(s3_key_idx) > self.read_lambda_threshold:
                     # Trigger page-in of available blocks from object store and wait for completion
+                    blog.debug("Triggering Lambda Page-in")
                     self.page_in_cubes(list(itemgetter(*s3_key_idx)(all_keys)))
                 else:
                     # Read cuboids from S3 into cache directly
                     # Convert cuboid-cache keys to object keys
-                    blog.debug("Paging In Keys Directly")
+                    blog.debug("Paging-in Keys Directly")
                     temp_keys = self.objectio.cached_cuboid_to_object_keys(itemgetter(*s3_key_idx)(all_keys))
 
                     # Get objects
@@ -528,7 +527,6 @@ class SpatialDB:
             # Get the dirty ones when you can with a timeout
             start_time = datetime.now()
             while dirty_keys:
-                blog.debug("Waiting for writes to finish before read can complete")
                 dirty_flags = self.kvio.is_dirty(cached_keys_list)
                 dirty_keys, clean_keys = [], []
                 for key, flag in zip(cached_keys_list, dirty_flags):
@@ -629,7 +627,6 @@ class SpatialDB:
         boss_logger.setLevel("debug")
         blog = boss_logger.logger
         blog.debug("In write_cuboid")
-        blog.error("In write_cuboid2")
 
         # Check if the resource is locked
         if self.resource_locked(resource.get_lookup_key()):

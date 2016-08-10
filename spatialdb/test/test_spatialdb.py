@@ -171,7 +171,7 @@ class SpatialDBImageDataTestMixin(object):
         """Test the get_cubes method - no time - single"""
         db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
-        cube = db.cutout(self.resource, (0, 0, 0), (128, 128, 16), 0)
+        cube = db.cutout(self.resource, (7, 88, 243), (128, 128, 16), 0)
 
         np.testing.assert_array_equal(np.sum(cube.data), 0)
 

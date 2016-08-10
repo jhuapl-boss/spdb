@@ -30,7 +30,7 @@ from bossutils import configuration
 class SpatialDBImageDataIntegrationTestMixin(object):
 
     def test_cutout_no_time_single_aligned_hit(self):
-        """Test the get_cubes method - no time - single"""
+        """Test the get_cubes method - no time - single - miss"""
         # Generate random data
         cube1 = Cube.create_cube(self.resource, [128, 128, 16])
         cube1.data = np.random.randint(0, 254, (1, 16, 128, 128))
@@ -45,26 +45,69 @@ class SpatialDBImageDataIntegrationTestMixin(object):
         np.testing.assert_array_equal(cube1.data, cube2.data)
 
     def test_cutout_no_time_single_aligned_miss(self):
-        """Test the get_cubes method - no time - single"""
+        """Test the get_cubes method - no time - single - hit"""
         # Generate random data
-        #cube1 = Cube.create_cube(self.resource, [128, 128, 16])
-        #cube1.data = np.random.randint(0, 254, (1, 16, 128, 128))
-        #cube1.morton_id = 0
-#
-        #db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
-#
-        ## populate dummy data
-        #self.write_test_cube(db, self.resource, 0, cube1, cache=False, s3=True)
-#
-        #cube2 = db.cutout(self.resource, (0, 0, 0), (128, 128, 16), 0)
-#
-        #np.testing.assert_array_equal(cube1.data, cube2.data)
-        assert 1==0
+        cube1 = Cube.create_cube(self.resource, [128, 128, 16])
+        cube1.data = np.random.randint(0, 254, (1, 16, 128, 128))
+        cube1.morton_id = 0
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        sp.write_cuboid(self.resource, (1, 0, 0), 0, cube1.data)
+
+        cube2 = sp.cutout(self.resource, (1, 0, 0), (128, 128, 16), 0)
+
+        # Make sure data is the same
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+
+        # Delete everything in the cache
+        sp.kvio.cache_client.flushdb()
+
+        # Get the data again
+        cube3 = sp.cutout(self.resource, (1, 0, 0), (128, 128, 16), 0)
+
+        # Make sure the data is the same
+        np.testing.assert_array_equal(cube1.data, cube3.data)
+
+    def test_cutout_no_time_single_aligned_existing_hit(self):
+        """Test the get_cubes method - no time - aligned - existing data - miss"""
+        # Generate random data
+        print("test1")
+        data1 = np.random.randint(0, 254, (16, 128, 128))
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        sp.write_cuboid(self.resource, (0, 0, 0), 0, data1)
+
+        cube2 = sp.cutout(self.resource, (0, 0, 0), (128, 128, 16), 0)
+
+        np.testing.assert_array_equal(data1, np.squeeze(cube2.data))
+
+        # now write to cuboid again
+        print("test2")
+        data3 = np.random.randint(0, 254, (16, 128, 128))
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        sp.write_cuboid(self.resource, (2, 0, 0), 0, data3)
+
+        cube4 = sp.cutout(self.resource, (2, 0, 0), (128, 128, 16), 0)
+
+        np.testing.assert_array_equal(data3, cube4.data)
 
 
-#class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
-#                                         SpatialDBImageDataIntegrationTestMixin, unittest.TestCase):
-class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataIntegrationTestMixin, unittest.TestCase):
+class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
+                                         SpatialDBImageDataIntegrationTestMixin, unittest.TestCase):
+
+    def tearDown(self):
+        """Clean kv store in between tests"""
+        client = redis.StrictRedis(host=self.kvio_config['cache_host'],
+                                   port=6379, db=1, decode_responses=False)
+        client.flushdb()
+        client = redis.StrictRedis(host=self.state_config['cache_state_host'],
+                                   port=6379, db=1, decode_responses=False)
+        client.flushdb()
+
     def setUpParams(self):
         """ Create a diction of configuration values for the test resource. """
         # setup resources
