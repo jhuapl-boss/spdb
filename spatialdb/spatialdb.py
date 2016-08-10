@@ -88,7 +88,7 @@ class SpatialDB:
         # Threshold number of cuboids for using lambda on reads
         self.read_lambda_threshold = 4
         # Number of seconds to wait for dirty cubes to get clean
-        self.dirty_read_timeout = 60
+        self.dirty_read_timeout = 20
 
         # Currently only a AWS object store is supported, so create interface instance
         self.objectio = AWSObjectStore(object_store_conf)
@@ -114,8 +114,7 @@ class SpatialDB:
 
     # Cube Processing Methods
     def get_cubes(self, resource, key_list):
-        """Load an array of cuboids from the cache key-value store as raw compressed byte arrays dealing with
-        cache misses if necessary (future)
+        """Load an array of cuboids from the cache key-value store as raw compressed byte arrays
 
         Args:
             resource (spdb.project.BossResource): Data model info based on the request or target resource
@@ -137,7 +136,7 @@ class SpatialDB:
         cuboids = sorted(cuboids, key=lambda element: (element[0], element[1]))
 
         # Unpack to lists
-        morton, time, cube_bytes = zip(*cuboids)
+        morton, time_sample, cube_bytes = zip(*cuboids)
 
         # Get groups of time samples by morton ID
         morton = np.array(morton)
@@ -160,9 +159,10 @@ class SpatialDB:
 
             # populate with all the time samples
             if not_time_series:
-                temp_cube.from_blosc_numpy(cube_bytes[start:end], [time[start], time[start] + 1])
+                print(time_sample[start])
+                temp_cube.from_blosc_numpy(cube_bytes[start:end], [time_sample[start], time_sample[start] + 1])
             else:
-                temp_cube.from_blosc_numpy(cube_bytes[start:end], [time[start], time[end - 1] + 1])
+                temp_cube.from_blosc_numpy(cube_bytes[start:end], [time_sample[start], time_sample[end - 1] + 1])
 
             # Save for output
             output_cubes.append(temp_cube)

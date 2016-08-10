@@ -29,51 +29,51 @@ from bossutils import configuration
 
 class SpatialDBImageDataIntegrationTestMixin(object):
 
-    def test_cutout_no_time_single_aligned_hit(self):
-        """Test the get_cubes method - no time - single - miss"""
-        # Generate random data
-        cube1 = Cube.create_cube(self.resource, [128, 128, 16])
-        cube1.data = np.random.randint(0, 254, (1, 16, 128, 128))
-        cube1.morton_id = 0
-
-        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
-
-        sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data)
-
-        cube2 = sp.cutout(self.resource, (0, 0, 0), (128, 128, 16), 0)
-
-        np.testing.assert_array_equal(cube1.data, cube2.data)
-
-    def test_cutout_no_time_single_aligned_miss(self):
-        """Test the get_cubes method - no time - single - hit"""
-        # Generate random data
-        cube1 = Cube.create_cube(self.resource, [128, 128, 16])
-        cube1.data = np.random.randint(0, 254, (1, 16, 128, 128))
-        cube1.morton_id = 0
-
-        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
-
-        sp.write_cuboid(self.resource, (1, 0, 0), 0, cube1.data)
-
-        cube2 = sp.cutout(self.resource, (1, 0, 0), (128, 128, 16), 0)
-
-        # Make sure data is the same
-        np.testing.assert_array_equal(cube1.data, cube2.data)
-
-        # Delete everything in the cache
-        sp.kvio.cache_client.flushdb()
-
-        # Get the data again
-        cube3 = sp.cutout(self.resource, (1, 0, 0), (128, 128, 16), 0)
-
-        # Make sure the data is the same
-        np.testing.assert_array_equal(cube1.data, cube3.data)
+    #def test_cutout_no_time_single_aligned_hit(self):
+    #    """Test the get_cubes method - no time - single - miss"""
+    #    # Generate random data
+    #    cube1 = Cube.create_cube(self.resource, [128, 128, 16])
+    #    cube1.data = np.random.randint(0, 254, (1, 16, 128, 128))
+    #    cube1.morton_id = 0
+#
+    #    sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+#
+    #    sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data)
+#
+    #    cube2 = sp.cutout(self.resource, (0, 0, 0), (128, 128, 16), 0)
+#
+    #    np.testing.assert_array_equal(cube1.data, cube2.data)
+#
+    #def test_cutout_no_time_single_aligned_miss(self):
+    #    """Test the get_cubes method - no time - single - hit"""
+    #    # Generate random data
+    #    cube1 = Cube.create_cube(self.resource, [128, 128, 16])
+    #    cube1.data = np.random.randint(0, 254, (1, 16, 128, 128))
+    #    cube1.morton_id = 0
+#
+    #    sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+#
+    #    sp.write_cuboid(self.resource, (1, 0, 0), 0, cube1.data)
+#
+    #    cube2 = sp.cutout(self.resource, (1, 0, 0), (128, 128, 16), 0)
+#
+    #    # Make sure data is the same
+    #    np.testing.assert_array_equal(cube1.data, cube2.data)
+#
+    #    # Delete everything in the cache
+    #    sp.kvio.cache_client.flushdb()
+#
+    #    # Get the data again
+    #    cube3 = sp.cutout(self.resource, (1, 0, 0), (128, 128, 16), 0)
+#
+    #    # Make sure the data is the same
+    #    np.testing.assert_array_equal(cube1.data, cube3.data)
 
     def test_cutout_no_time_single_aligned_existing_hit(self):
         """Test the get_cubes method - no time - aligned - existing data - miss"""
         # Generate random data
         print("test1")
-        data1 = np.random.randint(0, 254, (16, 128, 128))
+        data1 = np.random.randint(1, 254, (16, 128, 128))
 
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
@@ -85,19 +85,22 @@ class SpatialDBImageDataIntegrationTestMixin(object):
 
         # now write to cuboid again
         print("test2")
-        data3 = np.random.randint(0, 254, (16, 128, 128))
+        data3 = np.random.randint(1, 254, (16, 128, 128))
 
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
-        sp.write_cuboid(self.resource, (2, 0, 0), 0, data3)
+        sp.write_cuboid(self.resource, (0, 0, 0), 0, data3)
 
-        cube4 = sp.cutout(self.resource, (2, 0, 0), (128, 128, 16), 0)
+        cube4 = sp.cutout(self.resource, (0, 0, 0), (128, 128, 16), 0)
+        print("testing old")
+        np.testing.assert_array_equal(data1, np.squeeze(cube4.data))
+        print("testing new")
+        np.testing.assert_array_equal(data3, np.squeeze(cube4.data))
 
-        np.testing.assert_array_equal(data3, cube4.data)
 
-
-class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
-                                         SpatialDBImageDataIntegrationTestMixin, unittest.TestCase):
+#class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
+#                                         SpatialDBImageDataIntegrationTestMixin, unittest.TestCase):
+class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataIntegrationTestMixin, unittest.TestCase):
 
     def tearDown(self):
         """Clean kv store in between tests"""

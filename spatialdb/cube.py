@@ -162,6 +162,7 @@ class Cube(metaclass=ABCMeta):
             yield (t, blosc.pack_array(self.data[cnt, :, :, :]))
 
     def from_blosc_numpy(self, byte_arrays, time_sample_range=None):
+        # TODO: Conditional properties of this method are challenging for the developer. break into multiple methods
         """Uncompress and populate Cube data from a Blosc serialized and compressed byte array using the numpy interface
 
         If byte_arrays is a list, assume data is stored internally in this Cube instance in tzyx ordering and
@@ -202,6 +203,7 @@ class Cube(metaclass=ABCMeta):
                         temp_mat = blosc.unpack_array(byte_arrays[idx])
 
                         # Set shape
+                        print("shape in from_blosc_numpy: {}".format(temp_mat.shape))
                         self.z_dim, self.y_dim, self.x_dim = self.cube_size = list(temp_mat.shape)
 
                         # allocate
@@ -211,9 +213,8 @@ class Cube(metaclass=ABCMeta):
                         self.data[idx, :, :, :] = temp_mat
                     else:
                         self.data[idx, :, :, :] = blosc.unpack_array(byte_arrays[idx])
-
-        except:
-            raise SpdbError("Failed to decompress database cube.  Data integrity concern.",
+        except Exception as e:
+            raise SpdbError("Failed to decompress database cube. {}".format(e),
                             ErrorCodes.SERIALIZATION_ERROR)
 
         self._created_from_zeros = False
