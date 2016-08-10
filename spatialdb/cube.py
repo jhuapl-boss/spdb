@@ -125,28 +125,29 @@ class Cube(metaclass=ABCMeta):
         try:
             # Index into the data array with time
             return blosc.pack_array(self.data[:, :, :, :])
-        except:
-            raise SpdbError("Failed to decompress database cube.  Data integrity concern.",
+        except Exception as e:
+            raise SpdbError("Failed to compress cube. {}".format(e),
                             ErrorCodes.SERIALIZATION_ERROR)
 
     def get_blosc_numpy_by_time_index(self, time_index=0):
         """A method that packs data in this Cube instance using Blosc and the numpy array specific interface for a
-        single time sample.  The time index is the index value into self.data.
+        single time sample.  The time index is the time sample index value.  It will be converted to an actual index
+        into self.data by removing the cube's time offset
 
-        If the time_index isn't specified, 0 is used.
+        If the time_index isn't specified, 0 is used, effectively selecting the first sample.
 
         Args:
-            time_index (int): Index (starting from 0) into the time dimension of the data stored by this instance
+            time_index (int): Time sample to get.
 
         Returns:
             bytes - the compressed, serialized byte array of Cube matrix data for a given time sample
 
         """
         try:
-            # Index into the data array with time
-            return blosc.pack_array(self.data[time_index, :, :, :])
-        except:
-            raise SpdbError("Failed to decompress database cube.  Data integrity concern.",
+            # Index into the data array with time.  Return a 4D array
+            return blosc.pack_array(np.expand_dims(self.data[time_index - self.time_range[0], :, :, :], axis=0))
+        except Exception as e:
+            raise SpdbError("Failed to compress cube. {}".format(e),
                             ErrorCodes.SERIALIZATION_ERROR)
 
     def get_all_blosc_numpy_arrays(self):
@@ -158,17 +159,21 @@ class Cube(metaclass=ABCMeta):
         """
         # Create compressed byte arrays for each time point, and return in order as a tuple, indicating
         # the time point
-        for cnt, t in enumerate(range(self.time_range[0], self.time_range[1])):
-            yield (t, blosc.pack_array(self.data[cnt, :, :, :]))
+        try:
+            for cnt, t in enumerate(range(self.time_range[0], self.time_range[1])):
+                yield (t, blosc.pack_array(np.expand_dims(self.data[cnt, :, :, :], axis=0)))
+        except Exception as e:
+            raise SpdbError("Failed to compress cube. {}".format(e),
+                            ErrorCodes.SERIALIZATION_ERROR)
 
     def from_blosc_numpy(self, byte_arrays, time_sample_range=None):
         # TODO: Conditional properties of this method are challenging for the developer. break into multiple methods
         """Uncompress and populate Cube data from a Blosc serialized and compressed byte array using the numpy interface
 
         If byte_arrays is a list, assume data is stored internally in this Cube instance in tzyx ordering and
-        each byte array is a single zyx ordered time sample, in order, matching time_sample_range.
+        each byte array is a single tzyx ordered time sample, in order, matching time_sample_range.
 
-        If byte_arrays is a single list, assume it contains the entire Cube's data for all time samples and is of the
+        If byte_arrays is a single bytearray, assume it contains the entire Cube's data for all time samples and is of the
         format tzyx. Directly decompress and replace data in the Cube instance.
 
         Args:
@@ -194,7 +199,7 @@ class Cube(metaclass=ABCMeta):
                 self.data[:, :, :, :] = blosc.unpack_array(byte_arrays)
                 self.z_dim, self.y_dim, self.x_dim = self.cube_size = list(self.data.shape)[1:]
             else:
-                # Got a list of byte arrays, so assume they are each 3-D, corresponding to time samples
+                # Got a list of byte arrays, so assume they are each 4-D, corresponding to time samples
 
                 # Unpack all of the arrays into the cube
                 for idx, t in enumerate(range(time_sample_range[0], time_sample_range[1])):
@@ -203,8 +208,7 @@ class Cube(metaclass=ABCMeta):
                         temp_mat = blosc.unpack_array(byte_arrays[idx])
 
                         # Set shape
-                        print("shape in from_blosc_numpy: {}".format(temp_mat.shape))
-                        self.z_dim, self.y_dim, self.x_dim = self.cube_size = list(temp_mat.shape)
+                        self.z_dim, self.y_dim, self.x_dim = self.cube_size = list(temp_mat.shape)[1:]
 
                         # allocate
                         self.data = np.zeros(shape=(time_sample_range[1] - time_sample_range[0],

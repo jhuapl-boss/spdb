@@ -159,7 +159,6 @@ class SpatialDB:
 
             # populate with all the time samples
             if not_time_series:
-                print(time_sample[start])
                 temp_cube.from_blosc_numpy(cube_bytes[start:end], [time_sample[start], time_sample[start] + 1])
             else:
                 temp_cube.from_blosc_numpy(cube_bytes[start:end], [time_sample[start], time_sample[end - 1] + 1])
