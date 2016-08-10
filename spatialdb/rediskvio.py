@@ -140,7 +140,7 @@ class RedisKVIO(KVIO):
         result = []
         for key, data in zip(key_list, rows):
             if not data:
-                raise SpdbError("Received unexpected empty cuboid.",
+                raise SpdbError("Received unexpected empty cuboid. {}".format(key),
                                 ErrorCodes.REDIS_ERROR)
             vals = key.split("&")
             result.append((int(vals[-1]), int(vals[-2]), data))
@@ -195,10 +195,8 @@ class RedisKVIO(KVIO):
         Returns:
 
         """
-        if not isinstance(key_list, list):
-            t_list = []
-            t_list.append(key_list)
-            key_list = t_list
+        if isinstance(key_list, str):
+            key_list = [key_list]
 
         try:
             # Write data to redis
@@ -261,10 +259,8 @@ class RedisKVIO(KVIO):
         Returns:
             (list(bool)): A list of booleans, indicating if each key is dirty or not
         """
-        if not isinstance(cache_key_list, list):
-            t_list = []
-            t_list.append(cache_key_list)
-            cache_key_list = t_list
+        if isinstance(cache_key_list, str):
+            cache_key_list = [cache_key_list]
 
         # Convert cached-keys to write-cuboid keys without UUID
         # (we can't recreate UUIDs and want to check for ALL write-cuboid keys for a given cuboid anyway)

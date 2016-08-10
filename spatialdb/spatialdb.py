@@ -86,9 +86,9 @@ class SpatialDB:
         self.object_store_config = object_store_conf
 
         # Threshold number of cuboids for using lambda on reads
-        self.read_lambda_threshold = 4
+        self.read_lambda_threshold = 600  # Currently high since read lambda not implemented
         # Number of seconds to wait for dirty cubes to get clean
-        self.dirty_read_timeout = 20
+        self.dirty_read_timeout = 60
 
         # Currently only a AWS object store is supported, so create interface instance
         self.objectio = AWSObjectStore(object_store_conf)
@@ -124,10 +124,8 @@ class SpatialDB:
             list(cube.Cube): The cuboid data with time-series support, packed into Cube instances, sorted by morton id
         """
         # If you didn't pass in a list it's a single key. Carefully put it into a list without splitting characters
-        if not isinstance(key_list, list):
-            t_list = []
-            t_list.append(key_list)
-            key_list = t_list
+        if isinstance(key_list, str):
+            key_list = [key_list]
 
         # Get all cuboid byte arrays from db
         cuboids = self.kvio.get_cubes(key_list)
@@ -476,6 +474,7 @@ class SpatialDB:
                     temp_cubes = self.objectio.get_objects(temp_keys)
 
                     # write to cache
+                    blog.debug("put keys on direct page in: {}".format(itemgetter(*s3_key_idx)(all_keys)))
                     self.kvio.put_cubes(itemgetter(*s3_key_idx)(all_keys), temp_cubes)
 
             if len(zero_key_idx) > 0:
@@ -495,6 +494,7 @@ class SpatialDB:
         # TODO: Optimize access to cache data and checking for dirty cubes
         if len(s3_key_idx) > 0:
             blog.debug("Get cubes from cache that were paged in from S3")
+            blog.debug(itemgetter(*s3_key_idx)(all_keys))
 
             s3_cuboids = self.get_cubes(resource, itemgetter(*s3_key_idx)(all_keys))
 
@@ -507,10 +507,10 @@ class SpatialDB:
 
             # Get the cached keys once in list form
             cached_keys_list = itemgetter(*cached_key_idx)(all_keys)
-            if not isinstance(cached_keys_list, list):
-                t_list = []
-                t_list.append(cached_keys_list)
-                cached_keys_list = t_list
+            if isinstance(cached_keys_list, str):
+                cached_keys_list = [cached_keys_list]
+            if isinstance(cached_keys_list, tuple):
+                cached_keys_list = list(cached_keys_list)
 
             # Split clean and dirty keys
             dirty_flags = self.kvio.is_dirty(cached_keys_list)
@@ -613,7 +613,7 @@ class SpatialDB:
 
         Args:
             resource (project.BossResource): Data model info based on the request or target resource
-            corner ((int, int, int)): a list of Morton ID of the cuboids to get
+            corner ((int, int, int)): the xyz location of the corner of the cutout
             resolution (int): the resolution level
             cuboid_data (numpy.ndarray): Matrix of data to write as cuboids
             time_sample_start (int): if cuboid_data.ndim == 3, the time sample for the data
@@ -700,7 +700,7 @@ class SpatialDB:
                         temp_page_out_key = "TEMP&{}".format(uuid.uuid4().hex)
                         # Check for page out
                         if self.cache_state.in_page_out(temp_page_out_key, resource.get_lookup_key(),
-                                                        resolution, morton_idx, time_sample_start):
+                                                        resolution, morton_idx, t):
                             blog.debug("Writing Cuboid - Delayed Write: {}".format(write_cuboid_key))
                             # Delay Write!
                             self.cache_state.add_to_delayed_write(write_cuboid_key,
@@ -708,8 +708,8 @@ class SpatialDB:
                                                                   resolution,
                                                                   morton_idx,
                                                                   t)
-                            # You are done. break out
-                            break
+                            # You are done. continue
+                            #break
                         else:
                             # Attempt to get write slot by checking page out
                             in_page_out = self.cache_state.add_to_page_out(temp_page_out_key,
@@ -728,7 +728,7 @@ class SpatialDB:
                                                                resource)
                                 blog.debug("Writing Cuboid - Triggered Page Out: {}".format(write_cuboid_key))
                                 # All done. Break.
-                                break
+                                #break
                             else:
                                 # Ended up in page out during transaction. Make delayed write.
                                 blog.debug("Writing Cuboid - Delayed Write: {}".format(write_cuboid_key))
