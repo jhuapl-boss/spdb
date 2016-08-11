@@ -463,7 +463,7 @@ class SpatialDB:
                 if len(s3_key_idx) > self.read_lambda_threshold:
                     # Trigger page-in of available blocks from object store and wait for completion
                     blog.debug("Triggering Lambda Page-in")
-                    self.page_in_cubes(list(itemgetter(*s3_key_idx)(all_keys)))
+                    self.page_in_cubes(itemgetter(*s3_key_idx)(all_keys))
                 else:
                     # Read cuboids from S3 into cache directly
                     # Convert cuboid-cache keys to object keys

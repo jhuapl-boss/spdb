@@ -331,6 +331,7 @@ class AWSObjectStore(ObjectStore):
         params = {"page_in_channel": page_in_chan,
                   "kv_config": kv_config,
                   "state_config": state_config,
+                  "lambda-name": "page_in_lambda_function",
                   "object_store_config": self.config}
 
         # TODO: Make concurrent
