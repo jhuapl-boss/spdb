@@ -14,4 +14,4 @@ make all
 export PYTHONPATH=$WORKSPACE:../../../boss-tools/workspace
 
 cd $WORKSPACE/spdb
-nose2
+nose2 --config jenkins_nose2.cfg
