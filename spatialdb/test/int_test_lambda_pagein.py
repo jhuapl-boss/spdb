@@ -27,6 +27,10 @@ from botocore.exceptions import ClientError
 from bossutils import configuration
 
 
+"""
+Test lambda page in function.  Note, tests assume cuboid size is 
+(128, 128, 16).
+"""
 class TestIntegrationLambdaPageInImage8Data(unittest.TestCase):
 
     def tearDown(self):
@@ -116,7 +120,7 @@ class TestIntegrationLambdaPageInImage8Data(unittest.TestCase):
     def get_num_status_keys(self, spdb):
         return len(self.status_client.keys("*"))
 
-    def test_page_in(self):
+    def test_page_in_single_cuboid(self):
         # Generate random data
         cube1 = Cube.create_cube(self.resource, [128, 128, 16])
         cube1.data = np.random.randint(1, 254, (1, 16, 128, 128))
@@ -144,3 +148,91 @@ class TestIntegrationLambdaPageInImage8Data(unittest.TestCase):
 
         # Make sure the data is the same
         np.testing.assert_array_equal(cube1.data, cube3.data)
+
+    def test_page_in_multi_cuboids_x_dir(self):
+        # Generate random data
+        cube1 = Cube.create_cube(self.resource, [256, 128, 16])
+        cube1.data = np.random.randint(1, 254, (1, 16, 128, 256))
+        cube1.morton_id = 0
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data)
+
+        cube2 = sp.cutout(self.resource, (0, 0, 0), (256, 128, 16), 0)
+
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+
+        # Make sure data is the same
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+
+        # Delete everything in the cache
+        sp.kvio.cache_client.flushdb()
+
+        # Force use of lambda function.
+        sp.read_lambda_threshold = 0
+
+        # Get the data again, which should trigger lambda page in.
+        cube3 = sp.cutout(self.resource, (0, 0, 0), (256, 128, 16), 0)
+
+        # Make sure the data is the same
+        np.testing.assert_array_equal(cube1.data, cube3.data)
+
+    def test_page_in_multi_cuboids_y_dir(self):
+        # Generate random data
+        cube1 = Cube.create_cube(self.resource, [128, 256, 16])
+        cube1.data = np.random.randint(1, 254, (1, 16, 256, 128))
+        cube1.morton_id = 0
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data)
+
+        cube2 = sp.cutout(self.resource, (0, 0, 0), (128, 256, 16), 0)
+
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+
+        # Make sure data is the same
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+
+        # Delete everything in the cache
+        sp.kvio.cache_client.flushdb()
+
+        # Force use of lambda function.
+        sp.read_lambda_threshold = 0
+
+        # Get the data again, which should trigger lambda page in.
+        cube3 = sp.cutout(self.resource, (0, 0, 0), (128, 256, 16), 0)
+
+        # Make sure the data is the same
+        np.testing.assert_array_equal(cube1.data, cube3.data)
+
+    def test_page_in_multi_cuboids_z_dir(self):
+        # Generate random data
+        cube1 = Cube.create_cube(self.resource, [128, 128, 32])
+        cube1.data = np.random.randint(1, 254, (1, 32, 128, 128))
+        cube1.morton_id = 0
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data)
+
+        cube2 = sp.cutout(self.resource, (0, 0, 0), (128, 128, 32), 0)
+
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+
+        # Make sure data is the same
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+
+        # Delete everything in the cache
+        sp.kvio.cache_client.flushdb()
+
+        # Force use of lambda function.
+        sp.read_lambda_threshold = 0
+
+        # Get the data again, which should trigger lambda page in.
+        cube3 = sp.cutout(self.resource, (0, 0, 0), (128, 128, 32), 0)
+
+        # Make sure the data is the same
+        np.testing.assert_array_equal(cube1.data, cube3.data)
+
