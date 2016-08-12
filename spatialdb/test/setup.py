@@ -76,8 +76,8 @@ class SetupTests(object):
         else:
             waiter = self._create_s3_index_table(table_name)
 
-            # Wait for table to be ready (since this is real)
-            waiter.wait(TableName=table_name)
+            # Wait for actual table to be ready.
+            self.wait_table_create(table_name)
 
     def _delete_s3_index_table(self, table_name):
         """Method to delete the S3 index table"""
@@ -92,9 +92,49 @@ class SetupTests(object):
             self._delete_s3_index_table(table_name)
 
             # Wait for table to be deleted (since this is real)
-            client = boto3.client('dynamodb', region_name=get_region())
-            waiter = client.get_waiter('table_not_exists')
-            waiter.wait(TableName=table_name)
+            self.wait_table_delete(table_name)
+
+    def wait_table_create(self, table_name):
+        """Poll dynamodb at a 2s interval until the table creates."""
+        print('Waiting for creation of table {}'.format(
+            table_name), end='', flush=True)
+        client = boto3.client('dynamodb', region_name=get_region())
+        cnt = 0
+        while True:
+            time.sleep(2)
+            cnt += 1
+            if cnt > 50:
+                # Give up waiting.
+                return
+            try:
+                print('.', end='', flush=True)
+                resp = client.describe_table(TableName=table_name)
+                if resp['Table']['TableStatus'] == 'ACTIVE':
+                    print('')
+                    return
+            except:
+                # May get an exception if table doesn't currently exist.
+                pass
+
+    def wait_table_delete(self, table_name):
+        """Poll dynamodb at a 2s interval until the table deletes."""
+        print('Waiting for deletion of table {}'.format(
+            table_name), end='', flush=True)
+        client = boto3.client('dynamodb', region_name=get_region())
+        cnt = 0
+        while True:
+            time.sleep(2)
+            cnt += 1
+            if cnt > 50:
+                # Give up waiting.
+                return
+            try:
+                print('.', end='', flush=True)
+                resp = client.describe_table(TableName=table_name)
+            except:
+                # Exception thrown when table doesn't exist.
+                print('')
+                return
 
     # ***** END Cuboid Index Table END *****
 
