@@ -230,24 +230,43 @@ class CacheStateDB(object):
         self.status_client.rpush("DELAYED-WRITE&{}&{}&{}&{}".format(lookup_key, resolution, time_sample, morton),
                                  write_cuboid_key)
 
-    def get_delayed_write_keys(self):
+    def get_all_delayed_write_keys(self):
         """
-        Method to get delayed write-cuboid keys for processing
+        Method to get all available delayed write key
 
         Returns:
-            list((str, str)): List of tuples where the first item is the delayed-write key and the second is the
-                                write-cuboid key
+            list(str): List of available delayed write keys
         """
-        # TODO: Double check if key doesn't exist lpop returns nil
         delayed_write_keys = self.status_client.keys("DELAYED-WRITE*")
-        output = []
-        if delayed_write_keys:
-            for key in delayed_write_keys:
-                write_cuboid_key = self.status_client.lpop(key)
-                if write_cuboid_key:
-                    output.append((key, write_cuboid_key))
+        return [x.decode() for x in delayed_write_keys]
 
-        return output
+    def write_cuboid_key_to_delayed_write_key(self, write_cuboid_key):
+        """
+        Method to convert a write-cuboid key to a delayed write key
+
+        Returns:
+            str:  delayed write key
+        """
+        temp_key = write_cuboid_key.split("&", 1)[1]
+        temp_key = temp_key.rsplit("&", 1)[0]
+
+        return "DELAYED-WRITE&{}".format(temp_key)
+
+    def get_delayed_writes(self, delayed_write_key):
+        """
+        Method to get all delayed write-cuboid keys for a single delayed_write_key
+
+        Returns:
+            list(str): List of delayed write-cuboid keys
+        """
+        output = []
+        write_cuboid_key = self.status_client.lpop(delayed_write_key)
+        while write_cuboid_key:
+            if write_cuboid_key:
+                output.append(write_cuboid_key)
+            write_cuboid_key = self.status_client.lpop(delayed_write_key)
+
+        return [x.decode() for x in output]
 
     def add_to_page_out(self, temp_page_out_key, lookup_key, resolution, morton, time_sample):
         """

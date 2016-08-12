@@ -100,34 +100,77 @@ class CacheStateDBTestMixin(object):
         """Test if a cube is in delayed write"""
         csdb = CacheStateDB(self.config_data)
 
-        lookup_key = "1&1&1"
-        resolution = 1
-        time_sample = 1
-        morton = 234
-        write_cuboid_key1 = "WRITE-CUBOID&{}&{}&{}&daadsfjk".format(lookup_key,
+        lookup_key = "1&2&3"
+        resolution = 4
+        time_sample = 5
+        morton = 66
+        write_cuboid_key1 = "WRITE-CUBOID&{}&{}&{}&{}&daadsfjk".format(lookup_key,
                                                                     resolution,
                                                                     time_sample,
                                                                     morton)
-        write_cuboid_key2 = "WRITE-CUBOID&{}&{}&{}&fghfghjg".format(lookup_key,
+        write_cuboid_key2 = "WRITE-CUBOID&{}&{}&{}&{}&fghfghjg".format(lookup_key,
                                                                     resolution,
                                                                     time_sample,
                                                                     morton)
 
-        keys = csdb.get_delayed_write_keys()
+        keys = csdb.get_all_delayed_write_keys()
         assert not keys
 
         csdb.add_to_delayed_write(write_cuboid_key1, lookup_key, resolution, morton, time_sample)
         csdb.add_to_delayed_write(write_cuboid_key2, lookup_key, resolution, morton, time_sample)
 
-        keys = csdb.get_delayed_write_keys()
+        keys = csdb.get_all_delayed_write_keys()
         assert len(keys) == 1
-        assert keys[0][1].decode() == write_cuboid_key1
+        assert keys[0] == "DELAYED-WRITE&{}&{}&{}&{}".format(lookup_key,
+                                                             resolution,
+                                                             time_sample,
+                                                             morton)
 
-        keys = csdb.get_delayed_write_keys()
-        assert len(keys) == 1
-        assert keys[0][1].decode() == write_cuboid_key2
+        write_keys = csdb.get_delayed_writes(keys[0])
+        assert len(write_keys) == 2
+        assert write_keys[0] == write_cuboid_key1
+        assert write_keys[1] == write_cuboid_key2
 
-        keys = csdb.get_delayed_write_keys()
+    def test_get_all_delayed_write_cuboid_keys(self):
+        """Test getting all delayed write cuboid keys"""
+        csdb = CacheStateDB(self.config_data)
+
+        lookup_key = "1&2&3"
+        resolution = 4
+        time_sample = 5
+        morton = 234
+        write_cuboid_key1 = "WRITE-CUBOID&{}&{}&{}{}&&daadsfjk".format(lookup_key,
+                                                                       resolution,
+                                                                       time_sample,
+                                                                       morton)
+        write_cuboid_key2 = "WRITE-CUBOID&{}&{}&{}&{}&fghfghjg".format(lookup_key,
+                                                                       resolution,
+                                                                       time_sample,
+                                                                       morton)
+        write_cuboid_key3 = "WRITE-CUBOID&{}&{}&{}&{}&aaauihjg".format(lookup_key,
+                                                                       resolution,
+                                                                       time_sample,
+                                                                       morton)
+
+        delayed_write_key = "DELAYED-WRITE&{}&{}&{}&{}".format(lookup_key,
+                                                              resolution,
+                                                              time_sample,
+                                                              morton)
+
+        keys = csdb.get_delayed_writes(delayed_write_key)
+        assert not keys
+
+        csdb.add_to_delayed_write(write_cuboid_key1, lookup_key, resolution, morton, time_sample)
+        csdb.add_to_delayed_write(write_cuboid_key2, lookup_key, resolution, morton, time_sample)
+        csdb.add_to_delayed_write(write_cuboid_key3, lookup_key, resolution, morton, time_sample)
+
+        keys = csdb.get_delayed_writes(delayed_write_key)
+        assert len(keys) == 3
+        assert keys[0] == write_cuboid_key1
+        assert keys[1] == write_cuboid_key2
+        assert keys[2] == write_cuboid_key3
+
+        keys = csdb.get_delayed_writes(delayed_write_key)
         assert not keys
 
 
