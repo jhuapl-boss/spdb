@@ -193,7 +193,7 @@ class SetupTests(object):
             url = mock_sqs(self._create_flush_queue(queue_name))
         else:
             url = self._create_flush_queue(queue_name)
-            time.sleep(60)
+            time.sleep(30)
         return url
 
     def _delete_flush_queue(self, queue_url):

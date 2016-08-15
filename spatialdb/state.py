@@ -213,7 +213,7 @@ class CacheStateDB(object):
         else:
             return True
 
-    def add_to_delayed_write(self, write_cuboid_key, lookup_key, resolution, morton, time_sample):
+    def add_to_delayed_write(self, write_cuboid_key, lookup_key, resolution, morton, time_sample, resource_str):
         """
         Method to add a write cuboid key to a delayed write queue
 
@@ -229,6 +229,8 @@ class CacheStateDB(object):
         """
         self.status_client.rpush("DELAYED-WRITE&{}&{}&{}&{}".format(lookup_key, resolution, time_sample, morton),
                                  write_cuboid_key)
+        self.status_client.set("RESOURCE-DELAYED-WRITE&{}&{}&{}&{}".format(lookup_key, resolution, time_sample, morton),
+                               resource_str)
 
     def get_all_delayed_write_keys(self):
         """
@@ -268,6 +270,35 @@ class CacheStateDB(object):
 
         return [x.decode() for x in output]
 
+    def check_single_delayed_write(self, delayed_write_key):
+        """
+        Method to get a single delayed write-cuboid key for a single delayed_write_key without popping it off the queue
+
+        Returns:
+            list(str): Single delayed write-cuboid keys
+        """
+        write_cuboid_key = self.status_client.lindex(delayed_write_key, 0)
+
+        if write_cuboid_key:
+            return write_cuboid_key.decode()
+        else:
+            return None
+
+    def get_single_delayed_write(self, delayed_write_key):
+        """
+        Method to get a single delayed write-cuboid key for a single delayed_write_key without popping it off the queue
+
+        Returns:
+            list(str): Single delayed write-cuboid keys
+        """
+        write_cuboid_key = self.status_client.lpop(delayed_write_key)
+        resource = self.status_client.get("RESOURCE-{}".format(delayed_write_key))
+
+        if write_cuboid_key:
+            return write_cuboid_key.decode(), resource.decode()
+        else:
+            return None
+
     def add_to_page_out(self, temp_page_out_key, lookup_key, resolution, morton, time_sample):
         """
         Method to add a key to the page-out tracking set
@@ -282,21 +313,22 @@ class CacheStateDB(object):
             (bool, bool): Tuple where first value is if the transaction succeeded and the second is if the key is in
             page out already
         """
-        # TODO: Validate output from pipe
         page_out_key = "PAGE-OUT&{}&{}".format(lookup_key, resolution)
         in_page_out = True
+        cnt = 0
         with self.status_client.pipeline() as pipe:
             while 1:
                 try:
                     # Create temp set
-                    pipe = self.status_client.pipeline()
                     pipe.watch(page_out_key)
                     pipe.multi()
+                    pipe.sadd(temp_page_out_key, "{}&{}".format(time_sample, morton))
+                    pipe.expire(temp_page_out_key, 15)
                     pipe.sdiff(temp_page_out_key, page_out_key)
                     pipe.sadd(page_out_key, "{}&{}".format(time_sample, morton))
                     result = pipe.execute()
 
-                    if result[0]:
+                    if len(result[2]) > 0:
                         in_page_out = False
                     else:
                         in_page_out = True
@@ -304,6 +336,11 @@ class CacheStateDB(object):
                     break
                 except redis.WatchError as e:
                     # Watch error occurred, try again!
+                    cnt += 1
+
+                    if cnt > 200:
+                        raise SpdbError("Failed to add to page out due to timeout. {}".format(e),
+                                        ErrorCodes.REDIS_ERROR)
                     continue
 
                 except Exception as e:

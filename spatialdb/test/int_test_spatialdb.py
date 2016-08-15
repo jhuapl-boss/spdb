@@ -239,8 +239,11 @@ class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
         try:
             cls.object_store_config["s3_flush_queue"] = cls.setup_helper.create_flush_queue(cls.s3_flush_queue_name)
         except ClientError:
-            cls.setup_helper.delete_flush_queue(cls.object_store_config["s3_flush_queue"])
-            time.sleep(60)
+            try:
+                cls.setup_helper.delete_flush_queue(cls.object_store_config["s3_flush_queue"])
+            except:
+                pass
+            time.sleep(61)
             cls.object_store_config["s3_flush_queue"] = cls.setup_helper.create_flush_queue(cls.s3_flush_queue_name)
 
     @classmethod

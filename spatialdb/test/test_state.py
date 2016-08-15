@@ -116,8 +116,8 @@ class CacheStateDBTestMixin(object):
         keys = csdb.get_all_delayed_write_keys()
         assert not keys
 
-        csdb.add_to_delayed_write(write_cuboid_key1, lookup_key, resolution, morton, time_sample)
-        csdb.add_to_delayed_write(write_cuboid_key2, lookup_key, resolution, morton, time_sample)
+        csdb.add_to_delayed_write(write_cuboid_key1, lookup_key, resolution, morton, time_sample, "{dummy resource str}")
+        csdb.add_to_delayed_write(write_cuboid_key2, lookup_key, resolution, morton, time_sample, "{dummy resource str}")
 
         keys = csdb.get_all_delayed_write_keys()
         assert len(keys) == 1
@@ -160,9 +160,9 @@ class CacheStateDBTestMixin(object):
         keys = csdb.get_delayed_writes(delayed_write_key)
         assert not keys
 
-        csdb.add_to_delayed_write(write_cuboid_key1, lookup_key, resolution, morton, time_sample)
-        csdb.add_to_delayed_write(write_cuboid_key2, lookup_key, resolution, morton, time_sample)
-        csdb.add_to_delayed_write(write_cuboid_key3, lookup_key, resolution, morton, time_sample)
+        csdb.add_to_delayed_write(write_cuboid_key1, lookup_key, resolution, morton, time_sample, "{dummy resource str}")
+        csdb.add_to_delayed_write(write_cuboid_key2, lookup_key, resolution, morton, time_sample, "{dummy resource str}")
+        csdb.add_to_delayed_write(write_cuboid_key3, lookup_key, resolution, morton, time_sample, "{dummy resource str}")
 
         keys = csdb.get_delayed_writes(delayed_write_key)
         assert len(keys) == 3
@@ -172,6 +172,58 @@ class CacheStateDBTestMixin(object):
 
         keys = csdb.get_delayed_writes(delayed_write_key)
         assert not keys
+
+    def test_get_single_delayed_write_cuboid_key(self):
+        """Test getting all delayed write cuboid keys"""
+        csdb = CacheStateDB(self.config_data)
+
+        lookup_key = "1&2&3"
+        resolution = 4
+        time_sample = 5
+        morton = 234
+        write_cuboid_key1 = "WRITE-CUBOID&{}&{}&{}{}&&daadsfjk".format(lookup_key,
+                                                                       resolution,
+                                                                       time_sample,
+                                                                       morton)
+        write_cuboid_key2 = "WRITE-CUBOID&{}&{}&{}&{}&fghfghjg".format(lookup_key,
+                                                                       resolution,
+                                                                       time_sample,
+                                                                       morton)
+        write_cuboid_key3 = "WRITE-CUBOID&{}&{}&{}&{}&aaauihjg".format(lookup_key,
+                                                                       resolution,
+                                                                       time_sample,
+                                                                       morton)
+
+        delayed_write_key = "DELAYED-WRITE&{}&{}&{}&{}".format(lookup_key,
+                                                              resolution,
+                                                              time_sample,
+                                                              morton)
+
+        key = csdb.check_single_delayed_write(delayed_write_key)
+        assert not key
+
+        csdb.add_to_delayed_write(write_cuboid_key1, lookup_key, resolution, morton, time_sample, "{dummy resource str}")
+        csdb.add_to_delayed_write(write_cuboid_key2, lookup_key, resolution, morton, time_sample, "{dummy resource str}")
+        csdb.add_to_delayed_write(write_cuboid_key3, lookup_key, resolution, morton, time_sample, "{dummy resource str}")
+        csdb.add_to_delayed_write(write_cuboid_key3, lookup_key, resolution, morton, 67, "{dummy resource str4}")
+
+        key = csdb.check_single_delayed_write(delayed_write_key)
+        assert key == write_cuboid_key1
+
+        key = csdb.check_single_delayed_write(delayed_write_key)
+        assert key == write_cuboid_key1
+
+        key, resource = csdb.get_single_delayed_write(delayed_write_key)
+        assert key == write_cuboid_key1
+        assert resource == "{dummy resource str}"
+
+        key, resource = csdb.get_single_delayed_write(delayed_write_key)
+        assert key == write_cuboid_key2
+        assert resource == "{dummy resource str}"
+
+        key, resource = csdb.get_single_delayed_write(delayed_write_key)
+        assert key == write_cuboid_key3
+        assert resource == "{dummy resource str}"
 
 
 @patch('redis.StrictRedis', mock_strict_redis_client)

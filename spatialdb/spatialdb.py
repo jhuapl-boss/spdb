@@ -713,10 +713,10 @@ class SpatialDB:
                         else:
                             # Attempt to get write slot by checking page out
                             in_page_out = self.cache_state.add_to_page_out(temp_page_out_key,
-                                                                           resource.get_lookup_key(),
-                                                                           resolution,
-                                                                           morton_idx,
-                                                                           t)
+                                                                                    resource.get_lookup_key(),
+                                                                                    resolution,
+                                                                                    morton_idx,
+                                                                                    t)
 
                             if not in_page_out:
                                 # Good to trigger lambda!
