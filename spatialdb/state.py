@@ -223,6 +223,7 @@ class CacheStateDB(object):
             resolution (int): level in the resolution heirarchy
             morton (int): morton id for the cuboid
             time_sample (int): time sample for cuboid
+            resource_str (str): a JSON encoded resource for the write-cuboid to be written
 
         Returns:
             None
