@@ -149,6 +149,9 @@ class CacheStateDB(object):
             None
 
         """
+        if isinstance(key_list, str):
+            key_list = [key_list]
+
         self.status_client.rpush('CACHE-MISS', *key_list)
 
     def project_locked(self, lookup_key):
