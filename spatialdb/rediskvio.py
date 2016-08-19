@@ -157,13 +157,19 @@ class RedisKVIO(KVIO):
             (bool): A boolean indicating if they key exists
         """
         try:
-            # Get the data from the DB
-            result = self.cache_client.exists(key)
+            # Check in a transaction so you can reset the ttl for the key
+            pipe = self.cache_client.pipeline()
+            pipe.multi()
+            pipe.expire(key, self.kv_conf["read_timeout"])
+            pipe.exists(key)
+
+            # Run Pipelined commands
+            result = pipe.execute()
         except Exception as e:
             raise SpdbError("Error retrieving cuboid status from cache database. {}".format(e),
                             ErrorCodes.REDIS_ERROR)
 
-        return result
+        return result[1]
 
     def delete_cube(self, key):
         """Delete a cube from the cache db

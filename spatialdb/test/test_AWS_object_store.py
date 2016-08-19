@@ -46,8 +46,8 @@ class AWSObjectStoreTestMixin(object):
         object_keys = os.cached_cuboid_to_object_keys(cached_cuboid_keys)
 
         assert len(object_keys) == 2
-        assert object_keys[0] == 'a4931d58076dc47773957809380f206e4228517c9fa6daed536043782024e480&1&1&1&0&0&12'
-        assert object_keys[1] == 'f2b449f7e247c8aec6ecf754388a65ee6ea9dc245cd5ef149aebb2e0d20b4251&1&1&1&0&0&13'
+        assert object_keys[0] == '6b5ebb14395dec6cd9d7edaa1fbcd748&1&1&1&0&0&12'
+        assert object_keys[1] == '592ed5f40528bb16bce769fed5b2e9c6&1&1&1&0&0&13'
 
     def test_cached_cuboid_to_object_keys_str(self):
         """Test to check key conversion from cached cuboid to object"""
@@ -58,7 +58,7 @@ class AWSObjectStoreTestMixin(object):
         object_keys = os.cached_cuboid_to_object_keys(cached_cuboid_keys)
 
         assert len(object_keys) == 1
-        assert object_keys[0] == 'a4931d58076dc47773957809380f206e4228517c9fa6daed536043782024e480&1&1&1&0&0&12'
+        assert object_keys[0] == '6b5ebb14395dec6cd9d7edaa1fbcd748&1&1&1&0&0&12'
 
     def test_write_cuboid_to_object_keys(self):
         """Test to check key conversion from cached cuboid to object"""
@@ -70,8 +70,8 @@ class AWSObjectStoreTestMixin(object):
         object_keys = os.write_cuboid_to_object_keys(write_cuboid_keys)
 
         assert len(object_keys) == 2
-        assert object_keys[0] == 'a4931d58076dc47773957809380f206e4228517c9fa6daed536043782024e480&1&1&1&0&0&12'
-        assert object_keys[1] == 'f2b449f7e247c8aec6ecf754388a65ee6ea9dc245cd5ef149aebb2e0d20b4251&1&1&1&0&0&13'
+        assert object_keys[0] == '6b5ebb14395dec6cd9d7edaa1fbcd748&1&1&1&0&0&12'
+        assert object_keys[1] == '592ed5f40528bb16bce769fed5b2e9c6&1&1&1&0&0&13'
 
     def test_write_cuboid_to_object_atr(self):
         """Test to check key conversion from cached cuboid to object when a string instead of a list is passed"""
@@ -82,7 +82,7 @@ class AWSObjectStoreTestMixin(object):
         object_keys = os.write_cuboid_to_object_keys(write_cuboid_keys)
 
         assert len(object_keys) == 1
-        assert object_keys[0] == 'a4931d58076dc47773957809380f206e4228517c9fa6daed536043782024e480&1&1&1&0&0&12'
+        assert object_keys[0] == '6b5ebb14395dec6cd9d7edaa1fbcd748&1&1&1&0&0&12'
 
     def test_object_to_cached_cuboid_keys(self):
         """Test to check key conversion from cached cuboid to object"""
@@ -115,13 +115,14 @@ class AWSObjectStoreTestMixin(object):
         response = dynamodb.get_item(
             TableName=self.object_store_config['s3_index_table'],
             Key={'object-key': {'S': dummy_key},
-                 'version': {'S': 'a'}},
+                 'version-node': {'S': 'a'}},
             ReturnConsumedCapacity='NONE'
         )
 
         assert response['Item']['object-key']['S'] == dummy_key
-        assert response['Item']['version']['S'] == 'a'
-        assert response['Item']['ingest-job']['S'] == '1&1&1&0&0'
+        assert response['Item']['version-node']['S'] == 'a'
+        assert response['Item']['ingest-job-hash']['S'] == '1'
+        assert response['Item']['ingest-job-range']['S'] == '1&1&0&0'
 
     def test_cuboids_exist(self):
         """Test method for checking if cuboids exist in S3 index"""

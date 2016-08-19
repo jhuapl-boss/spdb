@@ -31,6 +31,39 @@ class BossResourceDjango(BossResource):
 
         self.boss_request = boss_request
 
+    def to_dict(self):
+        """
+        Method to convert a resource to a dictionary
+        Returns:
+            (dict): a dict of all the parameters
+        """
+        # Populate everything
+        self.populate_collection()
+        self.populate_coord_frame()
+        self.populate_experiment()
+        self.populate_channel_or_layer()
+        self.populate_boss_key()
+        self.populate_lookup_key()
+
+        # Collect Data
+        data = {"collection": self._collection.__dict__,
+                "coord_frame": self._coord_frame.__dict__,
+                "experiment": self._experiment.__dict__,
+                "boss_key": self._boss_key,
+                "lookup_key": self._lookup_key,
+                }
+
+        if self._channel:
+            data['channel_layer'] = self._channel.__dict__
+            data['channel_layer']['is_channel'] = True
+        else:
+            data['channel_layer'] = self._layer.__dict__
+            data['channel_layer']['is_channel'] = False
+            data['channel_layer']['parent_channels'] = [x for x in self._layer.parent_channels.all()]
+
+        # Serialize and return
+        return data
+
     # Methods to populate class properties
     def populate_collection(self):
         """

@@ -78,7 +78,7 @@ class AnnotateCube64(Cube):
             self.data[time_sample_range[0], :, :, :] = ndlib.overwriteDense64_ctype(
                 self.data[time_sample_range[0], :, :, :], input_data[time_sample_range[0], :, :, :])
 
-    def xy_image(self, z_index=0, t_index=0):
+    def xy_image(self, z_index=0, t_index=0, scale=1):
         """Render an image in the XY plane.
 
         Args:
@@ -89,19 +89,13 @@ class AnnotateCube64(Cube):
         Returns:
             Image
         """
-        # TODO: Implement recoloring when completing the tile service
-        pass
+        zdim, ydim, xdim = self.data.shape
+        imagemap = np.zeros([ydim, xdim], dtype=np.uint32)
 
-        ## This works for 16-> conversions
-        #z_dim, y_dim, x_dim = self.data.shape
+        # false color redrawing of the region
+        ndlib.recolor64_ctype(self.data.reshape((imagemap.shape[0], imagemap.shape[1])), imagemap)
 
-        ## If data type is uint8 you got windowed data FROM the API layer. Otherwise limit output range.
-        #if self.data.dtype == np.uint8:
-        #    return Image.frombuffer('L', (x_dim, y_dim), self.data[t_index, z_index, :, :].flatten(), 'raw', 'L', 0, 1)
-        #else:
-        #    out_image = Image.frombuffer('I;16', (x_dim, y_dim), self.data[t_index, z_index, :, :].flatten(),
-        #                                 'raw', 'I;16', 0, 1)
-        #    return out_image.point(lambda i: i * (1. / 256)).convert('L')
+        return Image.frombuffer('RGBA', (xdim, ydim), imagemap, 'raw', 'RGBA', 0, 1)
 
     def xz_image(self, z_scale=1, y_index=0, t_index=0):
         """Render an image in the xz plane.
@@ -114,20 +108,14 @@ class AnnotateCube64(Cube):
         Returns:
             Image
         """
-        # TODO: Implement recoloring when completing the tile service
-        pass
-        #z_dim, y_dim, x_dim = self.data.shape
+        zdim, ydim, xdim = self.data.shape
+        imagemap = np.zeros([zdim, xdim], dtype=np.uint32)
 
-        ## If data type is uint8 you got windowed data FROM the API layer. Otherwise limit output range.
-        #if self.data.dtype == np.uint8:
-        #    out_image = Image.frombuffer('L', (x_dim, z_dim), self.data[t_index, :, y_index, :].flatten(),
-        #                                 'raw', 'L', 0, 1)
-        #else:
-        #    out_image = Image.frombuffer('I;16', (x_dim, z_dim), self.data[t_index, :, y_index, :].flatten(),
-        #                                 'raw', 'I;16', 0, 1)
-        #    out_image = out_image.point(lambda i: i * (1. / 256)).convert('L')
+        # false color redrawing of the region
+        ndlib.recolor64_ctype(self.data.reshape((imagemap.shape[0], imagemap.shape[1])), imagemap)
 
-        #return out_image.resize([x_dim, int(z_dim * z_scale)])
+        outimage = Image.frombuffer('RGBA', (xdim, zdim), imagemap, 'raw', 'RGBA', 0, 1)
+        return outimage.resize([xdim, int(zdim * z_scale)])
 
     def yz_image(self, z_scale=1, x_index=0, t_index=0):
         """Render an image in the yz plane.
@@ -140,19 +128,13 @@ class AnnotateCube64(Cube):
         Returns:
             Image
         """
-        # TODO: Implement recoloring when completing the tile service
-        pass
-        #z_dim, y_dim, x_dim = self.data.shape
+        zdim, ydim, xdim = self.data.shape
+        imagemap = np.zeros([zdim, ydim], dtype=np.uint32)
 
-        ## If data type is uint8 you got windowed data FROM the API layer. Otherwise limit output range.
-        #if self.data.dtype == np.uint8:
-        #    out_image = Image.frombuffer('L', (y_dim, z_dim), self.data[t_index, :, :, x_index].flatten(),
-        #                                 'raw', 'L', 0, 1)
-        #else:
-        #    out_image = Image.frombuffer('I;16', (y_dim, z_dim), self.data[t_index, :, :, x_index].flatten(),
-        #                                 'raw', 'I;16', 0, 1)
-        #    out_image = out_image.point(lambda i: i * (1. / 256)).convert('L')
+        # false color redrawing of the region
+        ndlib.recolor64_ctype(self.data.reshape((imagemap.shape[0], imagemap.shape[1])), imagemap)
 
-        #return out_image.resize([y_dim, int(z_dim * z_scale)])
+        outimage = Image.frombuffer('RGBA', (ydim, zdim), imagemap, 'raw', 'RGBA', 0, 1)
+        return outimage.resize([ydim, int(zdim * z_scale)])
 
     # TODO: Implement zoom in/zoom out once propagation is implemented

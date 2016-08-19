@@ -187,7 +187,7 @@ class AWSObjectStore(ObjectStore):
 
             response = dynamodb.get_item(
                 TableName=self.config['s3_index_table'],
-                Key={'object-key': {'S': key}, 'version': {'S': version}},
+                Key={'object-key': {'S': key}, 'version-node': {'S': version}},
                 ConsistentRead=True,
                 ReturnConsumedCapacity='NONE')
 
@@ -199,7 +199,7 @@ class AWSObjectStore(ObjectStore):
 
         return s3_key_index, zero_key_index
 
-    def add_cuboid_to_index(self, object_key, version="a"):
+    def add_cuboid_to_index(self, object_key, version='a'):
         """
         Method to add a cuboid's object_key to the S3 index table
 
@@ -216,15 +216,17 @@ class AWSObjectStore(ObjectStore):
 
         # Get lookup key and resolution from object key
         vals = object_key.split("&")
-        lookup_key = "{}&{}&{}".format(vals[1], vals[2], vals[3])
-        resolution = vals[4]
+
+        # range key is exp&ch&res&task
+        ingest_job_range = "{}&{}&{}&0".format(vals[2], vals[3], vals[4])
 
         try:
             dynamodb.put_item(
                 TableName=self.config['s3_index_table'],
                 Item={'object-key': {'S': object_key},
-                      'version': {'S': version},
-                      'ingest-job': {'S': "{}&{}&0".format(lookup_key, resolution)}},
+                      'version-node': {'S': version},
+                      'ingest-job-hash': {'S': "{}".format(vals[1])},
+                      'ingest-job-range': {'S': ingest_job_range}},
                 ReturnConsumedCapacity='NONE',
                 ReturnItemCollectionMetrics='NONE',
             )
@@ -250,8 +252,7 @@ class AWSObjectStore(ObjectStore):
             temp_key = key.split("&", 1)[1]
 
             # Hash
-            # TODO: sha256 best hash to use?
-            hash_str = hashlib.sha256(temp_key.encode()).hexdigest()
+            hash_str = hashlib.md5(temp_key.encode()).hexdigest()
 
             # Combine
             output_keys.append("{}&{}".format(hash_str, temp_key))
@@ -277,8 +278,7 @@ class AWSObjectStore(ObjectStore):
             temp_key = temp_key.rsplit("&", 1)[0]
 
             # Hash
-            # TODO: sha256 best hash to use?
-            hash_str = hashlib.sha256(temp_key.encode()).hexdigest()
+            hash_str = hashlib.md5(temp_key.encode()).hexdigest()
 
             # Combine
             output_keys.append("{}&{}".format(hash_str, temp_key))

@@ -5,11 +5,15 @@
             "AttributeType": "S"
         },
         {
-            "AttributeName": "version",
+            "AttributeName": "version-node",
             "AttributeType": "S"
         },
         {
-            "AttributeName": "ingest-job",
+            "AttributeName": "ingest-job-hash",
+            "AttributeType": "S"
+        },
+        {
+            "AttributeName": "ingest-job-range",
             "AttributeType": "S"
         }
     ],
@@ -19,7 +23,7 @@
             "KeyType": "HASH"
         },
         {
-            "AttributeName": "version",
+            "AttributeName": "version-node",
             "KeyType": "RANGE"
         }
     ],
@@ -28,8 +32,12 @@
             "IndexName": "ingest-job-index",
             "KeySchema": [
                 {
-                    "AttributeName": "ingest-job",
+                    "AttributeName": "ingest-job-hash",
                     "KeyType": "HASH"
+                },
+                {
+                    "AttributeName": "ingest-job-range",
+                    "KeyType": "RANGE"
                 }
             ],
             "Projection": {
@@ -42,7 +50,7 @@
         }
     ],
     "ProvisionedThroughput": {
-        "ReadCapacityUnits": 10,
-        "WriteCapacityUnits": 10
+        "ReadCapacityUnits": 5,
+        "WriteCapacityUnits": 5
     }
 }

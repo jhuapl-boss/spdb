@@ -42,7 +42,8 @@ uint64_t XYZMorton ( uint64_t * );
 void MortonXYZ ( uint64_t , uint64_t [3] );
 
 // Declaring recolorCube function
-void recolorCubeOMP ( uint32_t * , int , int , uint32_t * , uint32_t * ); 
+void recolorCubeOMP32 ( uint32_t * , int , int , uint32_t * , uint32_t * );
+void recolorCubeOMP64 ( uint64_t * , int , int , uint64_t * , uint64_t * );
 
 // Declaring Quick Sort function
 void quicksort ( uint64_t [][4] , int ); 
