@@ -78,7 +78,7 @@ class AnnotateCube64(Cube):
             self.data[time_sample_range[0], :, :, :] = ndlib.overwriteDense64_ctype(
                 self.data[time_sample_range[0], :, :, :], input_data[time_sample_range[0], :, :, :])
 
-    def xy_image(self, z_index=0, t_index=0, scale=1):
+    def xy_image(self, z_index=0, t_index=0):
         """Render an image in the XY plane.
 
         Args:
@@ -89,13 +89,13 @@ class AnnotateCube64(Cube):
         Returns:
             Image
         """
-        zdim, ydim, xdim = self.data.shape
-        imagemap = np.zeros([ydim, xdim], dtype=np.uint32)
+        _, zdim, ydim, xdim = self.data.shape
+        imagemap = np.zeros([ydim, xdim], dtype=np.uint64)
 
         # false color redrawing of the region
-        ndlib.recolor64_ctype(self.data.reshape((imagemap.shape[0], imagemap.shape[1])), imagemap)
+        ndlib.recolor_ctype(self.data[t_index, z_index, :, :].reshape((ydim, xdim)), imagemap)
 
-        return Image.frombuffer('RGBA', (xdim, ydim), imagemap, 'raw', 'RGBA', 0, 1)
+        return Image.frombuffer('RGBA', (xdim, ydim), imagemap.astype(dtype=np.uint32), 'raw', 'RGBA', 0, 1)
 
     def xz_image(self, z_scale=1, y_index=0, t_index=0):
         """Render an image in the xz plane.
@@ -108,13 +108,13 @@ class AnnotateCube64(Cube):
         Returns:
             Image
         """
-        zdim, ydim, xdim = self.data.shape
-        imagemap = np.zeros([zdim, xdim], dtype=np.uint32)
+        _, zdim, ydim, xdim = self.data.shape
+        imagemap = np.zeros([zdim, xdim], dtype=np.uint64)
 
         # false color redrawing of the region
-        ndlib.recolor64_ctype(self.data.reshape((imagemap.shape[0], imagemap.shape[1])), imagemap)
+        ndlib.recolor_ctype(self.data[t_index, :, y_index, :].reshape((zdim, xdim)), imagemap)
 
-        outimage = Image.frombuffer('RGBA', (xdim, zdim), imagemap, 'raw', 'RGBA', 0, 1)
+        outimage = Image.frombuffer('RGBA', (xdim, zdim), imagemap.astype(dtype=np.uint32), 'raw', 'RGBA', 0, 1)
         return outimage.resize([xdim, int(zdim * z_scale)])
 
     def yz_image(self, z_scale=1, x_index=0, t_index=0):
@@ -128,13 +128,13 @@ class AnnotateCube64(Cube):
         Returns:
             Image
         """
-        zdim, ydim, xdim = self.data.shape
-        imagemap = np.zeros([zdim, ydim], dtype=np.uint32)
+        _, zdim, ydim, xdim = self.data.shape
+        imagemap = np.zeros([zdim, ydim], dtype=np.uint64)
 
         # false color redrawing of the region
-        ndlib.recolor64_ctype(self.data.reshape((imagemap.shape[0], imagemap.shape[1])), imagemap)
+        ndlib.recolor_ctype(self.data[t_index, :, :, x_index].reshape((zdim, ydim)), imagemap)
 
-        outimage = Image.frombuffer('RGBA', (ydim, zdim), imagemap, 'raw', 'RGBA', 0, 1)
+        outimage = Image.frombuffer('RGBA', (ydim, zdim), imagemap.astype(dtype=np.uint32), 'raw', 'RGBA', 0, 1)
         return outimage.resize([ydim, int(zdim * z_scale)])
 
     # TODO: Implement zoom in/zoom out once propagation is implemented

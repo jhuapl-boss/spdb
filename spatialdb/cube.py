@@ -229,7 +229,7 @@ class Cube(metaclass=ABCMeta):
         Returns:
             bool
         """
-        return np.any(self.data)
+        return bool(np.any(self.data))
 
     def from_zeros(self):
         """Determine if the Cube instance was created from all zeros

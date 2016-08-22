@@ -201,7 +201,7 @@ class ImageCube16(Cube):
         """
 
         # This works for 16-> conversions
-        z_dim, y_dim, x_dim = self.data.shape
+        _, z_dim, y_dim, x_dim = self.data.shape
 
         # If data type is uint8 you got windowed data FROM the API layer. Otherwise limit output range.
         if self.data.dtype == np.uint8:
@@ -222,7 +222,7 @@ class ImageCube16(Cube):
         Returns:
             Image
         """
-        z_dim, y_dim, x_dim = self.data.shape
+        _, z_dim, y_dim, x_dim = self.data.shape
 
         # If data type is uint8 you got windowed data FROM the API layer. Otherwise limit output range.
         if self.data.dtype == np.uint8:
@@ -246,7 +246,7 @@ class ImageCube16(Cube):
         Returns:
             Image
         """
-        z_dim, y_dim, x_dim = self.data.shape
+        _, z_dim, y_dim, x_dim = self.data.shape
 
         # If data type is uint8 you got windowed data FROM the API layer. Otherwise limit output range.
         if self.data.dtype == np.uint8:
