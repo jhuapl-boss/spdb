@@ -155,7 +155,7 @@ class AWSObjectStore(ObjectStore):
         for ii in range(0, len(object_keys), chunk_size):
             yield object_keys[ii:ii + chunk_size]
 
-    def cuboids_exist(self, key_list, cache_miss_key_idx=None, version="a"):
+    def cuboids_exist(self, key_list, cache_miss_key_idx=None, version=0):
         """
         Method to check if cuboids exist in S3 by checking the S3 Index table.
 
@@ -164,7 +164,8 @@ class AWSObjectStore(ObjectStore):
         Args:
             key_list (list(str)): A list of cached-cuboid keys to check for existence in the object store
             cache_miss_key_idx (list(int)): A list of ints indexing the keys in key_list that should be checked
-            version: TBD version of the cuboid
+            version (int): The ID of the version node - Default to 0 until fully implemented, but will eliminate
+                           need to do a migration
 
         Returns:
             (list(int)), (list(int)): A tuple of 2 lists.  The first is the index into key_list of keys IN S3.  The
@@ -184,10 +185,9 @@ class AWSObjectStore(ObjectStore):
         for idx, key in enumerate(object_keys):
             if idx not in cache_miss_key_idx:
                 continue
-
             response = dynamodb.get_item(
                 TableName=self.config['s3_index_table'],
-                Key={'object-key': {'S': key}, 'version-node': {'S': version}},
+                Key={'object-key': {'S': key}, 'version-node': {'N': "{}".format(version)}},
                 ConsistentRead=True,
                 ReturnConsumedCapacity='NONE')
 
@@ -199,7 +199,7 @@ class AWSObjectStore(ObjectStore):
 
         return s3_key_index, zero_key_index
 
-    def add_cuboid_to_index(self, object_key, version='a'):
+    def add_cuboid_to_index(self, object_key, version=0):
         """
         Method to add a cuboid's object_key to the S3 index table
 
@@ -207,7 +207,8 @@ class AWSObjectStore(ObjectStore):
 
         Args:
             object_key (str): An object-keys for a cuboid to add to the index
-            version: TBD version of the cuboid
+            version (int): The ID of the version node - Default to 0 until fully implemented, but will eliminate
+                           need to do a migration
 
         Returns:
             None
@@ -224,7 +225,7 @@ class AWSObjectStore(ObjectStore):
             dynamodb.put_item(
                 TableName=self.config['s3_index_table'],
                 Item={'object-key': {'S': object_key},
-                      'version-node': {'S': version},
+                      'version-node': {'N': "{}".format(version)},
                       'ingest-job-hash': {'S': "{}".format(vals[1])},
                       'ingest-job-range': {'S': ingest_job_range}},
                 ReturnConsumedCapacity='NONE',
@@ -347,18 +348,22 @@ class AWSObjectStore(ObjectStore):
 
         return object_keys
 
-    def get_single_object(self, key, version=None):
+    def get_single_object(self, key, version=0):
         """ Method to get a single object. Used in the lambda page-in function and non-parallelized version
 
         Args:
             key (list(str)): A list of cached-cuboid keys to retrieve from the object store
-            version: TBD version of the cuboid
+            version (int): The ID of the version node - Default to 0 until fully implemented, but will eliminate
+                           need to do a migration
 
         Returns:
             (bytes): A list of blosc compressed cuboid data
 
         """
         s3 = boto3.client('s3', region_name=get_region())
+
+        # Append version to key
+        key = "{}&{}".format(key, version)
 
         response = s3.get_object(
             Key=key,
@@ -370,12 +375,13 @@ class AWSObjectStore(ObjectStore):
 
         return response['Body'].read()
 
-    def get_objects(self, key_list, version=None):
+    def get_objects(self, key_list, version=0):
         """ Method to get multiple objects serially in a loop
 
         Args:
             key_list (list(str)): A list of object keys to retrieve from the object store
-            version: TBD version of the cuboid
+            version (int): The ID of the version node - Default to 0 until fully implemented, but will eliminate
+                           need to do a migration
 
         Returns:
             (list(bytes)): A list of blosc compressed cuboid data
@@ -386,6 +392,9 @@ class AWSObjectStore(ObjectStore):
         results = []
 
         for key in key_list:
+            # Append version to key
+            key = "{}&{}".format(key, version)
+
             response = s3.get_object(
                 Key=key,
                 Bucket=self.config["cuboid_bucket"],
@@ -398,13 +407,14 @@ class AWSObjectStore(ObjectStore):
 
         return results
 
-    def put_objects(self, key_list, cube_list, version=None):
+    def put_objects(self, key_list, cube_list, version=0):
         """
 
         Args:
             key_list (list(str)): A list of object keys to put into the object store
             cube_list (list(bytes)): A list of blosc compressed cuboid data
-            version: TBD version of the cuboid
+            version (int): The ID of the version node - Default to 0 until fully implemented, but will eliminate
+                           need to do a migration
 
         Returns:
 
@@ -412,6 +422,9 @@ class AWSObjectStore(ObjectStore):
         s3 = boto3.client('s3', region_name=get_region())
 
         for key, cube in zip(key_list, cube_list):
+            # Append version to key
+            key = "{}&{}".format(key, version)
+
             response = s3.put_object(
                 Body=cube,
                 Key=key,
@@ -455,5 +468,3 @@ class AWSObjectStore(ObjectStore):
             FunctionName=self.config["page_out_lambda_function"],
             InvocationType='Event',
             Payload=json.dumps(msg_data).encode())
-
-        # TODO: Add Error handling?

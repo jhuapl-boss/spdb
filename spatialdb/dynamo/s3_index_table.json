@@ -6,7 +6,7 @@
         },
         {
             "AttributeName": "version-node",
-            "AttributeType": "S"
+            "AttributeType": "N"
         },
         {
             "AttributeName": "ingest-job-hash",

@@ -115,12 +115,12 @@ class AWSObjectStoreTestMixin(object):
         response = dynamodb.get_item(
             TableName=self.object_store_config['s3_index_table'],
             Key={'object-key': {'S': dummy_key},
-                 'version-node': {'S': 'a'}},
+                 'version-node': {'N': "0"}},
             ReturnConsumedCapacity='NONE'
         )
 
         assert response['Item']['object-key']['S'] == dummy_key
-        assert response['Item']['version-node']['S'] == 'a'
+        assert response['Item']['version-node']['N'] == "0"
         assert response['Item']['ingest-job-hash']['S'] == '1'
         assert response['Item']['ingest-job-range']['S'] == '1&1&0&0'
 
