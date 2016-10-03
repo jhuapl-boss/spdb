@@ -46,7 +46,7 @@ class SpatialDBImageDataIntegrationTestMixin(object):
 
         cube2 = sp.cutout(self.resource, (0, 0, 0), (128, 128, 16), 0)
 
-        np.testing.assert_array_equal(cube1.data, cube2.data)
+        np.tesing.assert_array_equal(cube1.data, cube2.data)
 
     def test_cutout_no_time_single_aligned_miss(self):
         """Test the get_cubes method - no time - single - miss"""
@@ -123,19 +123,18 @@ class SpatialDBImageDataIntegrationTestMixin(object):
         sp.write_cuboid(self.resource, (600, 0, 0), 0, cube1.data)
 
         cube2 = sp.cutout(self.resource, (600, 0, 0), (128, 128, 16), 0)
-
         np.testing.assert_array_equal(cube1.data, cube2.data)
 
     def test_cutout_time0_single_aligned_hit(self):
         """Test the get_cubes method - w/ time - single - hit"""
         # Generate random data
-        cube1 = Cube.create_cube(self.resource, [128, 128, 16])
+        cube1 = Cube.create_cube(self.resource, [128, 128, 16], [0, 5])
         cube1.data = np.random.randint(1, 254, (5, 16, 128, 128))
         cube1.morton_id = 0
 
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
-        sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data)
+        sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data, time_sample_start=0)
 
         cube2 = sp.cutout(self.resource, (0, 0, 0), (128, 128, 16), 0, time_sample_range=[0, 5])
 
@@ -176,7 +175,6 @@ class SpatialDBImageDataIntegrationTestMixin(object):
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
 
-
 class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
                                          SpatialDBImageDataIntegrationTestMixin, unittest.TestCase):
 
@@ -201,7 +199,7 @@ class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
         self.config = configuration.BossConfig()
 
         # kvio settings
-        self.kvio_config = {"cache_host": self.config['aws']['cache'],
+        self.kvio_config = {"cache_host": self.config['aws']['cache'],#
                             "cache_db": 1,
                             "read_timeout": 86400}
 

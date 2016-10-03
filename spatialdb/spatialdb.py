@@ -735,5 +735,4 @@ class SpatialDB:
                                                                       resource.get_lookup_key(),
                                                                       resolution,
                                                                       morton_idx,
-                                                                      t,
-                                                                      resource.to_json())
+                                                                      t, resource.to_json())

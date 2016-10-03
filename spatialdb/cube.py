@@ -194,11 +194,7 @@ class Cube(metaclass=ABCMeta):
                 self.is_time_series = True
                 self.time_range = time_sample_range
 
-            if isinstance(byte_arrays, bytes):
-                # If you get a single array assume it is the complete 4D array
-                self.data[:, :, :, :] = blosc.unpack_array(byte_arrays)
-                self.z_dim, self.y_dim, self.x_dim = self.cube_size = list(self.data.shape)[1:]
-            else:
+            if isinstance(byte_arrays, list) or isinstance(byte_arrays, tuple):
                 # Got a list of byte arrays, so assume they are each 4-D, corresponding to time samples
 
                 # Unpack all of the arrays into the cube
@@ -217,6 +213,11 @@ class Cube(metaclass=ABCMeta):
                         self.data[idx, :, :, :] = temp_mat
                     else:
                         self.data[idx, :, :, :] = blosc.unpack_array(byte_arrays[idx])
+            else:
+                # If you get a single array assume it is the complete 4D array
+                self.data[:, :, :, :] = blosc.unpack_array(byte_arrays)
+                self.z_dim, self.y_dim, self.x_dim = self.cube_size = list(self.data.shape)[1:]
+
         except Exception as e:
             raise SpdbError("Failed to decompress database cube. {}".format(e),
                             ErrorCodes.SERIALIZATION_ERROR)
