@@ -136,7 +136,7 @@ class SpatialDBImageDataIntegrationTestMixin(object):
         """Test the get_cubes method - w/ time - single - hit"""
         # Generate random data
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
-        cube1.data = np.random.randint(1, 254, (5, self.z_dim, self.y_dim, self.z_dim))
+        cube1.data = np.random.randint(1, 254, (5, self.z_dim, self.y_dim, self.x_dim))
         cube1.morton_id = 0
 
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
