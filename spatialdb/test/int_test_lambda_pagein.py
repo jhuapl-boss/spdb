@@ -19,6 +19,7 @@ from spdb.project import BossResourceBasic
 from spdb.spatialdb.test.test_spatialdb import SpatialDBImageDataTestMixin
 from spdb.spatialdb import Cube, SpatialDB
 from spdb.spatialdb.test.setup import SetupTests
+from spdb.c_lib.ndtype import CUBOIDSIZE
 
 import redis
 import time
@@ -29,9 +30,13 @@ from bossutils import configuration
 
 """
 Test lambda page in function.  Note, tests assume cuboid size is 
-(128, 128, 16).
+(512, 512, 16).
 """
 class TestIntegrationLambdaPageInImage8Data(unittest.TestCase):
+    cuboid_size = CUBOIDSIZE[0]
+    x_dim = cuboid_size[0]
+    y_dim = cuboid_size[1]
+    z_dim = cuboid_size[2]
 
     def tearDown(self):
         """Clean kv store in between tests"""
@@ -122,15 +127,15 @@ class TestIntegrationLambdaPageInImage8Data(unittest.TestCase):
 
     def test_page_in_single_cuboid(self):
         # Generate random data
-        cube1 = Cube.create_cube(self.resource, [128, 128, 16])
-        cube1.data = np.random.randint(1, 254, (1, 16, 128, 128))
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube1.data = np.random.randint(1, 254, (1, self.z_dim, self.y_dim, self.x_dim))
         cube1.morton_id = 0
 
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
         sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data)
 
-        cube2 = sp.cutout(self.resource, (0, 0, 0), (128, 128, 16), 0)
+        cube2 = sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
 
@@ -144,7 +149,7 @@ class TestIntegrationLambdaPageInImage8Data(unittest.TestCase):
         sp.read_lambda_threshold = 0
 
         # Get the data again, which should trigger lambda page in.
-        cube3 = sp.cutout(self.resource, (0, 0, 0), (128, 128, 16), 0)
+        cube3 = sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
 
         # Make sure the data is the same
         np.testing.assert_array_equal(cube1.data, cube3.data)

@@ -19,6 +19,7 @@ from spdb.project import BossResourceBasic
 from spdb.spatialdb.test.test_spatialdb import SpatialDBImageDataTestMixin
 from spdb.spatialdb import Cube, SpatialDB
 from spdb.spatialdb.test.setup import SetupTests
+from spdb.c_lib.ndtype import CUBOIDSIZE
 
 import redis
 import time
@@ -29,37 +30,42 @@ from bossutils import configuration
 
 class SpatialDBImageDataIntegrationTestMixin(object):
 
+    cuboid_size = CUBOIDSIZE[0]
+    x_dim = cuboid_size[0]
+    y_dim = cuboid_size[1]
+    z_dim = cuboid_size[2]
+
     def test_cutout_no_time_single_aligned_hit(self):
         """Test the get_cubes method - no time - single - hit"""
         # Generate random data
-        cube1 = Cube.create_cube(self.resource, [128, 128, 16])
-        cube1.data = np.random.randint(1, 254, (1, 16, 128, 128))
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube1.data = np.random.randint(1, 254, (1, self.z_dim, self.y_dim, self.x_dim))
         cube1.morton_id = 0
 
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
         sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data)
 
-        cube2 = sp.cutout(self.resource, (0, 0, 0), (128, 128, 16), 0)
+        cube2 = sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
 
-        cube2 = sp.cutout(self.resource, (0, 0, 0), (128, 128, 16), 0)
+        cube2 = sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
 
     def test_cutout_no_time_single_aligned_miss(self):
         """Test the get_cubes method - no time - single - miss"""
         # Generate random data
-        cube1 = Cube.create_cube(self.resource, [128, 128, 16])
-        cube1.data = np.random.randint(1, 254, (1, 16, 128, 128))
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube1.data = np.random.randint(1, 254, (1, self.z_dim, self.y_dim, self.x_dim))
         cube1.morton_id = 0
 
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
         sp.write_cuboid(self.resource, (1, 0, 0), 0, cube1.data)
 
-        cube2 = sp.cutout(self.resource, (1, 0, 0), (128, 128, 16), 0)
+        cube2 = sp.cutout(self.resource, (1, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
 
         # Make sure data is the same
         np.testing.assert_array_equal(cube1.data, cube2.data)
@@ -68,7 +74,7 @@ class SpatialDBImageDataIntegrationTestMixin(object):
         sp.kvio.cache_client.flushdb()
 
         # Get the data again
-        cube3 = sp.cutout(self.resource, (1, 0, 0), (128, 128, 16), 0)
+        cube3 = sp.cutout(self.resource, (1, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
 
         # Make sure the data is the same
         np.testing.assert_array_equal(cube1.data, cube3.data)
@@ -76,90 +82,90 @@ class SpatialDBImageDataIntegrationTestMixin(object):
     def test_cutout_no_time_single_aligned_existing_hit(self):
         """Test the get_cubes method - no time - aligned - existing data - miss"""
         # Generate random data
-        data1 = np.random.randint(1, 254, (16, 128, 128))
+        data1 = np.random.randint(1, 254, (self.z_dim, self.y_dim, self.x_dim))
 
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
         sp.write_cuboid(self.resource, (0, 0, 0), 0, data1)
 
-        cube2 = sp.cutout(self.resource, (0, 0, 0), (128, 128, 16), 0)
+        cube2 = sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
 
         np.testing.assert_array_equal(data1, np.squeeze(cube2.data))
 
         # now write to cuboid again
-        data3 = np.random.randint(1, 254, (16, 128, 128))
+        data3 = np.random.randint(1, 254, (self.z_dim, self.y_dim, self.x_dim))
 
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
         sp.write_cuboid(self.resource, (0, 0, 0), 0, data3)
 
-        cube4 = sp.cutout(self.resource, (0, 0, 0), (128, 128, 16), 0)
+        cube4 = sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
         np.testing.assert_array_equal(data3, np.squeeze(cube4.data))
 
     def test_cutout_no_time_single_aligned_hit_shifted(self):
         """Test the get_cubes method - no time - single - hit - shifted into a different location"""
         # Generate random data
-        cube1 = Cube.create_cube(self.resource, [128, 128, 16])
-        cube1.data = np.random.randint(1, 254, (1, 16, 128, 128))
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube1.data = np.random.randint(1, 254, (1, self.z_dim, self.y_dim, self.x_dim))
         cube1.morton_id = 0
 
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
-        sp.write_cuboid(self.resource, (128, 128, 0), 0, cube1.data)
+        sp.write_cuboid(self.resource, (self.x_dim, self.y_dim, 0), 0, cube1.data)
 
-        cube2 = sp.cutout(self.resource, (128, 128, 0), (128, 128, 16), 0)
+        cube2 = sp.cutout(self.resource, (self.x_dim, self.y_dim, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
 
     def test_cutout_no_time_single_unaligned_hit(self):
         """Test the get_cubes method - no time - single - unaligned - hit"""
         # Generate random data
-        cube1 = Cube.create_cube(self.resource, [128, 128, 16])
-        cube1.data = np.random.randint(1, 254, (1, 16, 128, 128))
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube1.data = np.random.randint(1, 254, (1, self.z_dim, self.y_dim, self.x_dim))
         cube1.morton_id = 0
 
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
         sp.write_cuboid(self.resource, (600, 0, 0), 0, cube1.data)
 
-        cube2 = sp.cutout(self.resource, (600, 0, 0), (128, 128, 16), 0)
+        cube2 = sp.cutout(self.resource, (600, 0, 0), (self.x_dim, self.y_dim, 16), 0)
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
 
     def test_cutout_time0_single_aligned_hit(self):
         """Test the get_cubes method - w/ time - single - hit"""
         # Generate random data
-        cube1 = Cube.create_cube(self.resource, [128, 128, 16])
-        cube1.data = np.random.randint(1, 254, (5, 16, 128, 128))
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube1.data = np.random.randint(1, 254, (5, self.z_dim, self.y_dim, self.z_dim))
         cube1.morton_id = 0
 
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
         sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data)
 
-        cube2 = sp.cutout(self.resource, (0, 0, 0), (128, 128, 16), 0, time_sample_range=[0, 5])
+        cube2 = sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0, time_sample_range=[0, 5])
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
 
     def test_cutout_time_offset_single_aligned_hit(self):
         """Test the get_cubes method - w/ time - single - hit"""
         # Generate random data
-        cube1 = Cube.create_cube(self.resource, [128, 128, 16])
-        cube1.data = np.random.randint(1, 254, (3, 16, 128, 128))
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube1.data = np.random.randint(1, 254, (3, self.z_dim, self.y_dim, self.x_dim))
         cube1.morton_id = 0
 
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
         sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data, time_sample_start=6)
 
-        cube2 = sp.cutout(self.resource, (0, 0, 0), (128, 128, 16), 0, time_sample_range=[6, 9])
+        cube2 = sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0, time_sample_range=[6, 9])
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
 
     def test_cutout_no_time_multi_unaligned_hit(self):
         """Test the get_cubes method - no time - multi - unaligned - hit"""
         # Generate random data
-        cube1 = Cube.create_cube(self.resource, [128, 128, 16])
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
         cube1.data = np.random.randint(1, 254, (1, 8, 400, 400))
         cube1.morton_id = 0
 

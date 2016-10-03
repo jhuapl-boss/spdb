@@ -16,12 +16,18 @@ import unittest
 
 from spdb.spatialdb import ImageCube8, ImageCube16, Cube, SpdbError, AnnotateCube64
 from spdb.project import BossResourceBasic
+from spdb.c_lib.ndtype import CUBOIDSIZE
 import numpy as np
 
 from PIL import Image
 
 class TestImageCube8(unittest.TestCase):
     """Test the ImageCube8 Class parent class functionality"""
+
+    cuboid_size = CUBOIDSIZE[0]
+    x_dim = cuboid_size[0]
+    y_dim = cuboid_size[1]
+    z_dim = cuboid_size[2]
 
     def test_constructor_no_dim_no_time(self):
         """Test the Cube class constructor"""

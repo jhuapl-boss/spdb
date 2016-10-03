@@ -18,9 +18,9 @@ import numpy as np
 # Cuboid Size
 # TODO: Look into moving this into a data model table and set based on voxel size
 # non-isotropic slices should be 128,128,16. As you downsample move to 64,64,64 past isotropic
-CUBOIDSIZE = [[128, 128, 16],
-              [128, 128, 16],
-              [128, 128, 16],
+CUBOIDSIZE = [[512, 512, 16],
+              [512, 512, 16],
+              [512, 512, 16],
               [64, 64, 64],
               [64, 64, 64],
               [64, 64, 64],
