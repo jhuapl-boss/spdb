@@ -37,6 +37,13 @@ class AWSObjectStoreTestMixin(object):
         for cnt, chunk in enumerate(AWSObjectStore.object_key_chunks(keys, 3)):
             assert chunk == expected[cnt]
 
+    def test_generate_object_keys(self):
+        """Test to create object keys"""
+        os = AWSObjectStore(self.object_store_config)
+        object_keys = os.generate_object_key(self.resource, 0, 2, 56)
+
+        assert object_keys == '30a1be1564a8b1a1cf7f8e9c4deb643d&4&2&1&0&2&56'
+
     def test_cached_cuboid_to_object_keys(self):
         """Test to check key conversion from cached cuboid to object"""
 

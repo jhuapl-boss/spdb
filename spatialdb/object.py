@@ -155,6 +155,28 @@ class AWSObjectStore(ObjectStore):
         for ii in range(0, len(object_keys), chunk_size):
             yield object_keys[ii:ii + chunk_size]
 
+    def generate_object_key(self, resource, resolution, time_sample, morton_id):
+        """Generate Key for an object stored in the S3 cuboid bucket
+
+            hash&{lookup_key}&resolution&time_sample&morton_id
+
+        Args:
+            resource (spdb.project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            morton_id (int): Morton ID of the cuboids
+            time_sample (int):  time samples of the cuboids
+
+        Returns:
+            list[str]: A list of keys for each cuboid
+
+        """
+        base_key = '{}&{}&{}&{}'.format(resource.get_lookup_key(), resolution, time_sample, morton_id)
+
+        # Hash
+        hash_str = hashlib.md5(base_key.encode()).hexdigest()
+
+        return "{}&{}".format(hash_str, base_key)
+
     def cuboids_exist(self, key_list, cache_miss_key_idx=None, version=0):
         """
         Method to check if cuboids exist in S3 by checking the S3 Index table.
