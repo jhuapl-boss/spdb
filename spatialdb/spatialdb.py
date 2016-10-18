@@ -215,13 +215,13 @@ class SpatialDB:
     # Status Methods
     def resource_locked(self, lookup_key):
         """
-        Method to check if a given channel/layer is locked for writing due to an error
+        Method to check if a given channel is locked for writing due to an error
 
         Args:
-            lookup_key (str): Lookup key for a channel/layer
+            lookup_key (str): Lookup key for a channel
 
         Returns:
-            (bool): True if the channel/layer is locked, false if not
+            (bool): True if the channel is locked, false if not
         """
         return self.cache_state.project_locked(lookup_key)
 
@@ -229,7 +229,7 @@ class SpatialDB:
     def _up_sample_cutout(self, resource, corner, extent, resolution):
         """Transform coordinates of a base resolution cutout to a lower res level by up-sampling.
 
-        Only applicable to Layers.
+        Only applicable to annotation channels.
 
         When you make an annotation cutout and request a zoom level that is LOWER (higher resolution) than your base
         resolution (the resolution annotations should be written to by default) you must take a base resolution cutout
@@ -260,8 +260,8 @@ class SpatialDB:
         result_tuple = namedtuple('ResampleCoords',
                                   ['corner', 'extent', 'x_pixel_offset', 'y_pixel_offset'])
 
-        # Get base resolution for the layer
-        base_res = resource.get_layer().base_resolution
+        # Get base resolution for the annotation channel
+        base_res = resource.get_channel().base_resolution
 
         # scale the corner to lower resolution
         effcorner = (corner[0] / (2 ** (base_res - resolution)),
@@ -286,7 +286,7 @@ class SpatialDB:
     def _down_sample_cutout(self, resource, corner, dim, resolution):
         """Transform coordinates of a base resolution cutout to a higher res level by down-sampling.
 
-        Only applicable to Layers.
+        Only applicable to Annotation Channels.
 
         When you make an annotation cutout and request a zoom level that is HIGHER (lower resolution) than your base
         resolution (the resolution annotations should be written to by default) you must take a base resolution cutout
@@ -310,8 +310,8 @@ class SpatialDB:
         result_tuple = namedtuple('ResampleCoords',
                                   ['corner', 'extent', 'x_pixel_offset', 'y_pixel_offset'])
 
-        # Get base resolution for the layer
-        base_res = resource.get_layer().base_resolution
+        # Get base resolution for the annotation channel
+        base_res = resource.get_channel().base_resolution
 
         # scale the corner to higher resolution
         effcorner = (corner[0] * (2 ** (resolution - base_res)),
@@ -339,11 +339,8 @@ class SpatialDB:
             cube.Cube: The cutout data stored in a Cube instance
         """
         boss_logger = BossLogger()
-        boss_logger.setLevel("debug")
+        boss_logger.setLevel("info")
         blog = boss_logger.logger
-        blog.debug("In cutout")
-
-        # TODO: DMK move CUBOIDSIZE into Resource
 
         if not time_sample_range:
             # If not time sample list defined, used default of 0
@@ -351,7 +348,7 @@ class SpatialDB:
 
         # if cutout is below resolution, get a smaller cube and scaleup
         # ONLY FOR ANNO CHANNELS - if data is missing on the current resolution but exists else where...extrapolate
-        # resource.get_layer().base_resolution is the "base" resolution and you assume data exists there.
+        # resource.get_channel().base_resolution is the "base" resolution and you assume data exists there.
         # If propagated you don't have to worry about this.
         # currently we don't upsample annotations when hardening the database, so don't need to check for propagated.
 
@@ -360,9 +357,10 @@ class SpatialDB:
                                   ['corner', 'extent', 'x_pixel_offset', 'y_pixel_offset'])
 
         # Check if you need to scale a cutout due to off-base resolution cutouts/propagation state
-        if not resource.is_channel():
-            # Get base resolution for the layer
-            base_res = resource.get_layer().base_resolution
+        channel = resource.get_channel()
+        if not channel.is_image():
+            # The channel is an annotation!
+            base_res = channel.base_resolution
 
             if base_res > resolution:
                 # Must up-sample cutout dynamically find the effective dimensions of the up-sampled cutout
@@ -371,8 +369,8 @@ class SpatialDB:
                 [x_cube_dim, y_cube_dim, z_cube_dim] = cube_dim = CUBOIDSIZE[base_res]
                 cutout_resolution = base_res
 
-            elif not resource.is_channel() and base_res < resolution and not resource.is_propagated():
-                # If cutout is a layer, above base resolution (lower res), and NOT propagated, down-sample
+            elif not channel.is_image() and base_res < resolution and not resource.is_propagated():
+                # If cutout is an annotation channel, above base resolution (lower res), and NOT propagated, down-sample
                 cutout_coords = self._down_sample_cutout(resource, corner, extent, resolution)
 
                 [x_cube_dim, y_cube_dim, z_cube_dim] = cube_dim = CUBOIDSIZE[base_res]
@@ -387,7 +385,7 @@ class SpatialDB:
                 # Create namedtuple for consistency with re-sampling paths through the code
                 cutout_coords = result_tuple(corner, extent, None, None)
         else:
-            # Resouce is a channel, so no re-sampling
+            # Resource is an image channel, so no re-sampling
             # get the size of the image and cube
             [x_cube_dim, y_cube_dim, z_cube_dim] = cube_dim = CUBOIDSIZE[resolution]
             cutout_resolution = resolution
@@ -554,14 +552,9 @@ class SpatialDB:
             # add it to the output cube
             out_cube.add_data(cube, offset)
 
-        # Get the base resolution if channel or layer for logic below
-        base_res = None
-        if not resource.is_channel():
-            # Get base resolution for the layer
-            base_res = resource.get_layer().base_resolution
-
         # A smaller cube was cutout due to off-base resolution query: up-sample and trim
-        if not resource.is_channel() and base_res > resolution:
+        base_res = channel.base_resolution
+        if not channel.is_image() and base_res > resolution:
             # TODO: optimizing zoomData and rename when implementing propagate
             out_cube.zoomData(base_res - resolution)
 
@@ -574,7 +567,7 @@ class SpatialDB:
                           extent[2])
 
         # A larger cube was cutout due to off-base resolution query: down-sample and trim
-        elif not resource.is_channel() and base_res < resolution and not resource.is_propagated():
+        elif not channel.is_image() and base_res < resolution and not resource.is_propagated():
             # TODO: optimizing downScale and rename when implementing propagate
             out_cube.downScale(resolution - base_res)
 

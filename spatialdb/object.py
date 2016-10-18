@@ -117,13 +117,14 @@ class ObjectStore(metaclass=ABCMeta):
         raise NotImplemented
 
     @abstractmethod
-    def trigger_page_out(self, config_data, write_cuboid_key):
+    def trigger_page_out(self, config_data, write_cuboid_key, resource):
         """
         Method to trigger an page out to the object storage system
 
         Args:
             config_data (dict): Dictionary of configuration information
             write_cuboid_key (str): Unique write-cuboid to be flushed to S3
+            resource (spdb.project.resource.BossResource): resource for the given write cuboid key
 
         Returns:
             None
@@ -221,7 +222,7 @@ class AWSObjectStore(ObjectStore):
 
         return s3_key_index, zero_key_index
 
-    def add_cuboid_to_index(self, object_key, version=0):
+    def add_cuboid_to_index(self, object_key, version=0, ingest_job=0):
         """
         Method to add a cuboid's object_key to the S3 index table
 
@@ -241,7 +242,7 @@ class AWSObjectStore(ObjectStore):
         vals = object_key.split("&")
 
         # range key is exp&ch&res&task
-        ingest_job_range = "{}&{}&{}&0".format(vals[2], vals[3], vals[4])
+        ingest_job_range = "{}&{}&{}&{}".format(vals[2], vals[3], vals[4], ingest_job)
 
         try:
             dynamodb.put_item(

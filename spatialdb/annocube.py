@@ -19,6 +19,7 @@ from PIL import Image
 from .cube import Cube
 
 from spdb.c_lib import ndlib
+from spdb.c_lib.ndtype import CUBOIDSIZE
 
 from .error import SpdbError, ErrorCodes
 
@@ -28,7 +29,7 @@ class AnnotateCube64(Cube):
         """Create empty array of cube_size"""
 
         if not cube_size:
-            cube_size = [64, 64, 64]
+            cube_size = CUBOIDSIZE[0]
 
         # call the base class constructor
         Cube.__init__(self, cube_size, time_range)

@@ -133,38 +133,35 @@ class Channel:
     Attributes:
       name (str): Unique string to identify the channel
       description (str): A short description of the channel and what it contains
-      datatype (int): The bitdepth of the channel.  Valid choices are uint8, uint16, uint32, and uint64
-    """
-    def __init__(self, name, description, datatype):
-        self.name = name
-        self.description = description
-        self.datatype = datatype
-
-
-class Layer:
-    """
-    Class to store layer properties
-
-    Args:
-      name (str): Unique string to identify the layer
-      description (str): A short description of the layer and what it contains
-      datatype (int): The bitdepth of the channel.  Valid choices are uint8, uint16, uint32, and uint64
-      base_resolution (int): The resolution level of primary annotation/data (mainly used in layers).
-      parent_channels (list): The names of the parent channel(s) to which the Layer is linked
-
-    Attributes:
-      name (str): Unique string to identify the layer
-      description (str): A short description of the layer and what it contains
-      datatype (int): The bitdepth of the channel.  Valid choices are uint8, uint16, uint32, and uint64
+      type (str): The channel type: IMAGE or ANNOTATION
+      datatype (str): The bitdepth of the channel.  Valid choices are uint8, uint16, uint32, and uint64
       base_resolution (int): The resolution level of primary annotation and indicates where dynamic resampling will occur
-      parent_channels (list): The names of the parent channel(s) to which the Layer is linked
+      source (list(str)): A list of channels from which this channel is derived
+      source (list(str)): A list of channels that are related to this channel
+      default_time_step (int): The time step to use if time is omitted from a request
+
     """
-    def __init__(self, name, description, datatype, base_resolution, parent_channels):
+    def __init__(self, name, description, ch_type, datatype, base_resolution, source, related, default_time_step):
         self.name = name
         self.description = description
+        self.type = ch_type
         self.datatype = datatype
         self.base_resolution = base_resolution
-        self.parent_channels = parent_channels
+        self.source = source
+        self.related = related
+        self.default_time_step = default_time_step
+
+    def is_image(self):
+        """
+
+        Returns:
+            (bool): True if the channel is of type IMAGE
+
+        """
+        if self.type.lower() == "image":
+            return True
+        else:
+            return False
 
 
 class BossResource(metaclass=ABCMeta):
@@ -176,7 +173,6 @@ class BossResource(metaclass=ABCMeta):
       _coord_frame (spdb.project.resource.CoordinateFrame): A coordinate frame instance for the resource
       _experiment (spdb.project.resource.Experiment): A experiment instance for the resource
       _channel (spdb.project.resource.Channel): A channel instance for the resource (if a channel)
-      _layer (spdb.project.resource.Layer): A layer instance for the resource (if a layer)
       _boss_key (str): The unique, plain text key identifying the resource - used to query for the lookup key
       _lookup_key (str): The unique key identifying the resource that enables renaming resources and physically used to
       ID data in databases
@@ -186,7 +182,6 @@ class BossResource(metaclass=ABCMeta):
         self._coord_frame = None
         self._experiment = None
         self._channel = None
-        self._layer = None
         self._boss_key = None
         self._lookup_key = None
 
@@ -209,7 +204,7 @@ class BossResource(metaclass=ABCMeta):
         self.populate_collection()
         self.populate_coord_frame()
         self.populate_experiment()
-        self.populate_channel_or_layer()
+        self.populate_channel()
         self.populate_boss_key()
         self.populate_lookup_key()
 
@@ -217,16 +212,10 @@ class BossResource(metaclass=ABCMeta):
         data = {"collection": self._collection.__dict__,
                 "coord_frame": self._coord_frame.__dict__,
                 "experiment": self._experiment.__dict__,
+                "channel": self._channel.__dict__,
                 "boss_key": self._boss_key,
                 "lookup_key": self._lookup_key,
                 }
-
-        if self._channel:
-            data['channel_layer'] = self._channel.__dict__
-            data['channel_layer']['is_channel'] = True
-        else:
-            data['channel_layer'] = self._layer.__dict__
-            data['channel_layer']['is_channel'] = False
 
         # Serialize and return
         return data
@@ -254,12 +243,11 @@ class BossResource(metaclass=ABCMeta):
         return NotImplemented
 
     @abstractmethod
-    def populate_channel_or_layer(self):
+    def populate_channel(self):
         """
-        Method to create a Channel or Layer instance and set self._channel or self._layer.  Should be overridden.
+        Method to create a Channel instance and set self._channel.  Should be overridden.
         """
         return NotImplemented
-
 
     @abstractmethod
     def populate_boss_key(self):
@@ -307,34 +295,14 @@ class BossResource(metaclass=ABCMeta):
         return self._coord_frame
 
     def get_channel(self):
-        """Method to get the current Channel instance.  Lazily populated. None if current resource is a layer
+        """Method to get the current Channel instance.  Lazily populated.
 
         :returns A Channel instance for the given resource
         :rtype spdb.project.Channel
         """
-        if not self._channel and not self._layer:
-            self.populate_channel_or_layer()
+        if not self._channel:
+            self.populate_channel()
         return self._channel
-
-    def get_layer(self):
-        """Method to get the current Layer instance.  Lazily populated. None if current resource is a channel
-
-        :returns A Layer instance for the given resource
-        :rtype spdb.project.Layer
-        """
-        if not self._channel and not self._layer:
-            self.populate_channel_or_layer()
-        return self._layer
-
-    def is_channel(self):
-        """Method to check if the resource is a channel or a layer
-
-        :returns True if resource is a channel. False if a layer
-        :rtype bool
-        """
-        if not self._channel and not self._layer:
-            self.populate_channel_or_layer()
-        return self._layer is None
 
     def get_boss_key(self):
         """Method to get the current boss key.  Lazily populated.
@@ -350,13 +318,13 @@ class BossResource(metaclass=ABCMeta):
         """Method to get the current lookup keys.  Lazily populated.
 
         :returns The lookup key
-        :rtype list[str]
+        :rtype str
         """
         if not self._lookup_key:
             self.populate_lookup_key()
         return self._lookup_key
 
-    # TODO: Look into putting kv-engine in django model and support different engines?
+    # TODO: Look into putting kv-engine in django model and support different engines
     def get_kv_engine(self):
         """Method to get the key-value engine for the current resources
 
@@ -383,20 +351,10 @@ class BossResource(metaclass=ABCMeta):
         :returns A string identifying the data type for the channel or layer
         :rtype str
         """
-        if not self._channel and not self._layer:
-            self.populate_channel_or_layer()
+        if not self._channel:
+            self.populate_channel()
 
-        data_type = None
-        if self.is_channel():
-            if self._channel:
-                # You have a channel
-                data_type = self._channel.datatype
-        else:
-            if self._layer:
-                # You have a layer
-                data_type = self._layer.datatype
-
-        return data_type
+        return self._channel.datatype
 
     def get_bit_depth(self):
         """Method to get the bit depth of the channel or layer
@@ -405,11 +363,11 @@ class BossResource(metaclass=ABCMeta):
         :rtype int
         """
         data_type = self.get_data_type()
-        if data_type == "uint8":
+        if data_type.lower() == "uint8":
             bit_depth = 8
-        elif data_type == "uint16":
+        elif data_type.lower() == "uint16":
             bit_depth = 16
-        elif data_type == "uint64":
+        elif data_type.lower() == "uint64":
             bit_depth = 64
         else:
             return ValueError("Unsupported datatype")
@@ -421,78 +379,13 @@ class BossResource(metaclass=ABCMeta):
 
         """
         data_type = self.get_data_type()
-        if data_type == "uint8":
+        if data_type.lower() == "uint8":
             bit_depth = np.uint8
-        elif data_type == "uint16":
+        elif data_type.lower() == "uint16":
             bit_depth = np.uint16
-        elif data_type == "uint64":
+        elif data_type.lower() == "uint64":
             bit_depth = np.uint64
         else:
             return ValueError("Unsupported data type")
 
         return bit_depth
-
-    # Methods to delete the entry from the data model tables
-    @abstractmethod
-    def delete_collection_model(self):
-        """Method to delete a collection from the data model. Should not be called directly; Use delete_collection.
-
-        Returns:
-            None
-        """
-        return NotImplemented
-
-    @abstractmethod
-    def delete_experiment_model(self):
-        """Method to delete a experiment from the data model. Should not be called directly; Use delete_experiment.
-
-        Returns:
-            None
-        """
-        return NotImplemented
-
-    @abstractmethod
-    def delete_coord_frame_model(self):
-        """Method to delete a coord_frame from the data model. Should not be called directly; Use delete_coord_frame.
-
-        Returns:
-            None
-        """
-        return NotImplemented
-
-    @abstractmethod
-    def delete_channel_layer_model(self):
-        """Method to delete a channel_layer from the data model. Should not be called directly; Use delete_channel_layer.
-
-        Returns:
-            None
-        """
-        return NotImplemented
-
-    # Methods to delete Boss data model resources
-    # TODO: Add S3 support on deletes.
-    # TODO: Add delete support
-    def delete_collection(self):
-        """Delete the Collection"""
-        return NotImplemented
-
-    def delete_experiment(self):
-        """Delete the experiment"""
-        return NotImplemented
-
-    def delete_coordinate_frame(self):
-        """Delete the coordinate frame"""
-        return NotImplemented
-
-    def delete_channel(self):
-        """Delete a channel"""
-        return NotImplemented
-
-    def delete_layer(self):
-        """Delete a channel"""
-        return NotImplemented
-
-    def delete_time_sample(self, time_sample=None):
-        """Delete the time sample"""
-        return NotImplemented
-

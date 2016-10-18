@@ -14,21 +14,14 @@
 
 import unittest
 
-from spdb.project import BossResourceBasic
 from spdb.spatialdb import AWSObjectStore
 from .test_AWS_object_store import AWSObjectStoreTestMixin
 
-from bossutils import configuration
-import time
-
-import boto3
-from botocore.exceptions import ClientError
-
-from spdb.spatialdb.test.setup import SetupTests
+from spdb.spatialdb.test.setup import AWSSetupLayer
 
 
 class AWSObjectStoreTestIntegrationMixin(object):
-    # todo: implement tests here or remove
+    # TODO: implement tests here or remove
     def test_put_get_objects_async(self):
         """Method to test putting and getting objects to and from S3"""
         #os = AWSObjectStore(self.object_store_config)
@@ -79,92 +72,14 @@ class AWSObjectStoreTestIntegrationMixin(object):
 
 
 class TestAWSObjectStoreInt(AWSObjectStoreTestIntegrationMixin, AWSObjectStoreTestMixin, unittest.TestCase):
+    layer = AWSSetupLayer
 
-    @classmethod
-    def setUpClass(cls):
-        """ get_some_resource() is slow, to avoid calling it for each test use setUpClass()
-            and store the result as class variable
+    def setUp(self):
+        """ Copy params from the Layer setUpClass
         """
-        super(TestAWSObjectStoreInt, cls).setUpClass()
-        cls.setUpParams(cls)
-        try:
-            cls.setup_helper.create_s3_index_table(cls.object_store_config["s3_index_table"])
-        except ClientError:
-            cls.setup_helper.delete_s3_index_table(cls.object_store_config["s3_index_table"])
-            cls.setup_helper.create_s3_index_table(cls.object_store_config["s3_index_table"])
+        self.data = self.layer.data
+        self.resource = self.layer.resource
+        self.object_store_config = self.layer.object_store_config
 
-        try:
-            cls.setup_helper.create_cuboid_bucket(cls.object_store_config["cuboid_bucket"])
-        except ClientError:
-            cls.setup_helper.delete_cuboid_bucket(cls.object_store_config["cuboid_bucket"])
-            cls.setup_helper.create_cuboid_bucket(cls.object_store_config["cuboid_bucket"])
-
-    def setUpParams(self):
-        """ Create a diction of configuration values for the test resource. """
-        self.data = {}
-        self.data['collection'] = {}
-        self.data['collection']['name'] = "col1"
-        self.data['collection']['description'] = "Test collection 1"
-
-        self.data['coord_frame'] = {}
-        self.data['coord_frame']['name'] = "coord_frame_1"
-        self.data['coord_frame']['description'] = "Test coordinate frame"
-        self.data['coord_frame']['x_start'] = 0
-        self.data['coord_frame']['x_stop'] = 2000
-        self.data['coord_frame']['y_start'] = 0
-        self.data['coord_frame']['y_stop'] = 5000
-        self.data['coord_frame']['z_start'] = 0
-        self.data['coord_frame']['z_stop'] = 200
-        self.data['coord_frame']['x_voxel_size'] = 4
-        self.data['coord_frame']['y_voxel_size'] = 4
-        self.data['coord_frame']['z_voxel_size'] = 35
-        self.data['coord_frame']['voxel_unit'] = "nanometers"
-        self.data['coord_frame']['time_step'] = 0
-        self.data['coord_frame']['time_step_unit'] = "na"
-
-        self.data['experiment'] = {}
-        self.data['experiment']['name'] = "exp1"
-        self.data['experiment']['description'] = "Test experiment 1"
-        self.data['experiment']['num_hierarchy_levels'] = 7
-        self.data['experiment']['hierarchy_method'] = 'slice'
-
-        self.data['channel_layer'] = {}
-        self.data['channel_layer']['name'] = "ch1"
-        self.data['channel_layer']['description'] = "Test channel 1"
-        self.data['channel_layer']['is_channel'] = True
-        self.data['channel_layer']['datatype'] = 'uint8'
-        self.data['channel_layer']['max_time_step'] = 0
-
-        self.data['boss_key'] = 'col1&exp1&ch1'
-        self.data['lookup_key'] = '4&2&1'
-
-        self.resource = BossResourceBasic(self.data)
-
-        self.config = configuration.BossConfig()
-
-        # Get domain info
-        parts = self.config['aws']['cache'].split('.')
-        domain = "{}.{}".format(parts[1], parts[2])
-
-        self.object_store_config = {"s3_flush_queue": 'https://mytestqueue.com',
-                                    "cuboid_bucket": "int_test_bucket.{}".format(domain),
-                                    "page_in_lambda_function": "page_in.{}".format(domain),
-                                    "page_out_lambda_function": "page_out.{}".format(domain),
-                                    "s3_index_table": "int_test_s3_index_table.{}".format(domain)}
-        self.setup_helper = SetupTests()
-        self.setup_helper.mock = False
-
-    @classmethod
-    def tearDownClass(cls):
-        super(TestAWSObjectStoreInt, cls).tearDownClass()
-        try:
-            cls.setup_helper.delete_s3_index_table(cls.object_store_config["s3_index_table"])
-        except:
-            pass
-
-        try:
-            cls.setup_helper.delete_cuboid_bucket(cls.object_store_config["cuboid_bucket"])
-        except:
-            pass
 
 

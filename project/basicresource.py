@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from .resource import BossResource, Collection, CoordinateFrame, Experiment, Channel, Layer
+from .resource import BossResource, Collection, CoordinateFrame, Experiment, Channel
 import json
 
 
@@ -100,22 +100,18 @@ class BossResourceBasic(BossResource):
                                       self.data['experiment']['max_time_sample'],
                                       )
 
-    def populate_channel_or_layer(self):
+    def populate_channel(self):
         """
-        Method to create a Channel or Layer instance and set self._channel or self._layer.
+        Method to create a Channel instance and set self._channel.
         """
-        if self.data['channel_layer']['is_channel']:
-            # You have a channel request
-            self._channel = Channel(self.data['channel_layer']['name'],
-                                    self.data['channel_layer']['description'],
-                                    self.data['channel_layer']['datatype'])
-        else:
-            # You have a layer request
-            self._layer = Layer(self.data['channel_layer']['name'],
-                                self.data['channel_layer']['description'],
-                                self.data['channel_layer']['datatype'],
-                                self.data['channel_layer']['base_resolution'],
-                                self.data['channel_layer']['parent_channels'])
+        self._channel = Channel(self.data['channel']['name'],
+                                self.data['channel']['description'],
+                                self.data['channel']['type'],
+                                self.data['channel']['datatype'],
+                                self.data['channel']['base_resolution'],
+                                self.data['channel']['source'],
+                                self.data['channel']['related'],
+                                self.data['channel']['default_time_step'])
 
     def populate_boss_key(self):
         """
@@ -128,17 +124,4 @@ class BossResourceBasic(BossResource):
         Method to set self._lookup_key.  Should be overridden.
         """
         self._lookup_key = self.data['lookup_key']
-
-    # Methods to delete the entry from the data model tables
-    def delete_collection_model(self):
-        pass
-
-    def delete_experiment_model(self):
-        pass
-
-    def delete_coord_frame_model(self):
-        pass
-
-    def delete_channel_layer_model(self):
-        pass
 

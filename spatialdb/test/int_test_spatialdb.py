@@ -18,7 +18,7 @@ import numpy as np
 from spdb.project import BossResourceBasic
 from spdb.spatialdb.test.test_spatialdb import SpatialDBImageDataTestMixin
 from spdb.spatialdb import Cube, SpatialDB
-from spdb.spatialdb.test.setup import SetupTests
+from spdb.spatialdb.test.setup import AWSSetupLayer
 from spdb.c_lib.ndtype import CUBOIDSIZE
 
 import redis
@@ -185,6 +185,16 @@ class SpatialDBImageDataIntegrationTestMixin(object):
 
 class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
                                          SpatialDBImageDataIntegrationTestMixin, unittest.TestCase):
+    layer = AWSSetupLayer
+
+    def setUp(self):
+        """ Copy params from the Layer setUpClass
+        """
+        self.data = self.layer.data
+        self.resource = self.layer.resource
+        self.kvio_config = self.layer.kvio_config
+        self.state_config = self.layer.state_config
+        self.object_store_config = self.layer.object_store_config
 
     def tearDown(self):
         """Clean kv store in between tests"""
@@ -194,81 +204,6 @@ class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
         client = redis.StrictRedis(host=self.state_config['cache_state_host'],
                                    port=6379, db=1, decode_responses=False)
         client.flushdb()
-
-    def setUpParams(self):
-        """ Create a diction of configuration values for the test resource. """
-        # setup resources
-        self.setup_helper = SetupTests()
-        self.setup_helper.mock = False
-
-        self.data = self.setup_helper.get_image8_dict()
-        self.resource = BossResourceBasic(self.data)
-
-        self.config = configuration.BossConfig()
-
-        # kvio settings
-        self.kvio_config = {"cache_host": self.config['aws']['cache'],
-                            "cache_db": 1,
-                            "read_timeout": 86400}
-
-        # state settings
-        self.state_config = {"cache_state_host": self.config['aws']['cache-state'], "cache_state_db": 1}
-
-        # object store settings
-        _, domain = self.config['aws']['cuboid_bucket'].split('.', 1)
-        self.s3_flush_queue_name = "intTest.S3FlushQueue.{}".format(domain).replace('.', '-')
-        self.object_store_config = {"s3_flush_queue": "",
-                                    "cuboid_bucket": "intTest.{}".format(self.config['aws']['cuboid_bucket']),
-                                    "page_in_lambda_function": self.config['lambda']['page_in_function'],
-                                    "page_out_lambda_function": self.config['lambda']['flush_function'],
-                                    "s3_index_table": "intTest.{}".format(self.config['aws']['s3-index-table'])}
-
-    @classmethod
-    def setUpClass(cls):
-        """ get_some_resource() is slow, to avoid calling it for each test use setUpClass()
-            and store the result as class variable
-        """
-        super(TestIntegrationSpatialDBImage8Data, cls).setUpClass()
-        cls.setUpParams(cls)
-        try:
-            cls.setup_helper.create_s3_index_table(cls.object_store_config["s3_index_table"])
-        except ClientError:
-            cls.setup_helper.delete_s3_index_table(cls.object_store_config["s3_index_table"])
-            cls.setup_helper.create_s3_index_table(cls.object_store_config["s3_index_table"])
-
-        try:
-            cls.setup_helper.create_cuboid_bucket(cls.object_store_config["cuboid_bucket"])
-        except ClientError:
-            cls.setup_helper.delete_cuboid_bucket(cls.object_store_config["cuboid_bucket"])
-            cls.setup_helper.create_cuboid_bucket(cls.object_store_config["cuboid_bucket"])
-
-        try:
-            cls.object_store_config["s3_flush_queue"] = cls.setup_helper.create_flush_queue(cls.s3_flush_queue_name)
-        except ClientError:
-            try:
-                cls.setup_helper.delete_flush_queue(cls.object_store_config["s3_flush_queue"])
-            except:
-                pass
-            time.sleep(61)
-            cls.object_store_config["s3_flush_queue"] = cls.setup_helper.create_flush_queue(cls.s3_flush_queue_name)
-
-    @classmethod
-    def tearDownClass(cls):
-        super(TestIntegrationSpatialDBImage8Data, cls).tearDownClass()
-        try:
-            cls.setup_helper.delete_s3_index_table(cls.object_store_config["s3_index_table"])
-        except:
-            pass
-
-        try:
-            cls.setup_helper.delete_cuboid_bucket(cls.object_store_config["cuboid_bucket"])
-        except:
-            pass
-
-        try:
-            cls.setup_helper.delete_flush_queue(cls.object_store_config["s3_flush_queue"])
-        except:
-            pass
 
     def get_num_cache_keys(self, spdb):
         return len(self.cache_client.keys("*"))

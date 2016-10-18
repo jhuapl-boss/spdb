@@ -42,7 +42,7 @@ class AWSObjectStoreTestMixin(object):
         os = AWSObjectStore(self.object_store_config)
         object_keys = os.generate_object_key(self.resource, 0, 2, 56)
 
-        assert object_keys == '30a1be1564a8b1a1cf7f8e9c4deb643d&4&2&1&0&2&56'
+        assert object_keys == '631424bf68302b683a0be521101c192b&4&3&2&0&2&56'
 
     def test_cached_cuboid_to_object_keys(self):
         """Test to check key conversion from cached cuboid to object"""
@@ -204,26 +204,28 @@ class AWSObjectStoreTestMixin(object):
 
 class TestAWSObjectStore(AWSObjectStoreTestMixin, unittest.TestCase):
 
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls):
         """ Create a diction of configuration values for the test resource. """
         # Create resource
-        self.setup_helper = SetupTests()
-        self.data = self.setup_helper.get_image8_dict()
-        self.resource = BossResourceBasic(self.data)
+        cls.setup_helper = SetupTests()
+        cls.data = cls.setup_helper.get_image8_dict()
+        cls.resource = BossResourceBasic(cls.data)
 
         # Load config
-        self.config = configuration.BossConfig()
-        self.object_store_config = {"s3_flush_queue": 'https://mytestqueue.com',
-                                    "cuboid_bucket": "test_bucket",
-                                    "page_in_lambda_function": "page_in.test.boss",
-                                    "page_out_lambda_function": "page_out.test.boss",
-                                    "s3_index_table": "test_table"}
+        cls.config = configuration.BossConfig()
+        cls.object_store_config = {"s3_flush_queue": 'https://mytestqueue.com',
+                                   "cuboid_bucket": "test_bucket",
+                                   "page_in_lambda_function": "page_in.test.boss",
+                                   "page_out_lambda_function": "page_out.test.boss",
+                                   "s3_index_table": "test_table"}
 
         # Create AWS Resources needed for tests
-        self.setup_helper.start_mocking()
-        self.setup_helper.create_s3_index_table(self.object_store_config["s3_index_table"])
-        self.setup_helper.create_cuboid_bucket(self.object_store_config["cuboid_bucket"])
+        cls.setup_helper.start_mocking()
+        cls.setup_helper.create_s3_index_table(cls.object_store_config["s3_index_table"])
+        cls.setup_helper.create_cuboid_bucket(cls.object_store_config["cuboid_bucket"])
 
-    def tearDown(self):
-        self.setup_helper.stop_mocking()
+    @classmethod
+    def tearDownClass(cls):
+        cls.setup_helper.stop_mocking()
 

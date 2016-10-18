@@ -17,13 +17,17 @@ import json
 
 from bossutils.aws import get_region
 
-import boto3
 from moto import mock_s3
-from moto import mock_sqs
 from moto import mock_dynamodb2
 from moto import mock_sqs
+import boto3
+from botocore.exceptions import ClientError
 
 import time
+from spdb.project.test.resource_setup import get_image_dict
+from spdb.project import BossResourceBasic
+
+from bossutils import configuration
 
 
 class SetupTests(object):
@@ -211,47 +215,91 @@ class SetupTests(object):
 
     def get_image8_dict(self):
         """Method to get the config dictionary for an image8 resource"""
-        data = {}
-        data['collection'] = {}
-        data['collection']['name'] = "col1"
-        data['collection']['description'] = "Test collection 1"
-
-        data['coord_frame'] = {}
-        data['coord_frame']['name'] = "coord_frame_1"
-        data['coord_frame']['description'] = "Test coordinate frame"
-        data['coord_frame']['x_start'] = 0
-        data['coord_frame']['x_stop'] = 2000
-        data['coord_frame']['y_start'] = 0
-        data['coord_frame']['y_stop'] = 5000
-        data['coord_frame']['z_start'] = 0
-        data['coord_frame']['z_stop'] = 200
-        data['coord_frame']['x_voxel_size'] = 4
-        data['coord_frame']['y_voxel_size'] = 4
-        data['coord_frame']['z_voxel_size'] = 35
-        data['coord_frame']['voxel_unit'] = "nanometers"
-        data['coord_frame']['time_step'] = 0
-        data['coord_frame']['time_step_unit'] = "na"
-
-        data['experiment'] = {}
-        data['experiment']['name'] = "exp1"
-        data['experiment']['description'] = "Test experiment 1"
-        data['experiment']['num_hierarchy_levels'] = 7
-        data['experiment']['hierarchy_method'] = 'slice'
-        data['experiment']['base_resolution'] = 0
-        data['experiment']['max_time_sample'] = 0
-
-        data['channel_layer'] = {}
-        data['channel_layer']['name'] = "ch1"
-        data['channel_layer']['description'] = "Test channel 1"
-        data['channel_layer']['is_channel'] = True
-        data['channel_layer']['datatype'] = 'uint8'
-
-        data['boss_key'] = 'col1&exp1&ch1'
-        data['lookup_key'] = '4&2&1'
+        data = get_image_dict()
         return data
 
     def get_image16_dict(self):
         """Method to get the config dictionary for an image16 resource"""
         data = self.get_image8_dict()
-        data['channel_layer']['datatype'] = 'uint16'
+        data['channel']['datatype'] = 'uint16'
         return data
+
+
+class AWSSetupLayer(object):
+    """A nose2 layer for setting up temporary AWS resources for testing ONCE per run"""
+    setup_helper = SetupTests()
+    data = None
+    resource = None
+    kvio_config = None
+    state_config = None
+    object_store_config = None
+
+    @classmethod
+    def setUp(cls):
+        cls.setup_helper.mock = False
+
+        # Setup Data
+        cls.data = get_image_dict()
+        cls.resource = BossResourceBasic(cls.data)
+
+        config = configuration.BossConfig()
+
+        # Get domain info
+        parts = config['aws']['cache'].split('.')
+        domain = "{}.{}".format(parts[1], parts[2])
+
+        # kvio settings
+        cls.kvio_config = {"cache_host": config['aws']['cache'],
+                           "cache_db": 1,
+                           "read_timeout": 86400}
+
+        # state settings
+        cls.state_config = {"cache_state_host": config['aws']['cache-state'], "cache_state_db": 1}
+
+        _, domain = config['aws']['cuboid_bucket'].split('.', 1)
+        cls.s3_flush_queue_name = "intTest.S3FlushQueue.{}".format(domain).replace('.', '-')
+        cls.object_store_config = {"s3_flush_queue": "",
+                                   "cuboid_bucket": "intTest.{}".format(config['aws']['cuboid_bucket']),
+                                   "page_in_lambda_function": config['lambda']['page_in_function'],
+                                   "page_out_lambda_function": config['lambda']['flush_function'],
+                                   "s3_index_table": "intTest.{}".format(config['aws']['s3-index-table'])}
+
+        # Setup AWS
+        try:
+            cls.setup_helper.create_s3_index_table(cls.object_store_config["s3_index_table"])
+        except ClientError:
+            cls.setup_helper.delete_s3_index_table(cls.object_store_config["s3_index_table"])
+            cls.setup_helper.create_s3_index_table(cls.object_store_config["s3_index_table"])
+
+        try:
+            cls.setup_helper.create_cuboid_bucket(cls.object_store_config["cuboid_bucket"])
+        except ClientError:
+            cls.setup_helper.delete_cuboid_bucket(cls.object_store_config["cuboid_bucket"])
+            cls.setup_helper.create_cuboid_bucket(cls.object_store_config["cuboid_bucket"])
+
+        try:
+            cls.object_store_config["s3_flush_queue"] = cls.setup_helper.create_flush_queue(cls.s3_flush_queue_name)
+        except ClientError:
+            try:
+                cls.setup_helper.delete_flush_queue(cls.object_store_config["s3_flush_queue"])
+            except:
+                pass
+            time.sleep(61)
+            cls.object_store_config["s3_flush_queue"] = cls.setup_helper.create_flush_queue(cls.s3_flush_queue_name)
+
+    @classmethod
+    def tearDown(cls):
+        try:
+            cls.setup_helper.delete_s3_index_table(cls.object_store_config["s3_index_table"])
+        except:
+            pass
+
+        try:
+            cls.setup_helper.delete_cuboid_bucket(cls.object_store_config["cuboid_bucket"])
+        except:
+            pass
+
+        try:
+            cls.setup_helper.delete_flush_queue(cls.object_store_config["s3_flush_queue"])
+        except:
+            pass

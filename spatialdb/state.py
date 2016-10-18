@@ -156,24 +156,24 @@ class CacheStateDB(object):
 
     def project_locked(self, lookup_key):
         """
-        Method to check if a given channel/layer is locked for writing due to an error
+        Method to check if a given channel is locked for writing due to an error
 
         Args:
-            lookup_key (str): Lookup key for a channel/layer
+            lookup_key (str): Lookup key for a channel
 
         Returns:
-            (bool): True if the channel/layer is locked, false if not
+            (bool): True if the channel is locked, false if not
         """
         key = "WRITE-LOCK&{}".format(lookup_key)
         return bool(self.status_client.exists(key))
 
     def set_project_lock(self, lookup_key, locked):
         """
-        Method to modify the lock status of a channel/layer
+        Method to modify the lock status of a channel
 
         Args:
-            lookup_key (str): Lookup key for a channel/layer
-            locked (bool): boolean indicating lock state. True=locked, False=unloacked
+            lookup_key (str): Lookup key for a channel
+            locked (bool): boolean indicating lock state. True=locked, False=unlocked
 
         Returns:
             None
@@ -190,7 +190,7 @@ class CacheStateDB(object):
 
         Args:
             temp_page_out_key (str): a temporary set used to check if cubes are in page out
-            lookup_key (str): Lookup key for a channel/layer
+            lookup_key (str): Lookup key for a channel
             resolution (int): level in the resolution heirarchy
             morton (int): morton id for the cuboid
             time_sample (int): time sample for cuboid
@@ -222,7 +222,7 @@ class CacheStateDB(object):
 
         Args:
             write_cuboid_key (str): write-cuboid key for the cuboid to delay write
-            lookup_key (str): Lookup key for a channel/layer
+            lookup_key (str): Lookup key for a channel
             resolution (int): level in the resolution heirarchy
             morton (int): morton id for the cuboid
             time_sample (int): time sample for cuboid
@@ -308,7 +308,7 @@ class CacheStateDB(object):
         Method to add a key to the page-out tracking set
 
         Args:
-            lookup_key (str): Lookup key for a channel/layer
+            lookup_key (str): Lookup key for a channel
             resolution (int): level in the resolution heirarchy
             morton (int): morton id for the cuboid
             time_sample (int): time sample for cuboid

@@ -25,6 +25,7 @@ import numpy as np
 import blosc
 
 from bossutils import configuration
+from spdb.project.test.resource_setup import get_image_dict
 
 
 class RedisKVIOTestMixin(object):
@@ -34,10 +35,10 @@ class RedisKVIOTestMixin(object):
         rkv = RedisKVIO(self.config_data)
         keys = rkv.generate_cached_cuboid_keys(self.resource, 2, [0, 1, 2], [34, 35, 36])
         assert len(keys) == 9
-        assert keys[0] == "CACHED-CUBOID&4&2&1&2&0&34"
-        assert keys[2] == "CACHED-CUBOID&4&2&1&2&0&36"
-        assert keys[5] == "CACHED-CUBOID&4&2&1&2&1&36"
-        assert keys[8] == "CACHED-CUBOID&4&2&1&2&2&36"
+        assert keys[0] == "CACHED-CUBOID&4&3&2&2&0&34"
+        assert keys[2] == "CACHED-CUBOID&4&3&2&2&0&36"
+        assert keys[5] == "CACHED-CUBOID&4&3&2&2&1&36"
+        assert keys[8] == "CACHED-CUBOID&4&3&2&2&2&36"
 
     def test_generate_write_cuboid_keys(self):
         """Test if write-cuboid keys are formatted properly"""
@@ -49,10 +50,10 @@ class RedisKVIOTestMixin(object):
             uuids.append(key.rsplit("&", 1)[1])
         assert len(set(uuids)) == 9
 
-        assert keys[0].rsplit("&", 1)[0] == "WRITE-CUBOID&4&2&1&2&0&34"
-        assert keys[2].rsplit("&", 1)[0] == "WRITE-CUBOID&4&2&1&2&0&36"
-        assert keys[5].rsplit("&", 1)[0] == "WRITE-CUBOID&4&2&1&2&1&36"
-        assert keys[8].rsplit("&", 1)[0] == "WRITE-CUBOID&4&2&1&2&2&36"
+        assert keys[0].rsplit("&", 1)[0] == "WRITE-CUBOID&4&3&2&2&0&34"
+        assert keys[2].rsplit("&", 1)[0] == "WRITE-CUBOID&4&3&2&2&0&36"
+        assert keys[5].rsplit("&", 1)[0] == "WRITE-CUBOID&4&3&2&2&1&36"
+        assert keys[8].rsplit("&", 1)[0] == "WRITE-CUBOID&4&3&2&2&2&36"
 
     def test_get_missing_read_cache_keys(self):
         """Test for querying for keys missing in the cache"""
@@ -67,8 +68,8 @@ class RedisKVIOTestMixin(object):
         assert len(missing) == 4
         assert len(cached) == 2
 
-        assert all_keys[cached[0]] == "CACHED-CUBOID&4&2&1&2&0&34"
-        assert all_keys[cached[1]] == "CACHED-CUBOID&4&2&1&2&0&35"
+        assert all_keys[cached[0]] == "CACHED-CUBOID&4&3&2&2&0&34"
+        assert all_keys[cached[1]] == "CACHED-CUBOID&4&3&2&2&0&35"
 
     def test_write_cuboid_to_cache_key(self):
         """Test converting from write cuboid keys to cache keys"""
@@ -77,7 +78,7 @@ class RedisKVIOTestMixin(object):
         write_cuboid_keys = rkv.generate_write_cuboid_keys(self.resource, 2, [0], [34])
         cache_cuboid_key = rkv.write_cuboid_key_to_cache_key(write_cuboid_keys[0])
 
-        assert cache_cuboid_key == "CACHED-CUBOID&4&2&1&2&0&34"
+        assert cache_cuboid_key == "CACHED-CUBOID&4&3&2&2&0&34"
 
     def test_put_cubes(self):
         """Test adding cubes to the cache"""
@@ -242,58 +243,26 @@ class RedisKVIOTestMixin(object):
 @patch('redis.StrictRedis', mock_strict_redis_client)
 class TestRedisKVIOImageData(RedisKVIOTestMixin, unittest.TestCase):
 
+    @classmethod
+    @patch('redis.StrictRedis', mock_strict_redis_client)
+    def setUpClass(cls):
+        """Setup the redis client at the start of the test"""
+        cls.data = get_image_dict()
+        cls.resource = BossResourceBasic(cls.data)
+
+        cls.config = configuration.BossConfig()
+
+        cls.cache_client = redis.StrictRedis(host=cls.config["aws"]["cache"], port=6379, db=1,
+                                             decode_responses=False)
+
+        cls.config_data = {"cache_client": cls.cache_client, "read_timeout": 86400}
+
     def setUp(self):
-        """ Create a diction of configuration values for the test resource. """
+        """Clean out the cache DB between tests"""
         self.patcher = patch('redis.StrictRedis', mock_strict_redis_client)
         self.mock_tests = self.patcher.start()
 
-        self.data = {}
-        self.data['collection'] = {}
-        self.data['collection']['name'] = "col1"
-        self.data['collection']['description'] = "Test collection 1"
-
-        self.data['coord_frame'] = {}
-        self.data['coord_frame']['name'] = "coord_frame_1"
-        self.data['coord_frame']['description'] = "Test coordinate frame"
-        self.data['coord_frame']['x_start'] = 0
-        self.data['coord_frame']['x_stop'] = 2000
-        self.data['coord_frame']['y_start'] = 0
-        self.data['coord_frame']['y_stop'] = 5000
-        self.data['coord_frame']['z_start'] = 0
-        self.data['coord_frame']['z_stop'] = 200
-        self.data['coord_frame']['x_voxel_size'] = 4
-        self.data['coord_frame']['y_voxel_size'] = 4
-        self.data['coord_frame']['z_voxel_size'] = 35
-        self.data['coord_frame']['voxel_unit'] = "nanometers"
-        self.data['coord_frame']['time_step'] = 0
-        self.data['coord_frame']['time_step_unit'] = "na"
-
-        self.data['experiment'] = {}
-        self.data['experiment']['name'] = "exp1"
-        self.data['experiment']['description'] = "Test experiment 1"
-        self.data['experiment']['num_hierarchy_levels'] = 7
-        self.data['experiment']['hierarchy_method'] = 'slice'
-
-        self.data['channel_layer'] = {}
-        self.data['channel_layer']['name'] = "ch1"
-        self.data['channel_layer']['description'] = "Test channel 1"
-        self.data['channel_layer']['is_channel'] = True
-        self.data['channel_layer']['datatype'] = 'uint8'
-        self.data['channel_layer']['max_time_step'] = 0
-
-        self.data['boss_key'] = 'col1&exp1&ch1'
-        self.data['lookup_key'] = '4&2&1'
-
-        self.resource = BossResourceBasic(self.data)
-
-        self.config = configuration.BossConfig()
-
-        self.cache_client = redis.StrictRedis(host=self.config["aws"]["cache"], port=6379,
-                                              db=1,
-                                              decode_responses=False)
         self.cache_client.flushdb()
-
-        self.config_data = {"cache_client": self.cache_client, "read_timeout": 86400}
 
     def tearDown(self):
         self.mock_tests = self.patcher.stop()

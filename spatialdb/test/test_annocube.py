@@ -16,24 +16,27 @@ import unittest
 
 from spdb.spatialdb import AnnotateCube64, Cube, SpdbError
 from spdb.project import BossResourceBasic
+from spdb.project.test.resource_setup import get_anno_dict
+from spdb.c_lib.ndtype import CUBOIDSIZE
+
 import numpy as np
 
 
 class TestAnnotateCube64(unittest.TestCase):
-    """Test the ImageCube8 Class parent class functionality"""
+    """Test the AnnotateCube64 Class parent class functionality"""
 
     def test_constructor_no_dim_no_time(self):
         """Test the Cube class constructor"""
         c = AnnotateCube64()
 
-        assert c.cube_size == [64, 64, 64]
-        assert c.x_dim == 64
-        assert c.y_dim == 64
-        assert c.z_dim == 64
+        assert c.cube_size == [CUBOIDSIZE[0][2], CUBOIDSIZE[0][1], CUBOIDSIZE[0][0]]
+        assert c.x_dim == CUBOIDSIZE[0][0]
+        assert c.y_dim == CUBOIDSIZE[0][1]
+        assert c.z_dim == CUBOIDSIZE[0][2]
 
-        assert c.from_zeros() == False
+        assert c.from_zeros() is False
         assert c.time_range == [0, 1]
-        assert c.is_time_series == False
+        assert c.is_time_series is False
 
     def test_constructor_no_time(self):
         """Test the Cube class constructor"""
@@ -44,9 +47,9 @@ class TestAnnotateCube64(unittest.TestCase):
         assert c.y_dim == 64
         assert c.z_dim == 16
 
-        assert c.from_zeros() == False
+        assert c.from_zeros() is False
         assert c.time_range == [0, 1]
-        assert c.is_time_series == False
+        assert c.is_time_series is False
 
     def test_constructor(self):
         """Test the Cube class constructor"""
@@ -57,9 +60,9 @@ class TestAnnotateCube64(unittest.TestCase):
         assert c.y_dim == 64
         assert c.z_dim == 16
 
-        assert c.from_zeros() == False
+        assert c.from_zeros() is False
         assert c.time_range == [0, 10]
-        assert c.is_time_series == True
+        assert c.is_time_series is True
         assert c.data.dtype == np.uint64
 
     def test_zeros(self):
@@ -69,9 +72,9 @@ class TestAnnotateCube64(unittest.TestCase):
 
         size = c.data.shape
 
-        assert size == (1, 64, 64, 64)
-        assert c.from_zeros() == True
-        assert c.data.size == 64 * 64 * 64
+        assert size == (1, CUBOIDSIZE[0][2], CUBOIDSIZE[0][1], CUBOIDSIZE[0][0])
+        assert c.from_zeros() is True
+        assert c.data.size == CUBOIDSIZE[0][0] * CUBOIDSIZE[0][1] * CUBOIDSIZE[0][2]
         assert c.data.dtype == np.uint64
         assert c.data.sum() == 0
 
@@ -83,7 +86,7 @@ class TestAnnotateCube64(unittest.TestCase):
         size = c.data.shape
 
         assert size == (8, 16, 64, 128)
-        assert c.from_zeros() == True
+        assert c.from_zeros() is True
         assert c.data.size == 8 * 16 * 64 * 128
         assert c.data.dtype == np.uint64
         assert c.data.sum() == 0
@@ -93,12 +96,12 @@ class TestAnnotateCube64(unittest.TestCase):
 
         c_base = AnnotateCube64([20, 15, 10])
         c_base.zeros()
-        assert c_base.is_not_zeros() == False
+        assert c_base.is_not_zeros() is False
 
         c_add = AnnotateCube64([5, 5, 5])
         c_add.zeros()
         c_add.data += 1
-        assert c_add.is_not_zeros() == True
+        assert c_add.is_not_zeros() is True
 
         # Make sure c_base empty
         assert c_base.data.sum() == 0
@@ -146,6 +149,8 @@ class TestAnnotateCube64(unittest.TestCase):
         # Make sure it was in the right spot (remember data is still stored in zyx under the hood)
         assert c_base.data[0, 1, 1, 1] == 0
         assert c_base.data[0, 6, 4, 4] == 1
+
+        assert c_base.data.dtype == np.uint64
 
     def test_overwrite_no_time(self):
         """Test overwriting data - for ImageCub8 this just does a copy."""
@@ -242,7 +247,7 @@ class TestAnnotateCube64(unittest.TestCase):
         c = AnnotateCube64([10, 20, 5])
         c.zeros()
         c.data += 1
-        assert c.data.sum() == 10*20*5
+        assert c.data.sum() == 10 * 20 * 5
 
         c.data[0, 2, 7, 5] = 5
 
@@ -256,7 +261,7 @@ class TestAnnotateCube64(unittest.TestCase):
         c = AnnotateCube64([10, 20, 5], [0, 4])
         c.zeros()
         c.data += 1
-        assert c.data.sum() == 10*20*5*4
+        assert c.data.sum() == 10 * 20 * 5 * 4
 
         c.data[0, 2, 7, 5] = 5
         c.data[1, 3, 10, 7] = 2
@@ -273,7 +278,7 @@ class TestAnnotateCube64(unittest.TestCase):
 
         c = AnnotateCube64([10, 20, 5])
         c2 = AnnotateCube64([10, 20, 5])
-        data = np.random.randint(0, 255, size=[1, 5, 20, 10])
+        data = np.random.randint(0, 5000, size=[1, 5, 20, 10])
         c.data = data
 
         byte_array = c.get_blosc_numpy_by_time_index()
@@ -289,13 +294,13 @@ class TestAnnotateCube64(unittest.TestCase):
         """Test blosc compression of Cube data"""
         c = AnnotateCube64([10, 20, 5], [0, 4])
         c2 = AnnotateCube64([10, 20, 5], [0, 4])
-        data = np.random.randint(0, 255, size=[4, 5, 20, 10])
+        data = np.random.randint(0, 5000, size=[4, 5, 20, 10])
         c.data = data
 
         byte_array = c.get_blosc_numpy_by_time_index(2)
         c2.from_blosc_numpy([byte_array])
 
-        np.testing.assert_array_equal(np.expand_dims(c.data[2, :, :, :], axis=0), c2.data)
+        np.testing.assert_array_equal(np.expand_dims(c.data[2,:,:,:], axis=0), c2.data)
         assert c.cube_size == c2.cube_size
         assert c.z_dim == c2.z_dim
         assert c.y_dim == c2.y_dim
@@ -306,7 +311,7 @@ class TestAnnotateCube64(unittest.TestCase):
 
         c = AnnotateCube64([10, 20, 5], [0, 4])
         c2 = AnnotateCube64([10, 20, 5], [0, 4])
-        data = np.random.randint(0, 255, size=[4, 5, 20, 10])
+        data = np.random.randint(0, 5000, size=[4, 5, 20, 10])
         c.data = data
 
         byte_array = [x for x in c.get_all_blosc_numpy_arrays()]
@@ -322,15 +327,15 @@ class TestAnnotateCube64(unittest.TestCase):
         assert c.y_dim == c2.y_dim
         assert c.x_dim == c2.x_dim
         assert c.time_range == c2.time_range
-        assert c.is_time_series == True
-        assert c2.is_time_series == True
+        assert c.is_time_series is True
+        assert c2.is_time_series is True
 
     def test_blosc_all_time_samples_single_array(self):
         """Test blosc compression of Cube data"""
 
         c = AnnotateCube64([10, 20, 5], [0, 4])
         c2 = AnnotateCube64([10, 20, 5], [0, 4])
-        data = np.random.randint(0, 255, size=[4, 5, 20, 10])
+        data = np.random.randint(0, 5000, size=[4, 5, 20, 10])
         c.data = data
 
         byte_array = c.to_blosc_numpy()
@@ -343,104 +348,80 @@ class TestAnnotateCube64(unittest.TestCase):
         assert c.y_dim == c2.y_dim
         assert c.x_dim == c2.x_dim
         assert c.time_range == c2.time_range
-        assert c.is_time_series == True
-        assert c2.is_time_series == True
+        assert c.is_time_series is True
+        assert c2.is_time_series is True
+
+    def test_overwrite_dtype_mismatch(self):
+        c_base = AnnotateCube64([10, 10, 10])
+        c_base.zeros()
+
+        data = np.random.randint(0, 5000, size=[4, 5, 20, 10])
+
+        # Make sure c_base empty
+        assert c_base.data.sum() == 0
+
+        # Insert c_add into c_base
+        with self.assertRaises(SpdbError):
+             c_base.overwrite(data)
 
     def test_factory_no_time(self):
         """Test the Cube factory in Cube"""
 
-        data = {}
-        data['boss_key'] = ['col1&exp1&ch1&0']
-        data['lookup_key'] = ['1&1&1&0']
-        data['collection'] = {}
-        data['collection']['name'] = "col1"
-        data['collection']['description'] = "Test collection 1"
-
-        data['coord_frame'] = {}
-        data['coord_frame']['name'] = "coord_frame_1"
-        data['coord_frame']['description'] = "Test coordinate frame"
-        data['coord_frame']['x_start'] = 0
-        data['coord_frame']['x_stop'] = 2000
-        data['coord_frame']['y_start'] = 0
-        data['coord_frame']['y_stop'] = 5000
-        data['coord_frame']['z_start'] = 0
-        data['coord_frame']['z_stop'] = 200
-        data['coord_frame']['x_voxel_size'] = 4
-        data['coord_frame']['y_voxel_size'] = 4
-        data['coord_frame']['z_voxel_size'] = 35
-        data['coord_frame']['voxel_unit'] = "nanometers"
-        data['coord_frame']['time_step'] = 0
-        data['coord_frame']['time_step_unit'] = "na"
-
-        data['experiment'] = {}
-        data['experiment']['name'] = "exp1"
-        data['experiment']['description'] = "Test experiment 1"
-        data['experiment']['num_hierarchy_levels'] = 7
-        data['experiment']['hierarchy_method'] = 'slice'
-
-        data['channel_layer'] = {}
-        data['channel_layer']['name'] = "layer1"
-        data['channel_layer']['description'] = "Test layer 1"
-        data['channel_layer']['is_channel'] = False
-        data['channel_layer']['datatype'] = 'uint64'
-        data['channel_layer']['max_time_step'] = 0
-        data['channel_layer']['base_resolution'] = 0
-        data['channel_layer']['parent_channels'] = [0]
+        data = get_anno_dict()
 
         resource = BossResourceBasic(data)
 
         c = Cube.create_cube(resource, [30, 20, 13])
-        assert isinstance(c, AnnotateCube64) == True
+        assert isinstance(c, AnnotateCube64) is True
         assert c.cube_size == [13, 20, 30]
-        assert c.is_time_series == False
+        assert c.is_time_series is False
         assert c.time_range == [0, 1]
 
     def test_factory(self):
         """Test the Cube factory in Cube"""
 
-        data = {}
-        data['boss_key'] = ['col1&exp1&ch1&0']
-        data['lookup_key'] = ['1&1&1&0']
-        data['collection'] = {}
-        data['collection']['name'] = "col1"
-        data['collection']['description'] = "Test collection 1"
-
-        data['coord_frame'] = {}
-        data['coord_frame']['name'] = "coord_frame_1"
-        data['coord_frame']['description'] = "Test coordinate frame"
-        data['coord_frame']['x_start'] = 0
-        data['coord_frame']['x_stop'] = 2000
-        data['coord_frame']['y_start'] = 0
-        data['coord_frame']['y_stop'] = 5000
-        data['coord_frame']['z_start'] = 0
-        data['coord_frame']['z_stop'] = 200
-        data['coord_frame']['x_voxel_size'] = 4
-        data['coord_frame']['y_voxel_size'] = 4
-        data['coord_frame']['z_voxel_size'] = 35
-        data['coord_frame']['voxel_unit'] = "nanometers"
-        data['coord_frame']['time_step'] = 0
-        data['coord_frame']['time_step_unit'] = "na"
-
-        data['experiment'] = {}
-        data['experiment']['name'] = "exp1"
-        data['experiment']['description'] = "Test experiment 1"
-        data['experiment']['num_hierarchy_levels'] = 7
-        data['experiment']['hierarchy_method'] = 'slice'
-
-        data['channel_layer'] = {}
-        data['channel_layer']['name'] = "layer1"
-        data['channel_layer']['description'] = "Test layer 1"
-        data['channel_layer']['is_channel'] = False
-        data['channel_layer']['datatype'] = 'uint64'
-        data['channel_layer']['max_time_step'] = 0
-        data['channel_layer']['base_resolution'] = 0
-        data['channel_layer']['parent_channels'] = [0]
+        data = get_anno_dict()
 
         resource = BossResourceBasic(data)
 
         c = Cube.create_cube(resource, [30, 20, 13], [0, 15])
-        assert isinstance(c, AnnotateCube64) == True
+        assert isinstance(c, AnnotateCube64) is True
         assert c.cube_size == [13, 20, 30]
-        assert c.is_time_series == True
+        assert c.is_time_series is True
         assert c.time_range == [0, 15]
+
+    def test_tile_xy(self):
+        """Test getting an xy tile."""
+        # Create base data
+        c_base = AnnotateCube64([128, 128, 16], [0, 1])
+        c_base.zeros()
+
+        c_base.data = np.random.randint(1, 254, (1, 16, 128, 128)).astype(np.uint64)
+
+        img = c_base.xy_image(z_index=1)
+        #img.show()
+
+        assert img.size == (128, 128)
+
+    def test_tile_yz(self):
+        """Test getting an xy tile."""
+        # Create base data
+        c_base = AnnotateCube64([128, 100, 16], [0, 1])
+        c_base.zeros()
+
+        c_base.data = np.random.randint(1, 254, (1, 16, 100, 128)).astype(np.uint64)
+
+        img = c_base.yz_image(x_index=1)
+        assert img.size == (100, 16)
+
+    def test_tile_xz(self):
+        """Test getting an xy tile."""
+        # Create base data
+        c_base = AnnotateCube64([128, 100, 16], [0, 1])
+        c_base.zeros()
+
+        c_base.data = np.random.randint(1, 254, (1, 16, 100, 128)).astype(np.uint64)
+
+        img = c_base.xz_image(y_index=1)
+        assert img.size == (128, 16)
 

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .resource import BossResource, Collection, CoordinateFrame, Experiment, Channel, Layer
+from .resource import BossResource, Collection, CoordinateFrame, Experiment, Channel
 
 
 class BossResourceDjango(BossResource):
@@ -41,7 +41,7 @@ class BossResourceDjango(BossResource):
         self.populate_collection()
         self.populate_coord_frame()
         self.populate_experiment()
-        self.populate_channel_or_layer()
+        self.populate_channel()
         self.populate_boss_key()
         self.populate_lookup_key()
 
@@ -49,17 +49,10 @@ class BossResourceDjango(BossResource):
         data = {"collection": self._collection.__dict__,
                 "coord_frame": self._coord_frame.__dict__,
                 "experiment": self._experiment.__dict__,
+                "channel": self._channel.__dict__,
                 "boss_key": self._boss_key,
                 "lookup_key": self._lookup_key,
                 }
-
-        if self._channel:
-            data['channel_layer'] = self._channel.__dict__
-            data['channel_layer']['is_channel'] = True
-        else:
-            data['channel_layer'] = self._layer.__dict__
-            data['channel_layer']['is_channel'] = False
-            data['channel_layer']['parent_channels'] = [x for x in self._layer.parent_channels.all()]
 
         # Serialize and return
         return data
@@ -101,26 +94,18 @@ class BossResourceDjango(BossResource):
                                       self.boss_request.experiment.hierarchy_method,
                                       self.boss_request.experiment.max_time_sample)
 
-    def populate_channel_or_layer(self):
+    def populate_channel(self):
         """
-        Method to create a Channel or Layer instance and set self._channel or self._layer.
+        Method to create a Channel instance and set self._channel.
         """
-        if self.boss_request.channel_layer.is_channel:
-            # You have a channel request
-            self._channel = Channel(self.boss_request.channel_layer.name,
-                                    self.boss_request.channel_layer.description,
-                                    self.boss_request.channel_layer.datatype)
-        else:
-            # You have a layer request
-            if self.boss_request.channel_layer.linked_channel_layers:
-                linked_channels = self.boss_request.channel_layer.linked_channel_layers
-            else:
-                linked_channels = None
-            self._layer = Layer(self.boss_request.channel_layer.name,
-                                self.boss_request.channel_layer.description,
-                                self.boss_request.channel_layer.datatype,
-                                self.boss_request.channel_layer.base_resolution,
-                                linked_channels)
+        self._channel = Channel(self.boss_request.channel.name,
+                                self.boss_request.channel.description,
+                                self.boss_request.channel.type,
+                                self.boss_request.channel.datatype,
+                                self.boss_request.channel.base_resolution,
+                                self.boss_request.channel.source,
+                                self.boss_request.channel.related,
+                                self.boss_request.channel.default_time_step)
 
     def populate_boss_key(self):
         """
@@ -133,17 +118,3 @@ class BossResourceDjango(BossResource):
         Method to set self._lookup_key.  Should be overridden.
         """
         self._lookup_key = self.boss_request.get_lookup_key()
-
-    # Methods to delete the entry from the data model tables
-    def delete_collection_model(self):
-        pass
-
-    def delete_experiment_model(self):
-        pass
-
-    def delete_coord_frame_model(self):
-        pass
-
-    def delete_channel_layer_model(self):
-        pass
-

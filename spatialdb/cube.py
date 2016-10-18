@@ -332,18 +332,18 @@ class Cube(metaclass=ABCMeta):
         Args:
             resource (project.BossResource): Data model info based on the request or target resource
             cube_size ([int, int int]): Dimensions of the matrix in [x, y, z]
-            time_range list(int): The contiguous range of time samples stored in this cube instance [start, stop)
+            time_range (list(int)): The contiguous range of time samples stored in this cube instance [start, stop)
 
         Returns:
             cube.Cube - Instance of a child class of Cube
         """
+        channel = resource.get_channel()
         data_type = resource.get_data_type()
 
-        if not resource.is_channel() and data_type in ndtype.DTYPE_uint64:
+        if not channel.is_image() and data_type in ndtype.DTYPE_uint64:
             from .annocube import AnnotateCube64
             return AnnotateCube64(cube_size, time_range)
 
-        # Assume channels here
         elif data_type in ndtype.DTYPE_uint8:
             from .imagecube import ImageCube8
             return ImageCube8(cube_size, time_range)

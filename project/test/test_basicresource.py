@@ -17,53 +17,10 @@ import numpy as np
 import json
 
 from spdb.project import BossResourceBasic
+from spdb.project.test.resource_setup import get_image_dict, get_anno_dict
 
 
 class TestBasicResource(unittest.TestCase):
-
-    def get_image_dict(self):
-        """Method to generate an initial set of parameters to use to instantiate a basic resource
-        Returns:
-            dict - a dictionary of data to initialize a basic resource
-
-        """
-        data = {}
-        data['boss_key'] = ['col1&exp1&ch1']
-        data['lookup_key'] = ['1&1&1']
-        data['collection'] = {}
-        data['collection']['name'] = "col1"
-        data['collection']['description'] = "Test collection 1"
-
-        data['coord_frame'] = {}
-        data['coord_frame']['name'] = "coord_frame_1"
-        data['coord_frame']['description'] = "Test coordinate frame"
-        data['coord_frame']['x_start'] = 0
-        data['coord_frame']['x_stop'] = 2000
-        data['coord_frame']['y_start'] = 0
-        data['coord_frame']['y_stop'] = 5000
-        data['coord_frame']['z_start'] = 0
-        data['coord_frame']['z_stop'] = 200
-        data['coord_frame']['x_voxel_size'] = 4
-        data['coord_frame']['y_voxel_size'] = 4
-        data['coord_frame']['z_voxel_size'] = 35
-        data['coord_frame']['voxel_unit'] = "nanometers"
-        data['coord_frame']['time_step'] = 0
-        data['coord_frame']['time_step_unit'] = "na"
-
-        data['experiment'] = {}
-        data['experiment']['name'] = "exp1"
-        data['experiment']['description'] = "Test experiment 1"
-        data['experiment']['num_hierarchy_levels'] = 7
-        data['experiment']['hierarchy_method'] = 'slice'
-        data['experiment']['max_time_sample'] = 0
-
-        data['channel_layer'] = {}
-        data['channel_layer']['name'] = "ch1"
-        data['channel_layer']['description'] = "Test channel 1"
-        data['channel_layer']['is_channel'] = True
-        data['channel_layer']['datatype'] = 'uint8'
-
-        return data
 
     def test_basic_resource_col(self):
         """Test basic get collection interface
@@ -72,7 +29,7 @@ class TestBasicResource(unittest.TestCase):
             None
 
         """
-        setup_data = self.get_image_dict()
+        setup_data = get_image_dict()
         resource = BossResourceBasic(setup_data)
 
         col = resource.get_collection()
@@ -87,7 +44,7 @@ class TestBasicResource(unittest.TestCase):
             None
 
         """
-        setup_data = self.get_image_dict()
+        setup_data = get_image_dict()
         resource = BossResourceBasic(setup_data)
 
         coord = resource.get_coord_frame()
@@ -114,7 +71,7 @@ class TestBasicResource(unittest.TestCase):
             None
 
         """
-        setup_data = self.get_image_dict()
+        setup_data = get_image_dict()
         resource = BossResourceBasic(setup_data)
 
         exp = resource.get_experiment()
@@ -132,43 +89,18 @@ class TestBasicResource(unittest.TestCase):
             None
 
         """
-        setup_data = self.get_image_dict()
+        setup_data = get_image_dict()
         resource = BossResourceBasic(setup_data)
-
-        assert resource.is_channel() == True
-
-        assert not resource.get_layer()
 
         channel = resource.get_channel()
-        assert channel.name == setup_data['channel_layer']['name']
-        assert channel.description == setup_data['channel_layer']['description']
-        assert channel.datatype == setup_data['channel_layer']['datatype']
-
-    def test_basic_resource_layer_no_time(self):
-        """Test basic get layer interface
-
-        Returns:
-            None
-
-        """
-        setup_data = self.get_image_dict()
-        setup_data['channel_layer']['name'] = "layer1"
-        setup_data['channel_layer']['description'] = "Test layer 1"
-        setup_data['channel_layer']['is_channel'] = False
-        setup_data['channel_layer']['parent_channels'] = ['ch1']
-        setup_data['channel_layer']['base_resolution'] = 2
-        resource = BossResourceBasic(setup_data)
-
-        assert resource.is_channel() == False
-
-        assert not resource.get_channel()
-
-        channel = resource.get_layer()
-        assert channel.name == setup_data['channel_layer']['name']
-        assert channel.description == setup_data['channel_layer']['description']
-        assert channel.datatype == setup_data['channel_layer']['datatype']
-        assert channel.parent_channels == setup_data['channel_layer']['parent_channels']
-        assert channel.base_resolution == setup_data['channel_layer']['base_resolution']
+        assert channel.is_image() is True
+        assert channel.name == setup_data['channel']['name']
+        assert channel.description == setup_data['channel']['description']
+        assert channel.datatype == setup_data['channel']['datatype']
+        assert channel.base_resolution == setup_data['channel']['base_resolution']
+        assert channel.source == setup_data['channel']['source']
+        assert channel.related == setup_data['channel']['related']
+        assert channel.default_time_step == setup_data['channel']['default_time_step']
 
     def test_basic_resource_get_boss_key(self):
         """Test basic get boss key interface
@@ -177,7 +109,7 @@ class TestBasicResource(unittest.TestCase):
             None
 
         """
-        setup_data = self.get_image_dict()
+        setup_data = get_image_dict()
         resource = BossResourceBasic(setup_data)
 
         assert resource.get_boss_key() == setup_data['boss_key']
@@ -189,7 +121,7 @@ class TestBasicResource(unittest.TestCase):
             None
 
         """
-        setup_data = self.get_image_dict()
+        setup_data = get_image_dict()
         resource = BossResourceBasic(setup_data)
 
         assert resource.get_lookup_key() == setup_data['lookup_key']
@@ -201,10 +133,10 @@ class TestBasicResource(unittest.TestCase):
             None
 
         """
-        setup_data = self.get_image_dict()
+        setup_data = get_image_dict()
         resource = BossResourceBasic(setup_data)
 
-        assert resource.get_data_type() == setup_data['channel_layer']['datatype']
+        assert resource.get_data_type() == setup_data['channel']['datatype']
 
     def test_basic_resource_get_bit_depth(self):
         """Test basic get bit depth interface
@@ -213,7 +145,7 @@ class TestBasicResource(unittest.TestCase):
             None
 
         """
-        setup_data = self.get_image_dict()
+        setup_data = get_image_dict()
         resource = BossResourceBasic(setup_data)
 
         assert resource.get_bit_depth() == 8
@@ -225,7 +157,7 @@ class TestBasicResource(unittest.TestCase):
             None
 
         """
-        setup_data = self.get_image_dict()
+        setup_data = get_image_dict()
         resource = BossResourceBasic(setup_data)
 
         assert resource.get_numpy_data_type() == np.uint8
@@ -237,19 +169,19 @@ class TestBasicResource(unittest.TestCase):
             None
 
         """
-        setup_data = self.get_image_dict()
+        setup_data = get_image_dict()
         resource = BossResourceBasic(setup_data)
 
         data = resource.to_dict()
 
-        assert data['channel_layer'] == setup_data['channel_layer']
+        assert data['channel'] == setup_data['channel']
 
         assert data['collection'] == setup_data['collection']
 
         assert data['experiment'] == setup_data['experiment']
 
-        assert data['lookup_key'] == ['1&1&1']
-        assert data['boss_key'] == ['col1&exp1&ch1']
+        assert data['lookup_key'] == '4&3&2'
+        assert data['boss_key'] == 'col1&exp1&ch1'
 
     def test_basic_resource_from_dict(self):
         """Test basic to dict deserialization method
@@ -258,7 +190,7 @@ class TestBasicResource(unittest.TestCase):
             None
 
         """
-        setup_data = self.get_image_dict()
+        setup_data = get_image_dict()
         resource1 = BossResourceBasic(setup_data)
 
         resource2 = BossResourceBasic()
@@ -296,14 +228,18 @@ class TestBasicResource(unittest.TestCase):
 
         # Check channel
         channel = resource2.get_channel()
-        assert channel.name == setup_data['channel_layer']['name']
-        assert channel.description == setup_data['channel_layer']['description']
-        assert channel.datatype == setup_data['channel_layer']['datatype']
+        assert channel.is_image() is True
+        assert channel.name == setup_data['channel']['name']
+        assert channel.description == setup_data['channel']['description']
+        assert channel.datatype == setup_data['channel']['datatype']
+        assert channel.base_resolution == setup_data['channel']['base_resolution']
+        assert channel.source == setup_data['channel']['source']
+        assert channel.related == setup_data['channel']['related']
+        assert channel.default_time_step == setup_data['channel']['default_time_step']
 
         # check keys
         assert resource2.get_lookup_key() == setup_data['lookup_key']
         assert resource2.get_boss_key() == setup_data['boss_key']
-
 
     def test_basic_resource_to_json(self):
         """Test basic to json serialization method
@@ -312,26 +248,20 @@ class TestBasicResource(unittest.TestCase):
             None
 
         """
-        setup_data = self.get_image_dict()
+        setup_data = get_image_dict()
         resource = BossResourceBasic(setup_data)
 
         data = resource.to_json()
 
         data = json.loads(data)
 
-        assert data['channel_layer']['description'] == 'Test channel 1'
-        assert data['channel_layer']['datatype'] == 'uint8'
-        assert data['channel_layer']['name'] == 'ch1'
-        assert data['channel_layer']['is_channel'] == True
+        assert data['channel'] == setup_data['channel']
+        assert data['collection'] == setup_data['collection']
+        assert data['experiment'] == setup_data['experiment']
+        assert data['coord_frame'] == setup_data['coord_frame']
 
-        assert data['collection']['description'] == 'Test collection 1'
-        assert data['collection']['name'] == 'col1'
-
-        assert data['experiment']['name'] == 'exp1'
-        assert data['experiment']['max_time_sample'] == 0
-
-        assert data['lookup_key'] == ['1&1&1']
-        assert data['boss_key'] == ['col1&exp1&ch1']
+        assert data['lookup_key'] == '4&3&2'
+        assert data['boss_key'] == 'col1&exp1&ch1'
 
     def test_basic_resource_from_json(self):
         """Test basic to json deserialization method
@@ -340,7 +270,7 @@ class TestBasicResource(unittest.TestCase):
             None
 
         """
-        setup_data = self.get_image_dict()
+        setup_data = get_image_dict()
         resource1 = BossResourceBasic(setup_data)
 
         resource2 = BossResourceBasic()
@@ -378,27 +308,110 @@ class TestBasicResource(unittest.TestCase):
 
         # Check channel
         channel = resource2.get_channel()
-        assert channel.name == setup_data['channel_layer']['name']
-        assert channel.description == setup_data['channel_layer']['description']
-        assert channel.datatype == setup_data['channel_layer']['datatype']
+        assert channel.is_image() is True
+        assert channel.name == setup_data['channel']['name']
+        assert channel.description == setup_data['channel']['description']
+        assert channel.datatype == setup_data['channel']['datatype']
+        assert channel.base_resolution == setup_data['channel']['base_resolution']
+        assert channel.source == setup_data['channel']['source']
+        assert channel.related == setup_data['channel']['related']
+        assert channel.default_time_step == setup_data['channel']['default_time_step']
 
         # check keys
         assert resource2.get_lookup_key() == setup_data['lookup_key']
         assert resource2.get_boss_key() == setup_data['boss_key']
 
-    def test_basic_resource_from_json_layer(self):
+    def test_basic_resource_channel_with_source(self):
+        """Test basic get channel interface
+
+        Returns:
+            None
+
+        """
+        setup_data = get_image_dict()
+        setup_data['channel']['source'] = ["src_ch_1"]
+        resource = BossResourceBasic(setup_data)
+
+        channel = resource.get_channel()
+        assert channel.is_image() is True
+        assert channel.name == setup_data['channel']['name']
+        assert channel.description == setup_data['channel']['description']
+        assert channel.datatype == setup_data['channel']['datatype']
+        assert channel.base_resolution == setup_data['channel']['base_resolution']
+        assert channel.source == setup_data['channel']['source']
+        assert channel.related == setup_data['channel']['related']
+        assert channel.default_time_step == setup_data['channel']['default_time_step']
+
+    def test_basic_resource_channel_with_source1(self):
+        """Test basic get channel interface
+
+        Returns:
+            None
+
+        """
+        setup_data = get_image_dict()
+        setup_data['channel']['source'] = ["src_ch_1", "src_ch_2"]
+        resource = BossResourceBasic(setup_data)
+
+        channel = resource.get_channel()
+        assert channel.is_image() is True
+        assert channel.name == setup_data['channel']['name']
+        assert channel.description == setup_data['channel']['description']
+        assert channel.datatype == setup_data['channel']['datatype']
+        assert channel.base_resolution == setup_data['channel']['base_resolution']
+        assert channel.source == setup_data['channel']['source']
+        assert channel.related == setup_data['channel']['related']
+        assert channel.default_time_step == setup_data['channel']['default_time_step']
+
+    def test_basic_resource_channel_with_related(self):
+        """Test basic get channel interface
+
+        Returns:
+            None
+
+        """
+        setup_data = get_image_dict()
+        setup_data['channel']['related'] = ["ch_2", "ch_3"]
+        resource = BossResourceBasic(setup_data)
+
+        channel = resource.get_channel()
+        assert channel.is_image() is True
+        assert channel.name == setup_data['channel']['name']
+        assert channel.description == setup_data['channel']['description']
+        assert channel.datatype == setup_data['channel']['datatype']
+        assert channel.base_resolution == setup_data['channel']['base_resolution']
+        assert channel.source == setup_data['channel']['source']
+        assert channel.related == setup_data['channel']['related']
+        assert channel.default_time_step == setup_data['channel']['default_time_step']
+
+    def test_basic_resource_annotation_no_time(self):
+        """Test basic get layer interface
+
+        Returns:
+            None
+
+        """
+        setup_data = get_anno_dict()
+        resource = BossResourceBasic(setup_data)
+
+        channel = resource.get_channel()
+        assert channel.is_image() is False
+        assert channel.name == setup_data['channel']['name']
+        assert channel.description == setup_data['channel']['description']
+        assert channel.datatype == setup_data['channel']['datatype']
+        assert channel.base_resolution == setup_data['channel']['base_resolution']
+        assert channel.source == setup_data['channel']['source']
+        assert channel.related == setup_data['channel']['related']
+        assert channel.default_time_step == setup_data['channel']['default_time_step']
+
+    def test_basic_resource_from_json_annotation(self):
         """Test basic to json deserialization method
 
         Returns:
             None
 
         """
-        setup_data = self.get_image_dict()
-        setup_data['channel_layer']['name'] = "layer1"
-        setup_data['channel_layer']['description'] = "Test layer 1"
-        setup_data['channel_layer']['is_channel'] = False
-        setup_data['channel_layer']['parent_channels'] = ['ch1']
-        setup_data['channel_layer']['base_resolution'] = 2
+        setup_data = get_anno_dict()
         resource1 = BossResourceBasic(setup_data)
 
         resource2 = BossResourceBasic()
@@ -435,14 +448,15 @@ class TestBasicResource(unittest.TestCase):
         assert exp.max_time_sample == setup_data['experiment']['max_time_sample']
 
         # Check channel
-        assert not resource2.get_channel()
-
-        layer = resource2.get_layer()
-        assert layer.name == setup_data['channel_layer']['name']
-        assert layer.description == setup_data['channel_layer']['description']
-        assert layer.datatype == setup_data['channel_layer']['datatype']
-        assert layer.parent_channels == setup_data['channel_layer']['parent_channels']
-        assert layer.base_resolution == setup_data['channel_layer']['base_resolution']
+        channel = resource2.get_channel()
+        assert channel.is_image() is False
+        assert channel.name == setup_data['channel']['name']
+        assert channel.description == setup_data['channel']['description']
+        assert channel.datatype == setup_data['channel']['datatype']
+        assert channel.base_resolution == setup_data['channel']['base_resolution']
+        assert channel.source == setup_data['channel']['source']
+        assert channel.related == setup_data['channel']['related']
+        assert channel.default_time_step == setup_data['channel']['default_time_step']
 
         # check keys
         assert resource2.get_lookup_key() == setup_data['lookup_key']
