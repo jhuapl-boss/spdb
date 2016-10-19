@@ -129,9 +129,9 @@ class SpatialDBImageDataTestMixin(object):
     def test_get_cubes_time_single(self):
         """Test the get_cubes method - time - single"""
         # Generate random data
-        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim], [0, 4])
-        cube1.data = np.random.randint(0, 254, (4, self.z_dim, self.y_dim, self.x_dim))
-        cube1.morton_id = 32
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim], [0, 2])
+        cube1.data = np.random.randint(0, 254, (2, self.z_dim, self.y_dim, self.x_dim))
+        cube1.morton_id = 76
 
         db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
@@ -151,22 +151,17 @@ class SpatialDBImageDataTestMixin(object):
         cube2 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim], [0, 4])
         cube2.data = np.random.randint(0, 254, (4, self.z_dim, self.y_dim, self.x_dim))
         cube2.morton_id = 33
-        cube3 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim], [1, 5])
-        cube3.data = np.random.randint(0, 254, (4, self.z_dim, self.y_dim, self.x_dim))
-        cube3.morton_id = 36
 
         db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
         # populate dummy data
         keys = self.write_test_cube(db, self.resource, 0, cube1, cache=True, s3=False)
         keys.extend(self.write_test_cube(db, self.resource, 0, cube2, cache=True, s3=False))
-        keys.extend(self.write_test_cube(db, self.resource, 0, cube3, cache=True, s3=False))
 
         cube_read = db.get_cubes(self.resource, keys)
 
         np.testing.assert_array_equal(cube1.data, cube_read[0].data)
         np.testing.assert_array_equal(cube2.data, cube_read[1].data)
-        np.testing.assert_array_equal(cube3.data, cube_read[2].data)
 
     def test_cutout_no_time_single_aligned_zero(self):
         """Test the get_cubes method - no time - single"""

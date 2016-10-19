@@ -227,25 +227,25 @@ class TestIntegrationSpatialDBImage16Data(SpatialDBImageDataTestMixin,
         client.flushdb()
 
 
-#class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
-#                                          SpatialDBImageDataIntegrationTestMixin, unittest.TestCase):
-#    layer = AWSSetupLayer
-#
-#    def setUp(self):
-#        """ Copy params from the Layer setUpClass
-#        """
-#        self.data = get_anno_dict()
-#        self.resource = BossResourceBasic(self.data)
-#        self.kvio_config = self.layer.kvio_config
-#        self.state_config = self.layer.state_config
-#        self.object_store_config = self.layer.object_store_config
-#
-#    def tearDown(self):
-#        """Clean kv store in between tests"""
-#        client = redis.StrictRedis(host=self.kvio_config['cache_host'],
-#                                   port=6379, db=1, decode_responses=False)
-#        client.flushdb()
-#        client = redis.StrictRedis(host=self.state_config['cache_state_host'],
-#                                   port=6379, db=1, decode_responses=False)
-#        client.flushdb()
-#
+class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
+                                          SpatialDBImageDataIntegrationTestMixin, unittest.TestCase):
+    layer = AWSSetupLayer
+
+    def setUp(self):
+        """ Copy params from the Layer setUpClass
+        """
+        self.data = get_anno_dict()
+        self.data['channel']['base_resolution'] = 0
+        self.resource = BossResourceBasic(self.data)
+        self.kvio_config = self.layer.kvio_config
+        self.state_config = self.layer.state_config
+        self.object_store_config = self.layer.object_store_config
+
+    def tearDown(self):
+        """Clean kv store in between tests"""
+        client = redis.StrictRedis(host=self.kvio_config['cache_host'],
+                                   port=6379, db=1, decode_responses=False)
+        client.flushdb()
+        client = redis.StrictRedis(host=self.state_config['cache_state_host'],
+                                   port=6379, db=1, decode_responses=False)
+        client.flushdb()

@@ -363,18 +363,24 @@ class SpatialDB:
             base_res = channel.base_resolution
 
             if base_res > resolution:
+                raise SpdbError('Not Implemented',
+                                'Dynamic resolution scaling not yet implemented.',
+                                ErrorCodes.FUTURE)
                 # Must up-sample cutout dynamically find the effective dimensions of the up-sampled cutout
-                cutout_coords = self._up_sample_cutout(resource, corner, extent, resolution)
+                #cutout_coords = self._up_sample_cutout(resource, corner, extent, resolution)
 
-                [x_cube_dim, y_cube_dim, z_cube_dim] = cube_dim = CUBOIDSIZE[base_res]
-                cutout_resolution = base_res
+                #[x_cube_dim, y_cube_dim, z_cube_dim] = cube_dim = CUBOIDSIZE[base_res]
+                #cutout_resolution = base_res
 
             elif not channel.is_image() and base_res < resolution and not resource.is_propagated():
+                raise SpdbError('Not Implemented',
+                                'Dynamic resolution scaling not yet implemented.',
+                                ErrorCodes.FUTURE)
                 # If cutout is an annotation channel, above base resolution (lower res), and NOT propagated, down-sample
-                cutout_coords = self._down_sample_cutout(resource, corner, extent, resolution)
+                #cutout_coords = self._down_sample_cutout(resource, corner, extent, resolution)
 
-                [x_cube_dim, y_cube_dim, z_cube_dim] = cube_dim = CUBOIDSIZE[base_res]
-                cutout_resolution = base_res
+                #[x_cube_dim, y_cube_dim, z_cube_dim] = cube_dim = CUBOIDSIZE[base_res]
+                #cutout_resolution = base_res
             else:
                 # this is the default path when not DYNAMICALLY scaling the resolution
 
@@ -616,9 +622,8 @@ class SpatialDB:
             None
         """
         boss_logger = BossLogger()
-        boss_logger.setLevel("debug")
+        boss_logger.setLevel("info")
         blog = boss_logger.logger
-        blog.debug("In write_cuboid")
 
         # Check if the resource is locked
         if self.resource_locked(resource.get_lookup_key()):
@@ -665,7 +670,7 @@ class SpatialDB:
         # Get keys ready
         base_write_cuboid_key = "WRITE-CUBOID&{}&{}".format(resource.get_lookup_key(), resolution)
 
-        blog.debug("Writing Cuboid - Base Key: {}".format(base_write_cuboid_key))
+        blog.info("Writing Cuboid - Base Key: {}".format(base_write_cuboid_key))
 
         # Get current cube from db, merge with new cube, write back to the to db
         # TODO: Move splitting up data and computing morton into c-lib as single method
@@ -694,7 +699,7 @@ class SpatialDB:
                         # Check for page out
                         if self.cache_state.in_page_out(temp_page_out_key, resource.get_lookup_key(),
                                                         resolution, morton_idx, t):
-                            blog.debug("Writing Cuboid - Delayed Write: {}".format(write_cuboid_key))
+                            blog.info("Writing Cuboid - Delayed Write: {}".format(write_cuboid_key))
                             # Delay Write!
                             self.cache_state.add_to_delayed_write(write_cuboid_key,
                                                                   resource.get_lookup_key(),
@@ -719,11 +724,11 @@ class SpatialDB:
                                                                 "object_store_config": self.object_store_config},
                                                                write_cuboid_key,
                                                                resource)
-                                blog.debug("Writing Cuboid - Triggered Page Out: {}".format(write_cuboid_key))
+                                blog.info("Writing Cuboid - Triggered Page Out: {}".format(write_cuboid_key))
                                 # All done. continue.
                             else:
                                 # Ended up in page out during transaction. Make delayed write.
-                                blog.debug("Writing Cuboid - Delayed Write: {}".format(write_cuboid_key))
+                                blog.info("Writing Cuboid - Delayed Write: {}".format(write_cuboid_key))
                                 self.cache_state.add_to_delayed_write(write_cuboid_key,
                                                                       resource.get_lookup_key(),
                                                                       resolution,
