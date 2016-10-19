@@ -15,17 +15,14 @@
 import unittest
 import numpy as np
 
-from spdb.project import BossResourceBasic
 from spdb.spatialdb.test.test_spatialdb import SpatialDBImageDataTestMixin
 from spdb.spatialdb import Cube, SpatialDB
 from spdb.spatialdb.test.setup import AWSSetupLayer
 from spdb.c_lib.ndtype import CUBOIDSIZE
+from spdb.project.test.resource_setup import get_anno_dict
+from spdb.project import BossResourceBasic
 
 import redis
-import time
-from botocore.exceptions import ClientError
-
-from bossutils import configuration
 
 
 class SpatialDBImageDataIntegrationTestMixin(object):
@@ -91,11 +88,11 @@ class SpatialDBImageDataIntegrationTestMixin(object):
         cube2 = sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
 
         np.testing.assert_array_equal(data1, np.squeeze(cube2.data))
+        del data1
+        del cube2
 
         # now write to cuboid again
         data3 = np.random.randint(1, 254, (self.z_dim, self.y_dim, self.x_dim))
-
-        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
         sp.write_cuboid(self.resource, (0, 0, 0), 0, data3)
 
@@ -205,8 +202,50 @@ class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
                                    port=6379, db=1, decode_responses=False)
         client.flushdb()
 
-    def get_num_cache_keys(self, spdb):
-        return len(self.cache_client.keys("*"))
 
-    def get_num_status_keys(self, spdb):
-        return len(self.status_client.keys("*"))
+class TestIntegrationSpatialDBImage16Data(SpatialDBImageDataTestMixin,
+                                          SpatialDBImageDataIntegrationTestMixin, unittest.TestCase):
+    layer = AWSSetupLayer
+
+    def setUp(self):
+        """ Copy params from the Layer setUpClass
+        """
+        self.data = self.layer.data
+        self.data['channel']['datatype'] = 'uint16'
+        self.resource = self.layer.resource
+        self.kvio_config = self.layer.kvio_config
+        self.state_config = self.layer.state_config
+        self.object_store_config = self.layer.object_store_config
+
+    def tearDown(self):
+        """Clean kv store in between tests"""
+        client = redis.StrictRedis(host=self.kvio_config['cache_host'],
+                                   port=6379, db=1, decode_responses=False)
+        client.flushdb()
+        client = redis.StrictRedis(host=self.state_config['cache_state_host'],
+                                   port=6379, db=1, decode_responses=False)
+        client.flushdb()
+
+
+#class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
+#                                          SpatialDBImageDataIntegrationTestMixin, unittest.TestCase):
+#    layer = AWSSetupLayer
+#
+#    def setUp(self):
+#        """ Copy params from the Layer setUpClass
+#        """
+#        self.data = get_anno_dict()
+#        self.resource = BossResourceBasic(self.data)
+#        self.kvio_config = self.layer.kvio_config
+#        self.state_config = self.layer.state_config
+#        self.object_store_config = self.layer.object_store_config
+#
+#    def tearDown(self):
+#        """Clean kv store in between tests"""
+#        client = redis.StrictRedis(host=self.kvio_config['cache_host'],
+#                                   port=6379, db=1, decode_responses=False)
+#        client.flushdb()
+#        client = redis.StrictRedis(host=self.state_config['cache_state_host'],
+#                                   port=6379, db=1, decode_responses=False)
+#        client.flushdb()
+#

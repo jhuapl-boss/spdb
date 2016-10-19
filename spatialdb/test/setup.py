@@ -100,8 +100,6 @@ class SetupTests(object):
 
     def wait_table_create(self, table_name):
         """Poll dynamodb at a 2s interval until the table creates."""
-        print('Waiting for creation of table {}'.format(
-            table_name), end='', flush=True)
         client = boto3.client('dynamodb', region_name=get_region())
         cnt = 0
         while True:
@@ -111,10 +109,9 @@ class SetupTests(object):
                 # Give up waiting.
                 return
             try:
-                print('.', end='', flush=True)
+                print('-', end='', flush=True)
                 resp = client.describe_table(TableName=table_name)
                 if resp['Table']['TableStatus'] == 'ACTIVE':
-                    print('')
                     return
             except:
                 # May get an exception if table doesn't currently exist.
@@ -122,8 +119,6 @@ class SetupTests(object):
 
     def wait_table_delete(self, table_name):
         """Poll dynamodb at a 2s interval until the table deletes."""
-        print('Waiting for deletion of table {}'.format(
-            table_name), end='', flush=True)
         client = boto3.client('dynamodb', region_name=get_region())
         cnt = 0
         while True:
@@ -133,7 +128,7 @@ class SetupTests(object):
                 # Give up waiting.
                 return
             try:
-                print('.', end='', flush=True)
+                print('-', end='', flush=True)
                 resp = client.describe_table(TableName=table_name)
             except:
                 # Exception thrown when table doesn't exist.
@@ -197,7 +192,7 @@ class SetupTests(object):
             url = mock_sqs(self._create_flush_queue(queue_name))
         else:
             url = self._create_flush_queue(queue_name)
-            time.sleep(30)
+            time.sleep(10)
         return url
 
     def _delete_flush_queue(self, queue_url):
@@ -265,6 +260,7 @@ class AWSSetupLayer(object):
                                    "s3_index_table": "intTest.{}".format(config['aws']['s3-index-table'])}
 
         # Setup AWS
+        print('Creating Temporary AWS Resources', end='', flush=True)
         try:
             cls.setup_helper.create_s3_index_table(cls.object_store_config["s3_index_table"])
         except ClientError:
@@ -286,9 +282,11 @@ class AWSSetupLayer(object):
                 pass
             time.sleep(61)
             cls.object_store_config["s3_flush_queue"] = cls.setup_helper.create_flush_queue(cls.s3_flush_queue_name)
+        print('Done', end='', flush=True)
 
     @classmethod
     def tearDown(cls):
+        print('Deleting Temporary AWS Resources', end='', flush=True)
         try:
             cls.setup_helper.delete_s3_index_table(cls.object_store_config["s3_index_table"])
         except:
@@ -303,3 +301,4 @@ class AWSSetupLayer(object):
             cls.setup_helper.delete_flush_queue(cls.object_store_config["s3_flush_queue"])
         except:
             pass
+        print('Done', end='', flush=True)

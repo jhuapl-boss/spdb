@@ -34,12 +34,6 @@ class SpatialDBImageDataTestMixin(object):
     y_dim = cuboid_size[1]
     z_dim = cuboid_size[2]
 
-    def get_num_cache_keys(self, spdb):
-        raise NotImplemented
-
-    def get_num_status_keys(self, spdb):
-        raise NotImplemented
-
     def write_test_cube(self, sp, resource, res, cube, cache=True, s3=False):
         """
         Method to write data to test read operations
@@ -256,12 +250,6 @@ class TestSpatialDBImage8Data(SpatialDBImageDataTestMixin, unittest.TestCase):
         # Stop mocking
         self.setup_helper.stop_mocking()
 
-    def get_num_cache_keys(self, spdb):
-        return len(spdb.kvio.cache_client.redis)
-
-    def get_num_status_keys(self, spdb):
-        return len(spdb.kvio.status_client.redis)
-
 
 @patch('redis.StrictRedis', mock_strict_redis_client)
 class TestSpatialDBImage16Data(SpatialDBImageDataTestMixin, unittest.TestCase):
@@ -304,8 +292,4 @@ class TestSpatialDBImage16Data(SpatialDBImageDataTestMixin, unittest.TestCase):
         # Stop mocking
         self.setup_helper.stop_mocking()
 
-    def get_num_cache_keys(self, spdb):
-        return len(spdb.kvio.cache_client.redis)
 
-    def get_num_status_keys(self, spdb):
-        return len(spdb.kvio.status_client.redis)
