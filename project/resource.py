@@ -137,7 +137,7 @@ class Channel:
       datatype (str): The bitdepth of the channel.  Valid choices are uint8, uint16, uint32, and uint64
       base_resolution (int): The resolution level of primary annotation and indicates where dynamic resampling will occur
       source (list(str)): A list of channels from which this channel is derived
-      source (list(str)): A list of channels that are related to this channel
+      related (list(str)): A list of channels that are related to this channel
       default_time_step (int): The time step to use if time is omitted from a request
 
     """
