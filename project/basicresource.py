@@ -109,7 +109,7 @@ class BossResourceBasic(BossResource):
                                 self.data['channel']['type'],
                                 self.data['channel']['datatype'],
                                 self.data['channel']['base_resolution'],
-                                self.data['channel']['source'],
+                                self.data['channel']['sources'],
                                 self.data['channel']['related'],
                                 self.data['channel']['default_time_step'])
 

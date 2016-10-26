@@ -141,13 +141,13 @@ class Channel:
       default_time_step (int): The time step to use if time is omitted from a request
 
     """
-    def __init__(self, name, description, ch_type, datatype, base_resolution, source, related, default_time_step):
+    def __init__(self, name, description, ch_type, datatype, base_resolution, sources, related, default_time_step):
         self.name = name
         self.description = description
         self.type = ch_type
         self.datatype = datatype
         self.base_resolution = base_resolution
-        self.source = source
+        self.sources = sources
         self.related = related
         self.default_time_step = default_time_step
 

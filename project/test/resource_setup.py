@@ -46,7 +46,7 @@ def get_image_dict():
     data['channel']['type'] = "image"
     data['channel']['datatype'] = 'uint8'
     data['channel']['base_resolution'] = 0
-    data['channel']['source'] = []
+    data['channel']['sources'] = []
     data['channel']['related'] = []
     data['channel']['default_time_step'] = 0
 
@@ -65,7 +65,7 @@ def get_anno_dict():
     data['channel']['type'] = "annotation"
     data['channel']['datatype'] = 'uint64'
     data['channel']['base_resolution'] = 1
-    data['channel']['source'] = ["ch1"]
+    data['channel']['sources'] = ["ch1"]
     data['channel']['default_time_step'] = 0
     data['boss_key'] = 'col1&exp1&ch2'
     data['lookup_key'] = '4&3&6'

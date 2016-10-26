@@ -98,7 +98,7 @@ class TestBasicResource(unittest.TestCase):
         assert channel.description == setup_data['channel']['description']
         assert channel.datatype == setup_data['channel']['datatype']
         assert channel.base_resolution == setup_data['channel']['base_resolution']
-        assert channel.source == setup_data['channel']['source']
+        assert channel.sources == setup_data['channel']['sources']
         assert channel.related == setup_data['channel']['related']
         assert channel.default_time_step == setup_data['channel']['default_time_step']
 
@@ -233,7 +233,7 @@ class TestBasicResource(unittest.TestCase):
         assert channel.description == setup_data['channel']['description']
         assert channel.datatype == setup_data['channel']['datatype']
         assert channel.base_resolution == setup_data['channel']['base_resolution']
-        assert channel.source == setup_data['channel']['source']
+        assert channel.sources == setup_data['channel']['sources']
         assert channel.related == setup_data['channel']['related']
         assert channel.default_time_step == setup_data['channel']['default_time_step']
 
@@ -313,7 +313,7 @@ class TestBasicResource(unittest.TestCase):
         assert channel.description == setup_data['channel']['description']
         assert channel.datatype == setup_data['channel']['datatype']
         assert channel.base_resolution == setup_data['channel']['base_resolution']
-        assert channel.source == setup_data['channel']['source']
+        assert channel.sources == setup_data['channel']['sources']
         assert channel.related == setup_data['channel']['related']
         assert channel.default_time_step == setup_data['channel']['default_time_step']
 
@@ -329,7 +329,7 @@ class TestBasicResource(unittest.TestCase):
 
         """
         setup_data = get_image_dict()
-        setup_data['channel']['source'] = ["src_ch_1"]
+        setup_data['channel']['sources'] = ["src_ch_1"]
         resource = BossResourceBasic(setup_data)
 
         channel = resource.get_channel()
@@ -338,7 +338,7 @@ class TestBasicResource(unittest.TestCase):
         assert channel.description == setup_data['channel']['description']
         assert channel.datatype == setup_data['channel']['datatype']
         assert channel.base_resolution == setup_data['channel']['base_resolution']
-        assert channel.source == setup_data['channel']['source']
+        assert channel.sources == setup_data['channel']['sources']
         assert channel.related == setup_data['channel']['related']
         assert channel.default_time_step == setup_data['channel']['default_time_step']
 
@@ -350,7 +350,7 @@ class TestBasicResource(unittest.TestCase):
 
         """
         setup_data = get_image_dict()
-        setup_data['channel']['source'] = ["src_ch_1", "src_ch_2"]
+        setup_data['channel']['sources'] = ["src_ch_1", "src_ch_2"]
         resource = BossResourceBasic(setup_data)
 
         channel = resource.get_channel()
@@ -359,7 +359,7 @@ class TestBasicResource(unittest.TestCase):
         assert channel.description == setup_data['channel']['description']
         assert channel.datatype == setup_data['channel']['datatype']
         assert channel.base_resolution == setup_data['channel']['base_resolution']
-        assert channel.source == setup_data['channel']['source']
+        assert channel.sources == setup_data['channel']['sources']
         assert channel.related == setup_data['channel']['related']
         assert channel.default_time_step == setup_data['channel']['default_time_step']
 
@@ -380,7 +380,7 @@ class TestBasicResource(unittest.TestCase):
         assert channel.description == setup_data['channel']['description']
         assert channel.datatype == setup_data['channel']['datatype']
         assert channel.base_resolution == setup_data['channel']['base_resolution']
-        assert channel.source == setup_data['channel']['source']
+        assert channel.sources == setup_data['channel']['sources']
         assert channel.related == setup_data['channel']['related']
         assert channel.default_time_step == setup_data['channel']['default_time_step']
 
@@ -400,7 +400,7 @@ class TestBasicResource(unittest.TestCase):
         assert channel.description == setup_data['channel']['description']
         assert channel.datatype == setup_data['channel']['datatype']
         assert channel.base_resolution == setup_data['channel']['base_resolution']
-        assert channel.source == setup_data['channel']['source']
+        assert channel.sources == setup_data['channel']['sources']
         assert channel.related == setup_data['channel']['related']
         assert channel.default_time_step == setup_data['channel']['default_time_step']
 
@@ -454,7 +454,7 @@ class TestBasicResource(unittest.TestCase):
         assert channel.description == setup_data['channel']['description']
         assert channel.datatype == setup_data['channel']['datatype']
         assert channel.base_resolution == setup_data['channel']['base_resolution']
-        assert channel.source == setup_data['channel']['source']
+        assert channel.sources == setup_data['channel']['sources']
         assert channel.related == setup_data['channel']['related']
         assert channel.default_time_step == setup_data['channel']['default_time_step']
 

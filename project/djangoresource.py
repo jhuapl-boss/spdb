@@ -99,7 +99,7 @@ class BossResourceDjango(BossResource):
         Method to create a Channel instance and set self._channel.
         """
         # Pull out source names
-        source = [x.name for x in self.boss_request.channel.sources.all()]
+        sources = [x.name for x in self.boss_request.channel.sources.all()]
 
         # Pull out related names
         related = [x.name for x in self.boss_request.channel.related.all()]
@@ -109,7 +109,7 @@ class BossResourceDjango(BossResource):
                                 self.boss_request.channel.type,
                                 self.boss_request.channel.datatype,
                                 self.boss_request.channel.base_resolution,
-                                source,
+                                sources,
                                 related,
                                 self.boss_request.channel.default_time_step)
 
