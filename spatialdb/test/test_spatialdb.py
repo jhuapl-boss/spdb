@@ -51,7 +51,11 @@ class SpatialDBImageDataTestMixin(object):
             (list(str)): a list of the cached-cuboid keys written
         """
         # Get cache key
-        t, cube_bytes = zip(*collections.deque(cube.get_all_blosc_numpy_arrays()))
+        t = []
+        cube_bytes = []
+        for time_point in range(cube.time_range[0], cube.time_range[1]):
+            t.append(time_point)
+            cube_bytes.append(cube.to_blosc_by_time_index(time_point))
         keys = sp.kvio.generate_cached_cuboid_keys(resource, res, t, [cube.morton_id])
 
         # Write cuboid to cache
@@ -87,7 +91,7 @@ class SpatialDBImageDataTestMixin(object):
         """Test the get_cubes method - no time - single"""
         # Generate random data
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
-        cube1.data = np.random.randint(0, 254, (1, self.z_dim, self.y_dim, self.x_dim))
+        cube1.random()
         cube1.morton_id = 32
 
         db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
@@ -104,13 +108,13 @@ class SpatialDBImageDataTestMixin(object):
         # Generate random data
 
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
-        cube1.data = np.random.randint(0, 254, (1, self.z_dim, self.y_dim, self.x_dim))
+        cube1.random()
         cube1.morton_id = 32
         cube2 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
-        cube2.data = np.random.randint(0, 254, (1, self.z_dim, self.y_dim, self.x_dim))
+        cube2.random()
         cube2.morton_id = 33
         cube3 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
-        cube3.data = np.random.randint(0, 254, (1, self.z_dim, self.y_dim, self.x_dim))
+        cube3.random()
         cube3.morton_id = 36
 
         db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
@@ -130,7 +134,7 @@ class SpatialDBImageDataTestMixin(object):
         """Test the get_cubes method - time - single"""
         # Generate random data
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim], [0, 2])
-        cube1.data = np.random.randint(0, 254, (2, self.z_dim, self.y_dim, self.x_dim))
+        cube1.random()
         cube1.morton_id = 76
 
         db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
@@ -146,10 +150,10 @@ class SpatialDBImageDataTestMixin(object):
         """Test the get_cubes method - time - multiple"""
         # Generate random data
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim], [0, 4])
-        cube1.data = np.random.randint(0, 254, (4, self.z_dim, self.y_dim, self.x_dim))
+        cube1.random()
         cube1.morton_id = 32
         cube2 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim], [0, 4])
-        cube2.data = np.random.randint(0, 254, (4, self.z_dim, self.y_dim, self.x_dim))
+        cube2.random()
         cube2.morton_id = 33
 
         db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
@@ -175,7 +179,7 @@ class SpatialDBImageDataTestMixin(object):
         """Test the get_cubes method - no time - single"""
         # Generate random data
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
-        cube1.data = np.random.randint(0, 254, (1, self.z_dim, self.y_dim, self.x_dim))
+        cube1.random()
         cube1.morton_id = 0
 
         db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
@@ -191,7 +195,7 @@ class SpatialDBImageDataTestMixin(object):
         """Test the get_cubes method - no time - single"""
         # Generate random data
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
-        cube1.data = np.random.randint(0, 254, (1, self.z_dim, self.y_dim, self.x_dim))
+        cube1.random()
         cube1.morton_id = 0
 
         db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)

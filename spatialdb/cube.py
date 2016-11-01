@@ -12,8 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 import numpy as np
 import blosc
 from PIL import Image
@@ -22,6 +20,7 @@ from abc import ABCMeta, abstractmethod
 
 import spdb.c_lib.ndtype as ndtype
 from spdb.c_lib import ndlib
+import blosc
 
 from .error import SpdbError, ErrorCodes
 
@@ -63,6 +62,7 @@ class Cube(metaclass=ABCMeta):
 
         self.data = None
         self.morton_id = None
+        self.datatype = None
 
         # Setup time sample properties
         if time_range:
@@ -71,6 +71,18 @@ class Cube(metaclass=ABCMeta):
         else:
             self.is_time_series = False
             self.time_range = [0, 1]
+
+    def set_data(self, data):
+        """Method to set the cube data matrix
+
+        Args:
+            data(np.ndarray):
+
+        Returns:
+            None
+        """
+        self.data = data
+        self.datatype = data.dtype
 
     def add_data(self, input_cube, index):
         """Add data to a larger cube (this instance) from a smaller cube (input_cube)
@@ -112,29 +124,46 @@ class Cube(metaclass=ABCMeta):
         # update the cube dimensions, ignoring the time component since it does not change
         self.z_dim, self.y_dim, self.x_dim = self.cube_size = list(self.data.shape[1:])
 
-    def to_blosc_numpy(self):
-        """A method that packs data in this Cube instance using Blosc and the numpy array specific interface for all
+    def pack_array(self, data):
+        """Method to serialize and compress data using the blosc compressor.
+          Assumes the datatype of the passed in array if the datatype property is not set
+
+        Args:
+            data (np.ndarray): The array to pack
+
+        Returns:
+            (bytes): The resulting serialized and compressed byte array
+        """
+        if not self.datatype:
+            self.datatype = data.dtype
+
+        return blosc.compress(data, typesize=(np.dtype(self.datatype).itemsize * 8))
+
+    def to_blosc(self):
+        """A method that packs data in this Cube instance using blosc compressor for all
         time samples (assumes a 4-D matrix).
+
+        If the datatype property has not been set, the datatype of self.data is assumed.
 
         Args:
 
         Returns:
             bytes - the compressed, serialized byte array of Cube matrix data for a given time sample
-
         """
         try:
-            # Index into the data array with time
-            return blosc.pack_array(self.data[:, :, :, :])
+            return self.pack_array(self.data[:, :, :, :])
         except Exception as e:
             raise SpdbError("Failed to compress cube. {}".format(e),
                             ErrorCodes.SERIALIZATION_ERROR)
 
-    def get_blosc_numpy_by_time_index(self, time_index=0):
-        """A method that packs data in this Cube instance using Blosc and the numpy array specific interface for a
+    def to_blosc_by_time_index(self, time_index=0):
+        """A method that packs data in this Cube instance using Blosc compressor for a
         single time sample.  The time index is the time sample index value.  It will be converted to an actual index
         into self.data by removing the cube's time offset
 
         If the time_index isn't specified, 0 is used, effectively selecting the first sample.
+
+        Always packs a 4D array with a single time point for consistency internally.
 
         Args:
             time_index (int): Time sample to get.
@@ -145,28 +174,38 @@ class Cube(metaclass=ABCMeta):
         """
         try:
             # Index into the data array with time.  Return a 4D array
-            return blosc.pack_array(np.expand_dims(self.data[time_index - self.time_range[0], :, :, :], axis=0))
+            return self.pack_array(np.expand_dims(self.data[time_index - self.time_range[0], :, :, :], axis=0))
         except Exception as e:
             raise SpdbError("Failed to compress cube. {}".format(e),
                             ErrorCodes.SERIALIZATION_ERROR)
 
-    def get_all_blosc_numpy_arrays(self):
-        """A generator that packs data in this Cube instance using Blosc and the numpy array specific interface.
+    def unpack_array(self, data, num_time_points=1):
+        """Method to uncompress and deserialize the provided data.
+
+        If only a single time point provided,
+
+        Args:
+            data (bytes): The array to pack
 
         Returns:
-            (int, bytes) - a tuple of the time sample and the compressed, serialized byte array of Cube matrix data
-
+            (np.ndarray): The resulting serialized and compressed byte array
         """
-        # Create compressed byte arrays for each time point, and return in order as a tuple, indicating
-        # the time point
-        try:
-            for cnt, t in enumerate(range(self.time_range[0], self.time_range[1])):
-                yield (t, blosc.pack_array(np.expand_dims(self.data[cnt, :, :, :], axis=0)))
-        except Exception as e:
-            raise SpdbError("Failed to compress cube. {}".format(e),
+        if not self.datatype:
+            raise SpdbError("Cube instance must have datatype parameter set to enable deserialization.",
                             ErrorCodes.SERIALIZATION_ERROR)
 
-    def from_blosc_numpy(self, byte_arrays, time_sample_range=None):
+        raw_data = blosc.decompress(data)
+        data_mat = np.fromstring(raw_data, dtype=self.datatype)
+        if num_time_points > 1:
+            # Time series data
+
+            data_mat = np.reshape(data_mat, (num_time_points, self.z_dim, self.y_dim, self.x_dim), order='C')
+        else:
+            data_mat = np.reshape(data_mat, (self.z_dim, self.y_dim, self.x_dim), order='C')
+
+        return data_mat
+
+    def from_blosc(self, byte_arrays, time_sample_range=None):
         # TODO: Conditional properties of this method are challenging for the developer. break into multiple methods
         """Uncompress and populate Cube data from a Blosc serialized and compressed byte array using the numpy interface
 
@@ -201,10 +240,10 @@ class Cube(metaclass=ABCMeta):
                 for idx, t in enumerate(range(time_sample_range[0], time_sample_range[1])):
                     if idx == 0:
                         # On first cube get the size and allocate properly
-                        temp_mat = blosc.unpack_array(byte_arrays[idx])
+                        temp_mat = self.unpack_array(byte_arrays[idx])
 
                         # Set shape
-                        self.z_dim, self.y_dim, self.x_dim = self.cube_size = list(temp_mat.shape)[1:]
+                        #self.z_dim, self.y_dim, self.x_dim = self.cube_size = list(temp_mat.shape)[1:]
 
                         # allocate
                         self.data = np.zeros(shape=(time_sample_range[1] - time_sample_range[0],
@@ -212,11 +251,11 @@ class Cube(metaclass=ABCMeta):
 
                         self.data[idx, :, :, :] = temp_mat
                     else:
-                        self.data[idx, :, :, :] = blosc.unpack_array(byte_arrays[idx])
+                        self.data[idx, :, :, :] = self.unpack_array(byte_arrays[idx])
             else:
                 # If you get a single array assume it is the complete 4D array
-                self.data[:, :, :, :] = blosc.unpack_array(byte_arrays)
-                self.z_dim, self.y_dim, self.x_dim = self.cube_size = list(self.data.shape)[1:]
+                self.data[:, :, :, :] = self.unpack_array(byte_arrays, self.time_range[1] - self.time_range[0])
+                #self.z_dim, self.y_dim, self.x_dim = self.cube_size = list(self.data.shape)[1:]
 
         except Exception as e:
             raise SpdbError("Failed to decompress database cube. {}".format(e),
@@ -267,6 +306,15 @@ class Cube(metaclass=ABCMeta):
         Example for uin8 based cube:
             self._created_from_zeros = True
             self.data = np.zeros(self.cube_size, dtype=np.uint8)
+
+        Returns:
+            None
+        """
+        return NotImplemented
+
+    @abstractmethod
+    def random(self):
+        """Create a random cube, used primarily in testing
 
         Returns:
             None
@@ -340,16 +388,35 @@ class Cube(metaclass=ABCMeta):
         channel = resource.get_channel()
         data_type = resource.get_data_type()
 
-        if not channel.is_image() and data_type in ndtype.DTYPE_uint64:
+        if not channel.is_image() and data_type == "uint64":
             from .annocube import AnnotateCube64
             return AnnotateCube64(cube_size, time_range)
 
-        elif data_type in ndtype.DTYPE_uint8:
+        elif data_type == "uint8":
             from .imagecube import ImageCube8
             return ImageCube8(cube_size, time_range)
-        elif data_type in ndtype.DTYPE_uint16:
+        elif data_type == "uint16":
             from .imagecube import ImageCube16
             return ImageCube16(cube_size, time_range)
         else:
             return Cube(cube_size, time_range)
 
+
+
+
+#TODO: REMOVE
+#    def get_all_blosc_numpy_arrays(self):
+#        """A generator that packs data in this Cube instance using Blosc and the numpy array specific interface.
+#
+#        Returns:
+#            (int, bytes) - a tuple of the time sample and the compressed, serialized byte array of Cube matrix data
+#
+#        """
+#        # Create compressed byte arrays for each time point, and return in order as a tuple, indicating
+#        # the time point
+#        try:
+#            for cnt, t in enumerate(range(self.time_range[0], self.time_range[1])):
+#                yield (t, self.pack_array(np.expand_dims(self.data[cnt, :, :, :], axis=0)))
+#        except Exception as e:
+#            raise SpdbError("Failed to compress cube. {}".format(e),
+#                            ErrorCodes.SERIALIZATION_ERROR)

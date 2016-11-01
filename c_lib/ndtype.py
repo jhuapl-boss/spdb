@@ -17,7 +17,7 @@ import numpy as np
 
 # Cuboid Size
 # TODO: Look into moving this into a data model table and set based on voxel size
-# non-isotropic slices should be 128,128,16. As you downsample move to 64,64,64 past isotropic
+# non-isotropic slices should be 512,512,16. As you downsample move to 64,64,64 past isotropic
 CUBOIDSIZE = [[512, 512, 16],
               [512, 512, 16],
               [512, 512, 16],
@@ -30,22 +30,22 @@ CUBOIDSIZE = [[512, 512, 16],
               [64, 64, 64]]
 
 # SuperCube Size
-SUPERCUBESIZE = [10, 10, 10]
+SUPERCUBESIZE = [1, 1, 1]
 
 # ND Data Types, Mapping, Groups
-UINT8 = 'uint8'
-UINT16 = 'uint16'
-UINT32 = 'uint32'
-UINT64 = 'uint64'
-FLOAT32 = 'float32'
-
-DTYPE_uint8 = [UINT8]
-DTYPE_uint16 = [UINT16]
-DTYPE_uint32 = [UINT32]
-DTYPE_uint64 = [UINT64]
-DTYPE_float32 = [FLOAT32]
-
-ND_dtypetonp = {UINT8: np.uint8, UINT16: np.uint16, UINT32: np.uint32, UINT64: np.uint64, FLOAT32: np.float32}
+#UINT8 = 'uint8'
+#UINT16 = 'uint16'
+#UINT32 = 'uint32'
+#UINT64 = 'uint64'
+#FLOAT32 = 'float32'
+#
+#DTYPE_uint8 = [UINT8]
+#DTYPE_uint16 = [UINT16]
+#DTYPE_uint32 = [UINT32]
+#DTYPE_uint64 = [UINT64]
+#DTYPE_float32 = [FLOAT32]
+#
+#ND_dtypetonp = {UINT8: np.uint8, UINT16: np.uint16, UINT32: np.uint32, UINT64: np.uint64, FLOAT32: np.float32}
 
 # Propagated Values
 # TODO: Propagation not supported yet

@@ -3,7 +3,7 @@ redis==2.10.5
 mockredispy==2.9.3
 blosc==1.2.8
 nose2
-numpy
+numpy==1.11.1
 moto
 boto3
 hvac

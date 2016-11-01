@@ -40,11 +40,23 @@ class AnnotateCube64(Cube):
         # variable that describes when a cube is created from zeros rather than loaded from another source
         self._created_from_zeros = False
 
+        self.datatype = np.uint64
+
     # create an all zeros cube
     def zeros(self):
         """Create a cube of all 0"""
         self._created_from_zeros = True
         self.data = np.zeros([self.time_range[1]-self.time_range[0]] + self.cube_size, dtype=np.uint64, order='C')
+
+    def random(self):
+        """Create a random cube
+
+        Returns:
+            None
+        """
+        self.data = np.random.randint(1, 2**64 - 1,
+                                      size=[self.time_range[1]-self.time_range[0]] + self.cube_size,
+                                      dtype=np.uint64)
 
     def overwrite(self, input_data, time_sample_range=None):
         """ Overwrite data with all non-zero values in the input_data

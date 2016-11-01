@@ -157,9 +157,9 @@ class SpatialDB:
 
             # populate with all the time samples
             if not_time_series:
-                temp_cube.from_blosc_numpy(cube_bytes[start:end], [time_sample[start], time_sample[start] + 1])
+                temp_cube.from_blosc(cube_bytes[start:end], [time_sample[start], time_sample[start] + 1])
             else:
-                temp_cube.from_blosc_numpy(cube_bytes[start:end], [time_sample[start], time_sample[end - 1] + 1])
+                temp_cube.from_blosc(cube_bytes[start:end], [time_sample[start], time_sample[end - 1] + 1])
 
             # Save for output
             output_cubes.append(temp_cube)
@@ -692,7 +692,7 @@ class SpatialDB:
                     for t in range(time_sample_start, time_sample_stop):
                         # Add cuboid to write buffer
                         write_cuboid_key = self.kvio.insert_cube_in_write_buffer(base_write_cuboid_key, t, morton_idx,
-                                                                                 temp_cube.get_blosc_numpy_by_time_index(t))
+                                                                                 temp_cube.to_blosc_by_time_index(t))
 
                         # Page Out Attempt Loop
                         temp_page_out_key = "TEMP&{}".format(uuid.uuid4().hex)

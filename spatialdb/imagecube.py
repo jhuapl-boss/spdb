@@ -39,6 +39,8 @@ class ImageCube8(Cube):
         # variable that describes when a cube is created from zeros rather than loaded from another source
         self._created_from_zeros = False
 
+        self.datatype = np.uint8
+
     def zeros(self):
         """Create a cube of all zeros
 
@@ -47,6 +49,16 @@ class ImageCube8(Cube):
         """
         self._created_from_zeros = True
         self.data = np.zeros([self.time_range[1]-self.time_range[0]] + self.cube_size, dtype=np.uint8, order='C')
+
+    def random(self):
+        """Create a random cube
+
+        Returns:
+            None
+        """
+        self.data = np.random.randint(1, 255,
+                                      size=[self.time_range[1]-self.time_range[0]] + self.cube_size,
+                                      dtype=np.uint8)
 
     def overwrite(self, input_data, time_sample_range=None):
         """ Overwrite data with all non-zero values in the input_data
@@ -80,7 +92,6 @@ class ImageCube8(Cube):
             # Input data doesn't have any time indices
             self.data[time_sample_range[0], :, :, :] = ndlib.overwriteDense8_ctype(
                 self.data[time_sample_range[0], :, :, :], input_data[time_sample_range[0], :, :, :])
-
 
     def xy_image(self, z_index=0, t_index=0):
         """Render an image in the XY plane.
@@ -147,6 +158,8 @@ class ImageCube16(Cube):
         # variable that describes when a cube is created from zeros rather than loaded from another source
         self._created_from_zeros = False
 
+        self.datatype = np.uint16
+
     def zeros(self):
         """Create a cube of all zeros
 
@@ -155,6 +168,16 @@ class ImageCube16(Cube):
         """
         self._created_from_zeros = True
         self.data = np.zeros([self.time_range[1] - self.time_range[0]] + self.cube_size, dtype=np.uint16, order='C')
+
+    def random(self):
+        """Create a random cube
+
+        Returns:
+            None
+        """
+        self.data = np.random.randint(1, 65534,
+                                      size=[self.time_range[1]-self.time_range[0]] + self.cube_size,
+                                      dtype=np.uint16)
 
     def overwrite(self, input_data, time_sample_range=None):
         """ Overwrite data with all non-zero values in the input_data
