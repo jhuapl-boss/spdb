@@ -186,6 +186,7 @@ class Cube(metaclass=ABCMeta):
 
         Args:
             data (bytes): The array to pack
+            num_time_points (int): Number of time samples in the compressed data
 
         Returns:
             (np.ndarray): The resulting serialized and compressed byte array
@@ -196,12 +197,7 @@ class Cube(metaclass=ABCMeta):
 
         raw_data = blosc.decompress(data)
         data_mat = np.fromstring(raw_data, dtype=self.datatype)
-        if num_time_points > 1:
-            # Time series data
-
-            data_mat = np.reshape(data_mat, (num_time_points, self.z_dim, self.y_dim, self.x_dim), order='C')
-        else:
-            data_mat = np.reshape(data_mat, (self.z_dim, self.y_dim, self.x_dim), order='C')
+        data_mat = np.reshape(data_mat, (num_time_points, self.z_dim, self.y_dim, self.x_dim), order='C')
 
         return data_mat
 
@@ -240,10 +236,7 @@ class Cube(metaclass=ABCMeta):
                 for idx, t in enumerate(range(time_sample_range[0], time_sample_range[1])):
                     if idx == 0:
                         # On first cube get the size and allocate properly
-                        temp_mat = self.unpack_array(byte_arrays[idx])
-
-                        # Set shape
-                        #self.z_dim, self.y_dim, self.x_dim = self.cube_size = list(temp_mat.shape)[1:]
+                        temp_mat = self.unpack_array(byte_arrays[idx], 1)
 
                         # allocate
                         self.data = np.zeros(shape=(time_sample_range[1] - time_sample_range[0],
@@ -251,7 +244,7 @@ class Cube(metaclass=ABCMeta):
 
                         self.data[idx, :, :, :] = temp_mat
                     else:
-                        self.data[idx, :, :, :] = self.unpack_array(byte_arrays[idx])
+                        self.data[idx, :, :, :] = self.unpack_array(byte_arrays[idx], 1)
             else:
                 # If you get a single array assume it is the complete 4D array
                 self.data[:, :, :, :] = self.unpack_array(byte_arrays, self.time_range[1] - self.time_range[0])

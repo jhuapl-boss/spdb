@@ -661,7 +661,7 @@ class SpatialDB:
         # Populate the data buffer
         data_buffer = np.zeros([time_sample_stop - time_sample_start] +
                                [z_num_cubes * z_cube_dim, y_num_cubes * y_cube_dim, x_num_cubes * x_cube_dim],
-                               dtype=cuboid_data.dtype)
+                               dtype=cuboid_data.dtype, order="C")
 
         data_buffer[:, z_offset:z_offset + dim[2],
                        y_offset:y_offset + dim[1],
@@ -683,10 +683,10 @@ class SpatialDB:
                     # Get sub-cube
                     temp_cube = Cube.create_cube(resource, [x_cube_dim, y_cube_dim, z_cube_dim],
                                                  [time_sample_start, time_sample_stop])
-                    temp_cube.data = data_buffer[:,
-                                                 z * z_cube_dim:(z + 1) * z_cube_dim,
-                                                 y * y_cube_dim:(y + 1) * y_cube_dim,
-                                                 x * x_cube_dim:(x + 1) * x_cube_dim]
+                    temp_cube.data = np.ascontiguousarray(data_buffer[:,
+                                                          z * z_cube_dim:(z + 1) * z_cube_dim,
+                                                          y * y_cube_dim:(y + 1) * y_cube_dim,
+                                                          x * x_cube_dim:(x + 1) * x_cube_dim], dtype=data_buffer.dtype)
 
                     # For each time sample put cube into write-buffer and add to temp page out key
                     for t in range(time_sample_start, time_sample_stop):

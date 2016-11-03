@@ -282,7 +282,7 @@ class AWSSetupLayer(object):
                 pass
             time.sleep(61)
             cls.object_store_config["s3_flush_queue"] = cls.setup_helper.create_flush_queue(cls.s3_flush_queue_name)
-        print('Done', end='', flush=True)
+        print('Done', flush=True)
 
     @classmethod
     def tearDown(cls):
@@ -301,4 +301,4 @@ class AWSSetupLayer(object):
             cls.setup_helper.delete_flush_queue(cls.object_store_config["s3_flush_queue"])
         except:
             pass
-        print('Done', end='', flush=True)
+        print('Done', flush=True)

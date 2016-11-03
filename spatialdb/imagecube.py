@@ -56,9 +56,9 @@ class ImageCube8(Cube):
         Returns:
             None
         """
-        self.data = np.random.randint(1, 255,
-                                      size=[self.time_range[1]-self.time_range[0]] + self.cube_size,
-                                      dtype=np.uint8)
+        self.data = np.ascontiguousarray(np.random.randint(1, 254,
+                                         size=[self.time_range[1]-self.time_range[0]] + self.cube_size,
+                                         dtype=self.datatype), dtype=self.datatype)
 
     def overwrite(self, input_data, time_sample_range=None):
         """ Overwrite data with all non-zero values in the input_data
@@ -175,9 +175,9 @@ class ImageCube16(Cube):
         Returns:
             None
         """
-        self.data = np.random.randint(1, 65534,
-                                      size=[self.time_range[1]-self.time_range[0]] + self.cube_size,
-                                      dtype=np.uint16)
+        self.data = np.ascontiguousarray(np.random.randint(1, 65534,
+                                         size=[self.time_range[1]-self.time_range[0]] + self.cube_size,
+                                         dtype=self.datatype), dtype=self.datatype)
 
     def overwrite(self, input_data, time_sample_range=None):
         """ Overwrite data with all non-zero values in the input_data

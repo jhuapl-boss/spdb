@@ -14,6 +14,7 @@
 
 import unittest
 import numpy as np
+import time
 
 from spdb.spatialdb.test.test_spatialdb import SpatialDBImageDataTestMixin
 from spdb.spatialdb import Cube, SpatialDB
@@ -36,26 +37,31 @@ class SpatialDBImageDataIntegrationTestMixin(object):
         """Test the get_cubes method - no time - single - hit"""
         # Generate random data
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
-        cube1.data = np.random.randint(1, 254, (1, self.z_dim, self.y_dim, self.x_dim))
+        cube1.random()
         cube1.morton_id = 0
 
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
         sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data)
 
+        start = time.time()
         cube2 = sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
+        cutout1_time = time.time() - start
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
 
+        start = time.time()
         cube2 = sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
+        cutout2_time = time.time() - start
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
+        assert cutout2_time < cutout1_time
 
     def test_cutout_no_time_single_aligned_miss(self):
         """Test the get_cubes method - no time - single - miss"""
         # Generate random data
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
-        cube1.data = np.random.randint(1, 254, (1, self.z_dim, self.y_dim, self.x_dim))
+        cube1.random()
         cube1.morton_id = 0
 
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
@@ -74,36 +80,39 @@ class SpatialDBImageDataIntegrationTestMixin(object):
         cube3 = sp.cutout(self.resource, (1, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
 
         # Make sure the data is the same
+        np.testing.assert_array_equal(cube1.data, cube2.data)
         np.testing.assert_array_equal(cube1.data, cube3.data)
 
     def test_cutout_no_time_single_aligned_existing_hit(self):
         """Test the get_cubes method - no time - aligned - existing data - miss"""
         # Generate random data
-        data1 = np.random.randint(1, 254, (self.z_dim, self.y_dim, self.x_dim))
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube1.random()
 
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
-        sp.write_cuboid(self.resource, (0, 0, 0), 0, data1)
+        sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data)
 
         cube2 = sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
 
-        np.testing.assert_array_equal(data1, np.squeeze(cube2.data))
-        del data1
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+        del cube1
         del cube2
 
         # now write to cuboid again
-        data3 = np.random.randint(1, 254, (self.z_dim, self.y_dim, self.x_dim))
+        cube3 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube3.random()
 
-        sp.write_cuboid(self.resource, (0, 0, 0), 0, data3)
+        sp.write_cuboid(self.resource, (0, 0, 0), 0, cube3.data)
 
         cube4 = sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
-        np.testing.assert_array_equal(data3, np.squeeze(cube4.data))
+        np.testing.assert_array_equal(cube3.data, cube4.data)
 
     def test_cutout_no_time_single_aligned_hit_shifted(self):
         """Test the get_cubes method - no time - single - hit - shifted into a different location"""
         # Generate random data
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
-        cube1.data = np.random.randint(1, 254, (1, self.z_dim, self.y_dim, self.x_dim))
+        cube1.random()
         cube1.morton_id = 0
 
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
@@ -118,7 +127,7 @@ class SpatialDBImageDataIntegrationTestMixin(object):
         """Test the get_cubes method - no time - single - unaligned - hit"""
         # Generate random data
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
-        cube1.data = np.random.randint(1, 254, (1, self.z_dim, self.y_dim, self.x_dim))
+        cube1.random()
         cube1.morton_id = 0
 
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
@@ -132,8 +141,8 @@ class SpatialDBImageDataIntegrationTestMixin(object):
     def test_cutout_time0_single_aligned_hit(self):
         """Test the get_cubes method - w/ time - single - hit"""
         # Generate random data
-        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
-        cube1.data = np.random.randint(1, 254, (5, self.z_dim, self.y_dim, self.x_dim))
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim], time_range=[0, 5])
+        cube1.random()
         cube1.morton_id = 0
 
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
@@ -147,8 +156,8 @@ class SpatialDBImageDataIntegrationTestMixin(object):
     def test_cutout_time_offset_single_aligned_hit(self):
         """Test the get_cubes method - w/ time - single - hit"""
         # Generate random data
-        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
-        cube1.data = np.random.randint(1, 254, (3, self.z_dim, self.y_dim, self.x_dim))
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim], time_range=[0, 3])
+        cube1.random()
         cube1.morton_id = 0
 
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
@@ -162,8 +171,8 @@ class SpatialDBImageDataIntegrationTestMixin(object):
     def test_cutout_no_time_multi_unaligned_hit(self):
         """Test the get_cubes method - no time - multi - unaligned - hit"""
         # Generate random data
-        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
-        cube1.data = np.random.randint(1, 254, (1, 8, 400, 400))
+        cube1 = Cube.create_cube(self.resource, [400, 400, 8])
+        cube1.random()
         cube1.morton_id = 0
 
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
@@ -183,6 +192,16 @@ class SpatialDBImageDataIntegrationTestMixin(object):
 class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
                                          SpatialDBImageDataIntegrationTestMixin, unittest.TestCase):
     layer = AWSSetupLayer
+
+    @classmethod
+    def setUpClass(cls):
+        """Clean kv store in between tests"""
+        client = redis.StrictRedis(host=cls.kvio_config['cache_host'],
+                                   port=6379, db=1, decode_responses=False)
+        client.flushdb()
+        client = redis.StrictRedis(host=cls.state_config['cache_state_host'],
+                                   port=6379, db=1, decode_responses=False)
+        client.flushdb()
 
     def setUp(self):
         """ Copy params from the Layer setUpClass
@@ -207,6 +226,16 @@ class TestIntegrationSpatialDBImage16Data(SpatialDBImageDataTestMixin,
                                           SpatialDBImageDataIntegrationTestMixin, unittest.TestCase):
     layer = AWSSetupLayer
 
+    @classmethod
+    def setUpClass(cls):
+        """Clean kv store in between tests"""
+        client = redis.StrictRedis(host=cls.kvio_config['cache_host'],
+                                   port=6379, db=1, decode_responses=False)
+        client.flushdb()
+        client = redis.StrictRedis(host=cls.state_config['cache_state_host'],
+                                   port=6379, db=1, decode_responses=False)
+        client.flushdb()
+
     def setUp(self):
         """ Copy params from the Layer setUpClass
         """
@@ -230,6 +259,16 @@ class TestIntegrationSpatialDBImage16Data(SpatialDBImageDataTestMixin,
 class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
                                           SpatialDBImageDataIntegrationTestMixin, unittest.TestCase):
     layer = AWSSetupLayer
+
+    @classmethod
+    def setUpClass(cls):
+        """Clean kv store in between tests"""
+        client = redis.StrictRedis(host=cls.kvio_config['cache_host'],
+                                   port=6379, db=1, decode_responses=False)
+        client.flushdb()
+        client = redis.StrictRedis(host=cls.state_config['cache_state_host'],
+                                   port=6379, db=1, decode_responses=False)
+        client.flushdb()
 
     def setUp(self):
         """ Copy params from the Layer setUpClass
