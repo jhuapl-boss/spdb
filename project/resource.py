@@ -54,12 +54,12 @@ class Experiment:
       Valid values are 'near_iso', 'iso', and 'slice'.
       max_time_step (int): The maximum supported time sample
     """
-    def __init__(self, name, description, num_hierarchy_levels, hierarchy_method, num_time_samples):
+    def __init__(self, name, description, num_hierarchy_levels, hierarchy_method, max_time_sample):
         self.name = name
         self.description = description
         self.num_hierarchy_levels = num_hierarchy_levels
         self.hierarchy_method = hierarchy_method
-        self.num_time_samples = num_time_samples
+        self.max_time_sample = max_time_sample
 
 
 class CoordinateFrame:
@@ -138,10 +138,10 @@ class Channel:
       base_resolution (int): The resolution level of primary annotation and indicates where dynamic resampling will occur
       source (list(str)): A list of channels from which this channel is derived
       related (list(str)): A list of channels that are related to this channel
-      default_time_sample(int): The time step to use if time is omitted from a request
+      default_time_step (int): The time step to use if time is omitted from a request
 
     """
-    def __init__(self, name, description, ch_type, datatype, base_resolution, sources, related, default_time_sample):
+    def __init__(self, name, description, ch_type, datatype, base_resolution, sources, related, default_time_step):
         self.name = name
         self.description = description
         self.type = ch_type
@@ -149,7 +149,7 @@ class Channel:
         self.base_resolution = base_resolution
         self.sources = sources
         self.related = related
-        self.default_time_sample = default_time_sample
+        self.default_time_step = default_time_step
 
     def is_image(self):
         """

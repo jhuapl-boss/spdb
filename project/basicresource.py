@@ -97,7 +97,7 @@ class BossResourceBasic(BossResource):
                                       self.data['experiment']['description'],
                                       self.data['experiment']['num_hierarchy_levels'],
                                       self.data['experiment']['hierarchy_method'],
-                                      self.data['experiment']['num_time_samples'],
+                                      self.data['experiment']['max_time_sample'],
                                       )
 
     def populate_channel(self):
@@ -111,7 +111,7 @@ class BossResourceBasic(BossResource):
                                 self.data['channel']['base_resolution'],
                                 self.data['channel']['sources'],
                                 self.data['channel']['related'],
-                                self.data['channel']['default_time_sample'])
+                                self.data['channel']['default_time_step'])
 
     def populate_boss_key(self):
         """

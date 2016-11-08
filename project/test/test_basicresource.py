@@ -80,7 +80,7 @@ class TestBasicResource(unittest.TestCase):
         assert exp.description == setup_data['experiment']['description']
         assert exp.num_hierarchy_levels == setup_data['experiment']['num_hierarchy_levels']
         assert exp.hierarchy_method == setup_data['experiment']['hierarchy_method']
-        assert exp.num_time_samples == setup_data['experiment']['num_time_samples']
+        assert exp.max_time_sample == setup_data['experiment']['max_time_sample']
 
     def test_basic_resource_channel_no_time(self):
         """Test basic get channel interface
@@ -100,7 +100,7 @@ class TestBasicResource(unittest.TestCase):
         assert channel.base_resolution == setup_data['channel']['base_resolution']
         assert channel.sources == setup_data['channel']['sources']
         assert channel.related == setup_data['channel']['related']
-        assert channel.default_time_sample == setup_data['channel']['default_time_sample']
+        assert channel.default_time_step == setup_data['channel']['default_time_step']
 
     def test_basic_resource_get_boss_key(self):
         """Test basic get boss key interface
@@ -224,7 +224,7 @@ class TestBasicResource(unittest.TestCase):
         assert exp.description == setup_data['experiment']['description']
         assert exp.num_hierarchy_levels == setup_data['experiment']['num_hierarchy_levels']
         assert exp.hierarchy_method == setup_data['experiment']['hierarchy_method']
-        assert exp.num_time_samples == setup_data['experiment']['num_time_samples']
+        assert exp.max_time_sample == setup_data['experiment']['max_time_sample']
 
         # Check channel
         channel = resource2.get_channel()
@@ -235,7 +235,7 @@ class TestBasicResource(unittest.TestCase):
         assert channel.base_resolution == setup_data['channel']['base_resolution']
         assert channel.sources == setup_data['channel']['sources']
         assert channel.related == setup_data['channel']['related']
-        assert channel.default_time_sample == setup_data['channel']['default_time_sample']
+        assert channel.default_time_step == setup_data['channel']['default_time_step']
 
         # check keys
         assert resource2.get_lookup_key() == setup_data['lookup_key']
@@ -304,7 +304,7 @@ class TestBasicResource(unittest.TestCase):
         assert exp.description == setup_data['experiment']['description']
         assert exp.num_hierarchy_levels == setup_data['experiment']['num_hierarchy_levels']
         assert exp.hierarchy_method == setup_data['experiment']['hierarchy_method']
-        assert exp.num_time_samples == setup_data['experiment']['num_time_samples']
+        assert exp.max_time_sample == setup_data['experiment']['max_time_sample']
 
         # Check channel
         channel = resource2.get_channel()
@@ -315,7 +315,7 @@ class TestBasicResource(unittest.TestCase):
         assert channel.base_resolution == setup_data['channel']['base_resolution']
         assert channel.sources == setup_data['channel']['sources']
         assert channel.related == setup_data['channel']['related']
-        assert channel.default_time_sample == setup_data['channel']['default_time_sample']
+        assert channel.default_time_step == setup_data['channel']['default_time_step']
 
         # check keys
         assert resource2.get_lookup_key() == setup_data['lookup_key']
@@ -340,7 +340,7 @@ class TestBasicResource(unittest.TestCase):
         assert channel.base_resolution == setup_data['channel']['base_resolution']
         assert channel.sources == setup_data['channel']['sources']
         assert channel.related == setup_data['channel']['related']
-        assert channel.default_time_sample == setup_data['channel']['default_time_sample']
+        assert channel.default_time_step == setup_data['channel']['default_time_step']
 
     def test_basic_resource_channel_with_source1(self):
         """Test basic get channel interface
@@ -361,7 +361,7 @@ class TestBasicResource(unittest.TestCase):
         assert channel.base_resolution == setup_data['channel']['base_resolution']
         assert channel.sources == setup_data['channel']['sources']
         assert channel.related == setup_data['channel']['related']
-        assert channel.default_time_sample == setup_data['channel']['default_time_sample']
+        assert channel.default_time_step == setup_data['channel']['default_time_step']
 
     def test_basic_resource_channel_with_related(self):
         """Test basic get channel interface
@@ -382,7 +382,7 @@ class TestBasicResource(unittest.TestCase):
         assert channel.base_resolution == setup_data['channel']['base_resolution']
         assert channel.sources == setup_data['channel']['sources']
         assert channel.related == setup_data['channel']['related']
-        assert channel.default_time_sample == setup_data['channel']['default_time_sample']
+        assert channel.default_time_step == setup_data['channel']['default_time_step']
 
     def test_basic_resource_annotation_no_time(self):
         """Test basic get layer interface
@@ -402,7 +402,7 @@ class TestBasicResource(unittest.TestCase):
         assert channel.base_resolution == setup_data['channel']['base_resolution']
         assert channel.sources == setup_data['channel']['sources']
         assert channel.related == setup_data['channel']['related']
-        assert channel.default_time_sample == setup_data['channel']['default_time_sample']
+        assert channel.default_time_step == setup_data['channel']['default_time_step']
 
     def test_basic_resource_from_json_annotation(self):
         """Test basic to json deserialization method
@@ -445,7 +445,7 @@ class TestBasicResource(unittest.TestCase):
         assert exp.description == setup_data['experiment']['description']
         assert exp.num_hierarchy_levels == setup_data['experiment']['num_hierarchy_levels']
         assert exp.hierarchy_method == setup_data['experiment']['hierarchy_method']
-        assert exp.num_time_samples == setup_data['experiment']['num_time_samples']
+        assert exp.max_time_sample == setup_data['experiment']['max_time_sample']
 
         # Check channel
         channel = resource2.get_channel()
@@ -456,7 +456,7 @@ class TestBasicResource(unittest.TestCase):
         assert channel.base_resolution == setup_data['channel']['base_resolution']
         assert channel.sources == setup_data['channel']['sources']
         assert channel.related == setup_data['channel']['related']
-        assert channel.default_time_sample == setup_data['channel']['default_time_sample']
+        assert channel.default_time_step == setup_data['channel']['default_time_step']
 
         # check keys
         assert resource2.get_lookup_key() == setup_data['lookup_key']
