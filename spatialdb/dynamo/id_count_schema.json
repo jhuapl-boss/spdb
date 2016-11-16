@@ -1,7 +1,7 @@
 {
     "KeySchema": [
         {
-            "AttributeName": "channel_id_key",
+            "AttributeName": "channel-key",
             "KeyType": "HASH"
         },
         {
@@ -11,7 +11,7 @@
     ],
     "AttributeDefinitions":[
         {
-            "AttributeName": "channel_id_key",
+            "AttributeName": "channel-key",
             "AttributeType": "S"
         },
         {
