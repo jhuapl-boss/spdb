@@ -15,6 +15,7 @@
 from spdb.c_lib.ndlib import unique
 from bossutils.aws import get_region
 import boto3
+import hashlib
 
 class ObjectIndices:
     """
@@ -47,20 +48,38 @@ class ObjectIndices:
 
         return strs
 
-    def update_id_indices(self, key_list, cube_list, version=0):
+    def generate_channel_id_key(self, resource, resolution, id):
+        """
+        Generate key used by DynamoDB id index table to store cuboids keys associated with the given resource and id.
+
+        Args:
+            resource (BossResource): Data model info based on the request or target resource.
+            resolution (int): Resolution level.
+            id (string|uint64): Object id.
+
+        Returns:
+            (string): key to get cuboids associated with the given resource and id.
+        """
+        base_key = '{}&{}&{}'.format(resource.get_lookup_key(), resolution, id)
+        hash_str = hashlib.md5(base_key.encode()).hexdigest()
+        return '{}&{}'.format(hash_str, base_key)
+
+    def update_id_indices(self, resource, resolution, key_list, cube_list, version=0):
         """
         Update annotation id index and s3 cuboid index with ids in the given cuboids.
 
         Any ids that are zeros will not be added to the indices.
 
         Args:
-            key_list (list[string]):
-            cube_list (list[bytes]):
-            version (optional[int]):
+            resource (BossResource): Data model info based on the request or target resource.
+            resolution (int): Resolution level.
+            key_list (list[string]): keys for each cuboid.
+            cube_list (list[bytes]): bytes comprising each cuboid.
+            version (optional[int]): Defaults to zero, reserved for future use.
 
         Returns:
         """
-        for key, cube in zip(key_list, cube_list):
+        for obj_key, cube in zip(key_list, cube_list):
             # Find unique ids in this cube.
             ids = unique(cube)
 
@@ -70,12 +89,19 @@ class ObjectIndices:
             # Add these ids to the s3 cuboid index table.
             response = self.dynamodb.update_item(
                 TableName=self.s3_index_table,
-                Key={'object-key': {'S': key}, 'version-node': {'N': "{}".format(version)}},
+                Key={'object-key': {'S': obj_key}, 'version-node': {'N': "{}".format(version)}},
                 UpdateExpression='ADD #idset :ids',
                 ExpressionAttributeNames={'#idset': 'id-set'},
                 ExpressionAttributeValues={':ids': {'SS': ids_str_list}},
                 ReturnConsumedCapacity='NONE')
 
+            # Add object key to this id's cuboid set.
             for id in ids:
-                # Add key to cuboid set for this id.
-                pass
+                channel_id_key = self.generate_channel_id_key(resource, resolution, id)
+                response = self.dynamodb.update_item(
+                    TableName=self.id_index_table,
+                    Key={'channel-id-key': {'S': channel_id_key}, 'version': {'N': "{}".format(version)}},
+                    UpdateExpression='ADD #cuboidset :objkey',
+                    ExpressionAttributeNames={'#cuboidset': 'cuboid-set'},
+                    ExpressionAttributeValues={':objkey': {'SS': [obj_key]}},
+                    ReturnConsumedCapacity='NONE')

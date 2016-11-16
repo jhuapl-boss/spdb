@@ -13,6 +13,9 @@
 # limitations under the License.
 
 from spdb.spatialdb.object_indices import ObjectIndices
+from spdb.spatialdb.object import AWSObjectStore
+from spdb.project import BossResourceBasic
+from spdb.project.test.resource_setup import get_anno_dict
 
 from bossutils.aws import get_region
 import boto3
@@ -30,12 +33,21 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
     def setUpClass(cls):
         warnings.simplefilter('ignore')
 
+        # Need the generate_object_key() method.
+        cls.obj_store = AWSObjectStore({
+            's3_flush_queue': 'foo',
+            'cuboid_bucket': 'foo',
+            'page_in_lambda_function': 'foo',
+            'page_out_lambda_function': 'foo',
+            's3_index_table': 'foo'
+        })
+
         cls.s3_index = 'test_s3_index{}'.format(randint(1, 999))
         cls.id_index = 'test_id_index{}'.format(randint(1, 999))
         cls.s3_index_schema = resource_filename(
             'spdb', 'spatialdb/dynamo/s3_index_table.json')
         cls.id_index_schema = resource_filename(
-            'spdb', 'spatialdb/dynamo/dynamo_id_index_schema.json')
+            'spdb', 'spatialdb/dynamo/id_index_schema.json')
 
         # Use local DynamoDB if env variable set.
         cls.endpoint_url = None
@@ -118,6 +130,9 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
             self.s3_index, self.id_index, self.region, self.endpoint_url)
 
     def test_update_id_indices_new_entry_in_cuboid_index(self):
+        """
+        Test adding ids to new cuboids in the s3 cuboid index.
+        """
         bytes = np.zeros(10, dtype='uint64')
         bytes[1] = 20
         bytes[2] = 20
@@ -127,9 +142,11 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         expected = ['20', '55', '1000']
         key = 'hash_coll_exp_chan_key'
         version = 0
+        resource = BossResourceBasic(data=get_anno_dict())
+        resolution = 1
 
         # Method under test.
-        self.obj_ind.update_id_indices([key], [bytes], version)
+        self.obj_ind.update_id_indices(resource, resolution, [key], [bytes], version)
 
         response = self.dynamodb.get_item(
             TableName=self.s3_index,
@@ -143,6 +160,9 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         self.assertCountEqual(expected, response['Item']['id-set']['SS'])
 
     def test_update_id_indices_update_existing_entry_in_cuboid_index(self):
+        """
+        Test adding additional ids to existing cuboids in the s3 cuboid index.
+        """
         bytes = np.zeros(10, dtype='uint64')
         bytes[1] = 20
         bytes[2] = 20
@@ -151,9 +171,11 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         bytes[9] = 55
         key = 'hash_coll_exp_chan_key_existing'
         version = 0
+        resource = BossResourceBasic(data=get_anno_dict())
+        resolution = 1
 
         # Place initial ids for cuboid.
-        self.obj_ind.update_id_indices([key], [bytes], version)
+        self.obj_ind.update_id_indices(resource, resolution, [key], [bytes], version)
 
         new_bytes = np.zeros(4, dtype='uint64')
         new_bytes[0] = 1000
@@ -161,7 +183,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         new_bytes[3] = 55
 
         # Test adding one new id to the index.
-        self.obj_ind.update_id_indices([key], [new_bytes], version)
+        self.obj_ind.update_id_indices(resource, resolution, [key], [new_bytes], version)
 
         response = self.dynamodb.get_item(
             TableName=self.s3_index,
@@ -177,29 +199,104 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         self.assertCountEqual(expected, response['Item']['id-set']['SS'])
 
     def test_update_id_indices_new_entry_for_id_index(self):
+        """
+        Test adding new ids to the id index.
+        """
         bytes = np.zeros(10, dtype='uint64')
         bytes[1] = 20
         bytes[2] = 20
         bytes[5] = 55
         bytes[8] = 1000
         bytes[9] = 55
-        expected = ['20', '55', '1000']
-        key = 'hash_coll_exp_chan_key'
+        expected_ids = ['20', '55', '1000']
         version = 0
+        resource = BossResourceBasic(data=get_anno_dict())
+        resolution = 1
+        time_sample = 0
+        morton_id = 20
+        object_key = self.obj_store.generate_object_key(
+            resource, resolution, time_sample, morton_id)
 
         # Method under test.
-        self.obj_ind.update_id_indices([key], [bytes], version)
+        self.obj_ind.update_id_indices(resource, resolution, [object_key], [bytes], version)
+
+        # Confirm each id has the object_key in its cuboid-set attribute.
+        for id in expected_ids:
+            key = self.obj_ind.generate_channel_id_key(resource, resolution, id)
+
+            response = self.dynamodb.get_item(
+                TableName=self.id_index,
+                Key={'channel-id-key': {'S': key}, 'version': {'N': "{}".format(version)}},
+                ConsistentRead=True,
+                ReturnConsumedCapacity='NONE')
+
+            self.assertIn('Item', response)
+            self.assertIn('cuboid-set', response['Item'])
+            self.assertIn('SS', response['Item']['cuboid-set'])
+            self.assertIn(object_key, response['Item']['cuboid-set']['SS'])
+
+    def test_update_id_indices_add_new_cuboids_to_existing_ids(self):
+        """
+        Test that new cuboid object keys are added to the cuboid-set attributes of pre-existing ids.
+        """
+        bytes = np.zeros(10, dtype='uint64')
+        bytes[1] = 20
+        bytes[2] = 20
+        bytes[5] = 55
+        bytes[8] = 1000
+        bytes[9] = 55
+        expected_ids = ['20', '55', '1000']
+        version = 0
+        resource = BossResourceBasic(data=get_anno_dict())
+        resolution = 1
+        time_sample = 0
+        morton_id = 20
+        object_key = self.obj_store.generate_object_key(
+            resource, resolution, time_sample, morton_id)
+
+        self.obj_ind.update_id_indices(resource, resolution, [object_key], [bytes], version)
+
+        new_bytes = np.zeros(4, dtype='uint64')
+        new_bytes[0] = 1000     # Pre-existing id.
+        new_bytes[1] = 4444
+        new_bytes[3] = 55       # Pre-existing id.
+
+        new_morton_id = 90
+        new_object_key = self.obj_store.generate_object_key(
+            resource, resolution, time_sample, new_morton_id)
+
+        # Method under test.
+        self.obj_ind.update_id_indices(resource, resolution, [new_object_key], [new_bytes], version)
+
+        # Confirm cuboids for id 55.
+        key55 = self.obj_ind.generate_channel_id_key(resource, resolution, 55)
 
         response = self.dynamodb.get_item(
             TableName=self.id_index,
-            Key={'channel-id-key': {'S': key}, 'version': {'N': "{}".format(version)}},
+            Key={'channel-id-key': {'S': key55}, 'version': {'N': '{}'.format(version)}},
             ConsistentRead=True,
             ReturnConsumedCapacity='NONE')
 
         self.assertIn('Item', response)
-        self.assertIn('id-set', response['Item'])
-        self.assertIn('SS', response['Item']['id-set'])
-        self.assertCountEqual(expected, response['Item']['id-set']['SS'])
+        self.assertIn('cuboid-set', response['Item'])
+        self.assertIn('SS', response['Item']['cuboid-set'])
+        self.assertIn(object_key, response['Item']['cuboid-set']['SS'])
+        self.assertIn(new_object_key, response['Item']['cuboid-set']['SS'])
+
+        # Confirm cuboids for id 1000.
+        key1000 = self.obj_ind.generate_channel_id_key(resource, resolution, 1000)
+
+        response2 = self.dynamodb.get_item(
+            TableName=self.id_index,
+            Key={'channel-id-key': {'S': key1000}, 'version': {'N': '{}'.format(version)}},
+            ConsistentRead=True,
+            ReturnConsumedCapacity='NONE')
+
+        self.assertIn('Item', response2)
+        self.assertIn('cuboid-set', response2['Item'])
+        self.assertIn('SS', response2['Item']['cuboid-set'])
+        self.assertIn(object_key, response2['Item']['cuboid-set']['SS'])
+        self.assertIn(new_object_key, response2['Item']['cuboid-set']['SS'])
 
 if __name__ == '__main__':
     unittest.main()
