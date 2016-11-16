@@ -29,6 +29,11 @@ int cmpFunc32 ( const void * pa, const void * pb )
   return ( *(const uint32_t*)pa - *(const uint32_t*)pb );
 }
 
+int cmpFunc64 ( const void * pa, const void * pb )
+{
+  return ( *(const uint64_t*)pa - *(const uint64_t*)pb );
+}
+
 // Naive Implementation of Quicksort
 
 void quicksort32 ( uint32_t * data, int dataSize )
@@ -36,12 +41,17 @@ void quicksort32 ( uint32_t * data, int dataSize )
   qsort ( data , dataSize, sizeof(uint32_t), cmpFunc32 );
 }
 
+void quicksort64 ( uint64_t * data, int dataSize )
+{
+  qsort ( data , dataSize, sizeof(uint64_t), cmpFunc64 );
+}
 
-int unique( uint32_t * data, uint32_t * unique_array, int dataSize )
+
+int unique( uint64_t * data, uint64_t * unique_array, int dataSize )
 {
   int i,index=0;
   
-  quicksort32 ( data, dataSize );
+  quicksort64 ( data, dataSize );
   
   for ( i=0; i<dataSize; i++ )
   {

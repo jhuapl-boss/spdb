@@ -76,7 +76,7 @@ ndlib_ctypes.isotropicBuild32.argtypes = [array_2d_uint32, array_2d_uint32, arra
 ndlib_ctypes.isotropicBuildF32.argtypes = [array_2d_float32, array_2d_float32, array_2d_float32, cp.POINTER(cp.c_int)]
 ndlib_ctypes.addDataZSlice.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int), cp.POINTER(cp.c_int)]
 ndlib_ctypes.addDataIsotropic.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int), cp.POINTER(cp.c_int)]
-ndlib_ctypes.unique.argtypes = [array_1d_uint32, array_1d_uint32, cp.c_int]
+ndlib_ctypes.unique.argtypes = [array_1d_uint64, array_1d_uint64, cp.c_int]
 
 # setting the return type of the function in C
 # FORMAT: <library_name>.<function_name>.restype = [ ctype.<argtype> ]
@@ -164,7 +164,15 @@ def annotate_ctype(data, annid, offset, locations, conflictopt):
 
 
 def locate_ctype(locations, dims):
-    """ Remove all annotations in a cutout that do not match the filterlist """
+    """ Find the morton ID of all locations passed in.
+
+    Args:
+        locations (numpy.Array): Array is uint32[][3].
+
+    Returns:
+        (numpy.Array): an array with elements consisting of [mortonid, x, y, z].
+
+    """
 
     # get a copy of the iterator as a 1-D array
     cubeLocs = np.zeros([len(locations), 4], dtype=np.uint64)
@@ -414,7 +422,15 @@ def addDataToZSliceStack_ctype(cube, output, offset):
 
 
 def unique(data):
-    """Return the unqiue elements in the array"""
+    """Return the unique elements in the array.
+
+    Args:
+        data (numpy.Array): 2D array.
+
+    Returns:
+        (numpy.Array): Array of all unique elements in the input array.
+
+    """
 
     data = data.ravel()
     unique_array = np.zeros(len(data), dtype=data.dtype)

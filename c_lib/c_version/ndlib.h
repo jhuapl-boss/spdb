@@ -95,4 +95,4 @@ void addDataZslice ( uint32_t * , uint32_t *, int * , int * );
 void addDataIsotropic ( uint32_t * , uint32_t *, int * , int * );
 
 // Declaring the unique function
-int unique ( uint32_t *, uint32_t *, int );
+int unique ( uint64_t *, uint64_t *, int );
