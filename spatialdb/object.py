@@ -250,7 +250,8 @@ class AWSObjectStore(ObjectStore):
                 Item={'object-key': {'S': object_key},
                       'version-node': {'N': "{}".format(version)},
                       'ingest-job-hash': {'S': "{}".format(vals[1])},
-                      'ingest-job-range': {'S': ingest_job_range}},
+                      'ingest-job-range': {'S': ingest_job_range},
+                      'id-set': {'SS': []}},
                 ReturnConsumedCapacity='NONE',
                 ReturnItemCollectionMetrics='NONE',
             )
