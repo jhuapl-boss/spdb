@@ -92,7 +92,7 @@ class BossResourceDjango(BossResource):
                                       self.boss_request.experiment.description,
                                       self.boss_request.experiment.num_hierarchy_levels,
                                       self.boss_request.experiment.hierarchy_method,
-                                      self.boss_request.experiment.max_time_sample)
+                                      self.boss_request.experiment.num_time_samples)
 
     def populate_channel(self):
         """
@@ -111,7 +111,7 @@ class BossResourceDjango(BossResource):
                                 self.boss_request.channel.base_resolution,
                                 sources,
                                 related,
-                                self.boss_request.channel.default_time_step)
+                                self.boss_request.channel.default_time_sample)
 
     def populate_boss_key(self):
         """
