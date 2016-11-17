@@ -26,6 +26,7 @@ from pkg_resources import resource_filename
 from random import randint
 import time
 import unittest
+from unittest.mock import patch
 import warnings
 
 class TestObjectIndicesWithDynamoDb(unittest.TestCase):
@@ -33,16 +34,20 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
     def setUpClass(cls):
         warnings.simplefilter('ignore')
 
-        # Only need for the generate_object_key() method.
-        cls.obj_store = AWSObjectStore({
-            's3_flush_queue': 'foo',
-            'cuboid_bucket': 'foo',
-            'page_in_lambda_function': 'foo',
-            'page_out_lambda_function': 'foo',
-            's3_index_table': 'foo',
-            'id_index_table': 'foo',
-            'id_count_table': 'foo'
-        })
+        # Only need for the AWSObjectStore's generate_object_key() method, so
+        # can provide dummy values to initialize it.
+        with patch('spdb.spatialdb.object.get_region') as fake_get_region:
+            # Force us-east-1 region for testing.
+            fake_get_region.return_value = 'us-east-1'
+            cls.obj_store = AWSObjectStore({
+                's3_flush_queue': 'foo',
+                'cuboid_bucket': 'foo',
+                'page_in_lambda_function': 'foo',
+                'page_out_lambda_function': 'foo',
+                's3_index_table': 'foo',
+                'id_index_table': 'foo',
+                'id_count_table': 'foo'
+            })
 
         cls.s3_index = 'test_s3_index{}'.format(randint(1, 999))
         cls.id_index = 'test_id_index{}'.format(randint(1, 999))
@@ -293,6 +298,8 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
             Key={'channel-id-key': {'S': key1000}, 'version': {'N': '{}'.format(version)}},
             ConsistentRead=True,
             ReturnConsumedCapacity='NONE')
+
+        print(response2)
 
         self.assertIn('Item', response2)
         self.assertIn('cuboid-set', response2['Item'])
