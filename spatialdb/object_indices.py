@@ -116,6 +116,9 @@ class ObjectIndices:
 
         Returns:
             (list[string]): List of object keys of cuboids that contain the given id.
+
+        Raises:
+            (SpdbError): Can't talk to DynamoDB or table data corrupted.
         """
 
         channel_id_key = self.generate_channel_id_key(resource, resolution, id)
@@ -128,16 +131,23 @@ class ObjectIndices:
             ReturnConsumedCapacity='NONE')
 
         if response['ResponseMetadata']['HTTPStatusCode'] != 200:
-            raise SpdbError("Error reading id index table from DynamoDB.",
-                            ErrorCodes.OBJECT_STORE_ERROR)
+            raise SpdbError(
+                "Error reading id index table from DynamoDB.",
+                ErrorCodes.OBJECT_STORE_ERROR)
 
+        # Id not in table.  Should we raise instead?
         if 'Item' not in response:
             return []
 
+        # This is not an error condition.  DynamoDB does not allow a set to be
+        # empty.
         if 'cuboid-set' not in response['Item']:
             return []
 
         if 'SS' not in response['Item']['cuboid-set']:
-            raise SpdbError("Error in cuboid-set attribute in id index table of DynamoDB.",
-                            ErrorCodes.OBJECT_STORE_ERROR)
+            raise SpdbError(
+                "Error cuboid-set attribute is not string set in id index table of DynamoDB.",
+                ErrorCodes.OBJECT_STORE_ERROR)
+
+        return response['Item']['cuboid-set']['SS']
 

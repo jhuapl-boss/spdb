@@ -305,6 +305,28 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         self.assertIn(object_key, response2['Item']['cuboid-set']['SS'])
         self.assertIn(new_object_key, response2['Item']['cuboid-set']['SS'])
 
+    def test_get_cuboids(self):
+        id = 22222
+        bytes = np.zeros(10, dtype='uint64')
+        bytes[1] = id
+        key = 'hash_coll_exp_chan_key_cuboids'
+        version = 0
+        resource = BossResourceBasic(data=get_anno_dict())
+        resolution = 1
+
+        new_bytes = np.zeros(4, dtype='uint64')
+        new_bytes[0] = id     # Pre-existing id.
+        new_key = 'hash_coll_exp_chan_key_cuboids2'
+
+        self.obj_ind.update_id_indices(
+            resource, resolution, [key, new_key], [bytes, new_bytes], version)
+
+        # Method under test.
+        actual = self.obj_ind.get_cuboids(resource, resolution, id)
+
+        expected = [key, new_key]
+        self.assertCountEqual(expected, actual)
+
 if __name__ == '__main__':
     unittest.main()
 
