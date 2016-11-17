@@ -222,7 +222,7 @@ class TestAWSObjectStore(AWSObjectStoreTestMixin, unittest.TestCase):
 
         # Create AWS Resources needed for tests
         cls.setup_helper.start_mocking()
-        cls.setup_helper.create_s3_index_table(cls.object_store_config["s3_index_table"])
+        cls.setup_helper.create_index_table(cls.object_store_config["s3_index_table"], cls.setup_helper.DYNAMODB_SCHEMA)
         cls.setup_helper.create_cuboid_bucket(cls.object_store_config["cuboid_bucket"])
 
     @classmethod

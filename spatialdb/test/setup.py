@@ -41,6 +41,8 @@ class SetupTests(object):
         self.mock_sqs = None
 
         self.DYNAMODB_SCHEMA = resource_filename('spdb', 'spatialdb/dynamo/s3_index_table.json')
+        self.ID_INDEX_SCHEMA = resource_filename('spdb', 'spatialdb/dynamo/id_index_schema.json')
+        self.ID_COUNT_SCHEMA = resource_filename('spdb', 'spatialdb/dynamo/id_count_schema.json')
 
     def start_mocking(self):
         """Method to start mocking"""
@@ -59,11 +61,11 @@ class SetupTests(object):
         self.mock_sqs.stop()
 
     # ***** Cuboid Index Table *****
-    def _create_s3_index_table(self, table_name):
+    def _create_index_table(self, table_name, schema_file):
         """Method to create the S3 index table"""
 
         # Load json spec
-        with open(self.DYNAMODB_SCHEMA) as handle:
+        with open(schema_file) as handle:
             json_str = handle.read()
             table_params = json.loads(json_str)
 
@@ -73,12 +75,12 @@ class SetupTests(object):
 
         return client.get_waiter('table_exists')
 
-    def create_s3_index_table(self, table_name):
-        """Method to create the S3 index table"""
+    def create_index_table(self, table_name, schema_file):
+        """Method to create DynamoDB index table"""
         if self.mock:
-            mock_dynamodb2(self._create_s3_index_table(table_name))
+            mock_dynamodb2(self._create_index_table(table_name, schema_file))
         else:
-            waiter = self._create_s3_index_table(table_name)
+            waiter = self._create_index_table(table_name, schema_file)
 
             # Wait for actual table to be ready.
             self.wait_table_create(table_name)
@@ -257,15 +259,29 @@ class AWSSetupLayer(object):
                                    "cuboid_bucket": "intTest.{}".format(config['aws']['cuboid_bucket']),
                                    "page_in_lambda_function": config['lambda']['page_in_function'],
                                    "page_out_lambda_function": config['lambda']['flush_function'],
-                                   "s3_index_table": "intTest.{}".format(config['aws']['s3-index-table'])}
+                                   "s3_index_table": "intTest.{}".format(config['aws']['s3-index-table']),
+                                   "id_index_table": "intTest.{}".format(config['aws']['id-index-table']),
+                                   "id_count_table": "intTest.{}".format(config['aws']['id-count-table'])}
 
         # Setup AWS
         print('Creating Temporary AWS Resources', end='', flush=True)
         try:
-            cls.setup_helper.create_s3_index_table(cls.object_store_config["s3_index_table"])
+            cls.setup_helper.create_index_table(cls.object_store_config["s3_index_table"], self.DYNAMODB_SCHEMA )
         except ClientError:
             cls.setup_helper.delete_s3_index_table(cls.object_store_config["s3_index_table"])
-            cls.setup_helper.create_s3_index_table(cls.object_store_config["s3_index_table"])
+            cls.setup_helper.create_index_table(cls.object_store_config["s3_index_table"], self.DYNAMODB_SCHEMA)
+
+        try:
+            cls.setup_helper.create_index_table(cls.object_store_config["id_index_table"], self.ID_INDEX_SCHEMA )
+        except ClientError:
+            cls.setup_helper.delete_s3_index_table(cls.object_store_config["id_index_table"])
+            cls.setup_helper.create_index_table(cls.object_store_config["id_index_table"], self.ID_INDEX_SCHEMA )
+
+        try:
+            cls.setup_helper.create_index_table(cls.object_store_config["id_count_table"], self.ID_COUNT_SCHEMA )
+        except ClientError:
+            cls.setup_helper.delete_s3_index_table(cls.object_store_config["id_count_table"])
+            cls.setup_helper.create_index_table(cls.object_store_config["id_count_table"], self.ID_COUNT_SCHEMA )
 
         try:
             cls.setup_helper.create_cuboid_bucket(cls.object_store_config["cuboid_bucket"])

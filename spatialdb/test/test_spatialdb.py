@@ -242,7 +242,7 @@ class TestSpatialDBImage8Data(SpatialDBImageDataTestMixin, unittest.TestCase):
 
         # Create AWS Resources needed for tests
         self.setup_helper.start_mocking()
-        self.setup_helper.create_s3_index_table(self.object_store_config["s3_index_table"])
+        self.setup_helper.create_index_table(self.object_store_config["s3_index_table"], self.setup_helper.DYNAMODB_SCHEMA)
         self.setup_helper.create_cuboid_bucket(self.object_store_config["cuboid_bucket"])
 
     def tearDown(self):
@@ -284,7 +284,7 @@ class TestSpatialDBImage16Data(SpatialDBImageDataTestMixin, unittest.TestCase):
 
         # Create AWS Resources needed for tests
         self.setup_helper.start_mocking()
-        self.setup_helper.create_s3_index_table(self.object_store_config["s3_index_table"])
+        self.setup_helper.create_index_table(self.object_store_config["s3_index_table"], self.setup_helper.DYNAMODB_SCHEMA)
         self.setup_helper.create_cuboid_bucket(self.object_store_config["cuboid_bucket"])
 
     def tearDown(self):

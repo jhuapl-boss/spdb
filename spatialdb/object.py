@@ -16,6 +16,7 @@ from abc import ABCMeta, abstractmethod
 import json
 import hashlib
 from .error import SpdbError, ErrorCodes
+from .object_indices import ObjectIndices
 
 from bossutils.aws import get_region
 
@@ -146,9 +147,14 @@ class AWSObjectStore(ObjectStore):
             page_in_lambda_function: name of lambda function for page in operation (e.g. page_in.handler)
             page_out_lambda_function: name of lambda function for page out operation (e.g. page_in.handler)
             s3_index_table: name of the dynamoDB table for storing the s3 cuboid index
+            id_index_table: name of DynamoDB table that maps object ids to cuboid object keys
+            id_count_table: name of DynamoDB table that reserves objects ids for channels
         """
         # call the base class constructor
         ObjectStore.__init__(self, conf)
+        self.obj_ind = ObjectIndices(
+            conf['s3_index_table'], conf['id_index_table'], get_region())
+
 
     @staticmethod
     def object_key_chunks(object_keys, chunk_size):
@@ -456,6 +462,22 @@ class AWSObjectStore(ObjectStore):
             if response['ResponseMetadata']['HTTPStatusCode'] != 200:
                 raise SpdbError("Error writing cuboid to S3.",
                                 ErrorCodes.OBJECT_STORE_ERROR)
+
+    def update_id_indices(self, resource, resolution, key_list, cube_list, version=0):
+        """
+        Update annotation id index and s3 cuboid index with ids in the given cuboids.
+
+        Any ids that are zeros will not be added to the indices.
+
+        Args:
+            resource (BossResource): Data model info based on the request or target resource.
+            resolution (int): Resolution level.
+            key_list (list[string]): keys for each cuboid.
+            cube_list (list[bytes]): bytes comprising each cuboid.
+            version (optional[int]): Defaults to zero, reserved for future use.
+        """
+        self.obj_ind.update_id_indices(
+            resource, resolution, key_list, cube_list, version)
 
     def trigger_page_out(self, config_data, write_cuboid_key, resource):
         """

@@ -76,8 +76,6 @@ class ObjectIndices:
             key_list (list[string]): keys for each cuboid.
             cube_list (list[bytes]): bytes comprising each cuboid.
             version (optional[int]): Defaults to zero, reserved for future use.
-
-        Returns:
         """
         for obj_key, cube in zip(key_list, cube_list):
             # Find unique ids in this cube.
