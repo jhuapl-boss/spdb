@@ -32,7 +32,7 @@ def get_image_dict():
     data['experiment']['description'] = "Test experiment 1"
     data['experiment']['num_hierarchy_levels'] = 7
     data['experiment']['hierarchy_method'] = 'slice'
-    data['experiment']['max_time_sample'] = 0
+    data['experiment']['num_time_samples'] = 0
 
     data['channel_layer'] = {}
     data['channel_layer']['name'] = "ch1"
@@ -48,7 +48,7 @@ def get_image_dict():
     data['channel']['base_resolution'] = 0
     data['channel']['sources'] = []
     data['channel']['related'] = []
-    data['channel']['default_time_step'] = 0
+    data['channel']['default_time_sample'] = 0
 
     return data
 
@@ -66,7 +66,7 @@ def get_anno_dict():
     data['channel']['datatype'] = 'uint64'
     data['channel']['base_resolution'] = 1
     data['channel']['sources'] = ["ch1"]
-    data['channel']['default_time_step'] = 0
+    data['channel']['default_time_sample'] = 0
     data['boss_key'] = 'col1&exp1&ch2'
     data['lookup_key'] = '4&3&6'
 
