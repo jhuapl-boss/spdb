@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from spdb.c_lib.ndlib import unique
-from bossutils.aws import get_region
+from .error import SpdbError, ErrorCodes
 import boto3
 import hashlib
 
@@ -103,3 +103,41 @@ class ObjectIndices:
                     ExpressionAttributeNames={'#cuboidset': 'cuboid-set'},
                     ExpressionAttributeValues={':objkey': {'SS': [obj_key]}},
                     ReturnConsumedCapacity='NONE')
+
+    def get_cuboids(self, resource, resolution, id, version=0):
+        """
+        Get object keys of cuboids that contain the given id.
+
+        Args:
+            resource (BossResource): Data model info based on the request or target resource.
+            resolution (int): Resolution level.
+            id (string|uint64): Object id.
+            version (optional[int]): Defaults to zero, reserved for future use.
+
+        Returns:
+            (list[string]): List of object keys of cuboids that contain the given id.
+        """
+
+        channel_id_key = self.generate_channel_id_key(resource, resolution, id)
+
+        #TODO: consider using batch_get_items() in the future.
+        response = self.dynamodb.get_item(
+            TableName=self.id_index_table,
+            Key={'channel-id-key': {'S': channel_id_key}, 'version': {'N': '{}'.format(version)}},
+            ConsistentRead=True,
+            ReturnConsumedCapacity='NONE')
+
+        if response['ResponseMetadata']['HTTPStatusCode'] != 200:
+            raise SpdbError("Error reading id index table from DynamoDB.",
+                            ErrorCodes.OBJECT_STORE_ERROR)
+
+        if 'Item' not in response:
+            return []
+
+        if 'cuboid-set' not in response['Item']:
+            return []
+
+        if 'SS' not in response['Item']['cuboid-set']:
+            raise SpdbError("Error in cuboid-set attribute in id index table of DynamoDB.",
+                            ErrorCodes.OBJECT_STORE_ERROR)
+

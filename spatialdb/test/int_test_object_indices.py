@@ -299,8 +299,6 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
             ConsistentRead=True,
             ReturnConsumedCapacity='NONE')
 
-        print(response2)
-
         self.assertIn('Item', response2)
         self.assertIn('cuboid-set', response2['Item'])
         self.assertIn('SS', response2['Item']['cuboid-set'])
