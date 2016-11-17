@@ -266,22 +266,22 @@ class AWSSetupLayer(object):
         # Setup AWS
         print('Creating Temporary AWS Resources', end='', flush=True)
         try:
-            cls.setup_helper.create_index_table(cls.object_store_config["s3_index_table"], self.DYNAMODB_SCHEMA )
+            cls.setup_helper.create_index_table(cls.object_store_config["s3_index_table"], cls.setup_helper.DYNAMODB_SCHEMA )
         except ClientError:
             cls.setup_helper.delete_s3_index_table(cls.object_store_config["s3_index_table"])
-            cls.setup_helper.create_index_table(cls.object_store_config["s3_index_table"], self.DYNAMODB_SCHEMA)
+            cls.setup_helper.create_index_table(cls.object_store_config["s3_index_table"], cls.setup_helper.DYNAMODB_SCHEMA)
 
         try:
-            cls.setup_helper.create_index_table(cls.object_store_config["id_index_table"], self.ID_INDEX_SCHEMA )
+            cls.setup_helper.create_index_table(cls.object_store_config["id_index_table"], cls.setup_helper.ID_INDEX_SCHEMA )
         except ClientError:
             cls.setup_helper.delete_s3_index_table(cls.object_store_config["id_index_table"])
-            cls.setup_helper.create_index_table(cls.object_store_config["id_index_table"], self.ID_INDEX_SCHEMA )
+            cls.setup_helper.create_index_table(cls.object_store_config["id_index_table"], cls.setup_helper.ID_INDEX_SCHEMA )
 
         try:
-            cls.setup_helper.create_index_table(cls.object_store_config["id_count_table"], self.ID_COUNT_SCHEMA )
+            cls.setup_helper.create_index_table(cls.object_store_config["id_count_table"], cls.setup_helper.ID_COUNT_SCHEMA )
         except ClientError:
             cls.setup_helper.delete_s3_index_table(cls.object_store_config["id_count_table"])
-            cls.setup_helper.create_index_table(cls.object_store_config["id_count_table"], self.ID_COUNT_SCHEMA )
+            cls.setup_helper.create_index_table(cls.object_store_config["id_count_table"], cls.setup_helper.ID_COUNT_SCHEMA )
 
         try:
             cls.setup_helper.create_cuboid_bucket(cls.object_store_config["cuboid_bucket"])
