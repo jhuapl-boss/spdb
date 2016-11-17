@@ -33,13 +33,15 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
     def setUpClass(cls):
         warnings.simplefilter('ignore')
 
-        # Need the generate_object_key() method.
+        # Only need for the generate_object_key() method.
         cls.obj_store = AWSObjectStore({
             's3_flush_queue': 'foo',
             'cuboid_bucket': 'foo',
             'page_in_lambda_function': 'foo',
             'page_out_lambda_function': 'foo',
-            's3_index_table': 'foo'
+            's3_index_table': 'foo',
+            'id_index_table': 'foo',
+            'id_count_table': 'foo'
         })
 
         cls.s3_index = 'test_s3_index{}'.format(randint(1, 999))
