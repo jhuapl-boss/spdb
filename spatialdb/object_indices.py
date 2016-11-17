@@ -76,6 +76,9 @@ class ObjectIndices:
             key_list (list[string]): keys for each cuboid.
             cube_list (list[bytes]): bytes comprising each cuboid.
             version (optional[int]): Defaults to zero, reserved for future use.
+
+        Raises:
+            (SpdbError): Failure performing update_item operation on DynamoDB.
         """
         for obj_key, cube in zip(key_list, cube_list):
             # Find unique ids in this cube.
@@ -92,6 +95,10 @@ class ObjectIndices:
                 ExpressionAttributeNames={'#idset': 'id-set'},
                 ExpressionAttributeValues={':ids': {'SS': ids_str_list}},
                 ReturnConsumedCapacity='NONE')
+            if response['ResponseMetadata']['HTTPStatusCode'] != 200:
+                raise SpdbError(
+                    "Error updating {} in cuboid index table in DynamoDB.".format(obj_key),
+                    ErrorCodes.OBJECT_STORE_ERROR)
 
             # Add object key to this id's cuboid set.
             for id in ids:
@@ -103,6 +110,10 @@ class ObjectIndices:
                     ExpressionAttributeNames={'#cuboidset': 'cuboid-set'},
                     ExpressionAttributeValues={':objkey': {'SS': [obj_key]}},
                     ReturnConsumedCapacity='NONE')
+                if response['ResponseMetadata']['HTTPStatusCode'] != 200:
+                    raise SpdbError(
+                        "Error updating {} in id index table in DynamoDB.".format(channel_id_key),
+                        ErrorCodes.OBJECT_STORE_ERROR)
 
     def get_cuboids(self, resource, resolution, id, version=0):
         """
