@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from spdb.c_lib.ndlib import unique
+from spdb.c_lib.ndlib import MortonXYZ, XYZMorton
 from .error import SpdbError, ErrorCodes
 import boto3
 import botocore
@@ -189,6 +190,31 @@ class ObjectIndices:
                 ErrorCodes.OBJECT_STORE_ERROR)
 
         return response['Item']['cuboid-set']['SS']
+
+    def get_bounding_box(self, resource, resolution, id, bb_type='loose'):
+        """
+        Get the bounding box that contains the object labeled with id.
+
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            id (uint64|string): object's id
+            bb_type (optional[string]): 'loose' | 'tight'. Defaults to 'loose'
+
+        Returns:
+            (dict): {'x_range': [0, 10], 'y_range': [0, 10], 'z_range': [0, 10], 't_range': [0, 10]}
+
+        Raises:
+            (SpdbError): Can't talk to id index database or database corrupt.
+        """
+        cf = resource.get_coord_frame()
+        x_min = cf
+        obj_keys = self.get_cuboids(resource, resolution, id)
+        for key in obj_keys:
+            morton = int(key.split('&')[6])
+            xyz = MortonXYZ(morton)
+
+
 
     def reserve_ids(self, resource, num_ids, version=0):
         """Method to reserve a block of ids for a given channel at a version.
