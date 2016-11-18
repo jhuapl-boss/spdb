@@ -734,3 +734,21 @@ class SpatialDB:
                                                                       resolution,
                                                                       morton_idx,
                                                                       t, resource.to_json())
+
+    def get_bounding_box(self, resource, resolution, id, bb_type='loose'):
+        """
+        Get the bounding box that contains the object labeled with id.
+
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            id (uint64|string): object's id
+            bb_type (optional[string]): 'loose' | 'tight'. Defaults to 'loose'
+
+        Returns:
+            (dict): {'x_range': [0, 10], 'y_range': [0, 10], 'z_range': [0, 10], 't_range': [0, 10]}
+
+        Raises:
+            (SpdbError): Can't talk to id index database or database corrupt.
+        """
+        return {'x_range': [0, 10], 'y_range': [0, 10], 'z_range': [0, 10], 't_range': [0, 10]}
