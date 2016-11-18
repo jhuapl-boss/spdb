@@ -153,7 +153,7 @@ class AWSObjectStore(ObjectStore):
         # call the base class constructor
         ObjectStore.__init__(self, conf)
         self.obj_ind = ObjectIndices(
-            conf['s3_index_table'], conf['id_index_table'], get_region())
+            conf['s3_index_table'], conf['id_index_table'],  conf['id_count_table'], get_region())
 
 
     @staticmethod

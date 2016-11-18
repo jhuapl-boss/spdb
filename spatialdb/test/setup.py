@@ -223,6 +223,13 @@ class SetupTests(object):
         data['channel']['datatype'] = 'uint16'
         return data
 
+    def get_anno64_dict(self):
+        """Method to get the config dictionary for an image16 resource"""
+        data = self.get_image8_dict()
+        data['channel']['datatype'] = 'uint64'
+        data['channel']['type'] = 'annotation'
+        return data
+
 
 class AWSSetupLayer(object):
     """A nose2 layer for setting up temporary AWS resources for testing ONCE per run"""

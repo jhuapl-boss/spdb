@@ -16,10 +16,19 @@ from spdb.spatialdb.object_indices import ObjectIndices
 
 import numpy as np
 import unittest
+import random
 
-class TestObjectIndices(unittest.TestCase):
+from bossutils import configuration
+
+from spdb.project import BossResourceBasic
+from spdb.spatialdb.test.setup import SetupTests
+from spdb.spatialdb.error import SpdbError
+
+
+class TestObjectIndicesMixin(object):
     def setUp(self):
-        self.obj_ind = ObjectIndices('s3_index', 'id_index', 'us-east-1')
+        # Randomize the look-up key so tests don't mess with each other
+        self.resource._lookup_key = "1&2&{}".format(random.randint(4, 1000))
 
     def test_make_ids_strings_ignore_zeros(self):
         zeros = np.zeros(4, dtype='uint64')
@@ -36,6 +45,59 @@ class TestObjectIndices(unittest.TestCase):
         actual = self.obj_ind._make_ids_strings(arr)
         self.assertEqual(expected, actual)
 
-if __name__ == '__main__':
-    unittest.main()
+    def test_create_id_counter_key(self):
+        self.resource._lookup_key = "1&2&3"
+        key = self.obj_ind.generate_reserve_id_key(self.resource)
+        self.assertEqual(key, '14a343245e1adb6297e43c12e22770ad&1&2&3')
+
+    def test_reserve_id_wrong_type(self):
+        img_data = self.setup_helper.get_image8_dict()
+        img_resource = BossResourceBasic(img_data)
+
+        with self.assertRaises(SpdbError):
+            start_id = self.obj_ind.reserve_ids(img_resource, 10)
+
+    def test_reserve_id_init(self):
+        start_id = self.obj_ind.reserve_ids(self.resource, 10)
+        self.assertEqual(start_id, 11)
+
+    def test_reserve_id_increment(self):
+        start_id = self.obj_ind.reserve_ids(self.resource, 10)
+        self.assertEqual(start_id, 11)
+        start_id = self.obj_ind.reserve_ids(self.resource, 5)
+        self.assertEqual(start_id, 16)
+
+class TestObjectIndices(TestObjectIndicesMixin, unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        """ Create a diction of configuration values for the test resource. """
+        # Create resource
+        cls.setup_helper = SetupTests()
+        cls.data = cls.setup_helper.get_anno64_dict()
+        cls.resource = BossResourceBasic(cls.data)
+
+        # Load config
+        cls.config = configuration.BossConfig()
+        cls.object_store_config = {"s3_flush_queue": 'https://mytestqueue.com',
+                                   "cuboid_bucket": "test_bucket",
+                                   "page_in_lambda_function": "page_in.test.boss",
+                                   "page_out_lambda_function": "page_out.test.boss",
+                                   "s3_index_table": "test_s3_table",
+                                   "id_index_table": "test_id_table",
+                                   "id_count_table": "test_count_table",
+                                   }
+
+        # Create AWS Resources needed for tests while mocking
+        cls.setup_helper.start_mocking()
+        cls.setup_helper.create_index_table(cls.object_store_config["id_count_table"], cls.setup_helper.ID_COUNT_SCHEMA)
+
+        cls.obj_ind = ObjectIndices(cls.object_store_config["s3_index_table"],
+                                    cls.object_store_config["id_index_table"],
+                                    cls.object_store_config["id_count_table"],
+                                    'us-east-1')
+
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.setup_helper.stop_mocking()
 
