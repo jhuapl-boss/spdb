@@ -195,6 +195,9 @@ class ObjectIndices:
         """
         Get the bounding box that contains the object labeled with id.
 
+        Bounding box ranges follow the Python range convention.  For example,
+        if x_range = [0, 10], then x >= 0 and x < 10.
+
         Args:
             resource (project.BossResource): Data model info based on the request or target resource
             resolution (int): the resolution level
@@ -208,12 +211,36 @@ class ObjectIndices:
             (SpdbError): Can't talk to id index database or database corrupt.
         """
         cf = resource.get_coord_frame()
-        x_min = cf
+        x_min = cf.x_stop
+        x_max = cf.x_start
+        y_min = cf.y_stop
+        y_max = cf.y_start
+        z_min = cf.z_stop
+        z_max = cf.z_start
+
         obj_keys = self.get_cuboids(resource, resolution, id)
         for key in obj_keys:
             morton = int(key.split('&')[6])
             xyz = MortonXYZ(morton)
+            if xyz[0] < x_min:
+                x_min = xyz[0]
+            if xyz[0] > x_max:
+                x_max = xyz[0]
+            if xyz[1] < y_min:
+                y_min = xyz[1]
+            if xyz[1] > z_max:
+                y_max = xyz[1]
+            if xyz[2] < z_min:
+                z_min = xyz[2]
+            if xyz[2] > z_max:
+                z_max = xyz[2]
 
+        return {
+            'x_range': [x_min, x_max+1],
+            'y_range': [y_min, y_max+1],
+            'z_range': [z_min, z_max+1],
+            't_range': [0, 1]
+        }
 
 
     def reserve_ids(self, resource, num_ids, version=0):

@@ -54,10 +54,6 @@ class TestObjectIndicesMixin(object):
 
     def test_get_bounding_box_loose(self):
 
-        return
-        
-
-
         # Only need for the AWSObjectStore's generate_object_key() method, so
         # can provide dummy values to initialize it.
         with patch('spdb.spatialdb.object.get_region') as fake_get_region:
@@ -86,9 +82,9 @@ class TestObjectIndicesMixin(object):
             fake_get_cuboids.return_value = [key0, key1, key2]
             actual = self.obj_ind.get_bounding_box(self.resource, resolution, id, 'loose')
             expected = {
-                'x_range': [2, 6],
-                'y_range': [1, 7],
-                'z_range': [3, 5],
+                'x_range': [2, 6+1],
+                'y_range': [1, 7+1],
+                'z_range': [3, 5+1],
                 't_range': [0, 1]
             }
             self.assertEqual(expected, actual)
