@@ -498,7 +498,7 @@ class AWSObjectStore(ObjectStore):
         Raises:
             (SpdbError): Can't talk to id index database or database corrupt.
         """
-        self.obj_ind.get_bounding_box(resource, resolution, id, bb_type)
+        return self.obj_ind.get_bounding_box(resource, resolution, id, bb_type)
 
     def trigger_page_out(self, config_data, write_cuboid_key, resource):
         """

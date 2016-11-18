@@ -751,4 +751,6 @@ class SpatialDB:
         Raises:
             (SpdbError): Can't talk to id index database or database corrupt.
         """
-        return {'x_range': [0, 10], 'y_range': [0, 10], 'z_range': [0, 10], 't_range': [0, 10]}
+        return self.objectio.get_bounding_box(resource, resolution, id, bb_type)
+
+
