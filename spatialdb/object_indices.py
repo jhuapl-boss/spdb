@@ -87,6 +87,11 @@ class ObjectIndices:
             # Convert ids to a string.
             ids_str_list = self._make_ids_strings(ids)
 
+            if len(ids_str_list) == 0:
+                # No need to update if there are no non-zero ids in the cuboid.
+                print('Object key: {} has no ids'.format(obj_key))
+                continue
+
             # Add these ids to the s3 cuboid index table.
             response = self.dynamodb.update_item(
                 TableName=self.s3_index_table,
