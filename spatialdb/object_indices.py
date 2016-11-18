@@ -210,6 +210,11 @@ class ObjectIndices:
         Raises:
             (SpdbError): Can't talk to id index database or database corrupt.
         """
+        if not bb_type == 'loose':
+            raise SpdbError(
+                "Only loose bounding box currently supported",
+                ErrorCodes.SPDB_ERROR )
+
         cf = resource.get_coord_frame()
         x_min = cf.x_stop
         x_max = cf.x_start
