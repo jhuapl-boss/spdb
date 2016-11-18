@@ -16,7 +16,7 @@ from spdb.spatialdb.object_indices import ObjectIndices
 
 from bossutils.aws import get_region
 import numpy as np
-from spdb.c_lib.ndlib import MortonXYZ, XYZMorton
+from spdb.c_lib.ndlib import XYZMorton
 from spdb.project import BossResourceBasic
 from spdb.project.test.resource_setup import get_anno_dict
 from spdb.spatialdb.object import AWSObjectStore
