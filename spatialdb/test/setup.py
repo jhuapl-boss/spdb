@@ -87,17 +87,17 @@ class SetupTests(object):
             # Wait for actual table to be ready.
             self.wait_table_create(table_name)
 
-    def _delete_s3_index_table(self, table_name):
+    def _delete_index_table(self, table_name):
         """Method to delete the S3 index table"""
         client = boto3.client('dynamodb', region_name=get_region())
         client.delete_table(TableName=table_name)
 
-    def delete_s3_index_table(self, table_name):
+    def delete_index_table(self, table_name):
         """Method to create the S3 index table"""
         if self.mock:
-            mock_dynamodb2(self._delete_s3_index_table(table_name))
+            mock_dynamodb2(self._delete_index_table(table_name))
         else:
-            self._delete_s3_index_table(table_name)
+            self._delete_index_table(table_name)
 
             # Wait for table to be deleted (since this is real)
             self.wait_table_delete(table_name)
@@ -277,19 +277,19 @@ class AWSSetupLayer(object):
         try:
             cls.setup_helper.create_index_table(cls.object_store_config["s3_index_table"], cls.setup_helper.DYNAMODB_SCHEMA )
         except ClientError:
-            cls.setup_helper.delete_s3_index_table(cls.object_store_config["s3_index_table"])
+            cls.setup_helper.delete_index_table(cls.object_store_config["s3_index_table"])
             cls.setup_helper.create_index_table(cls.object_store_config["s3_index_table"], cls.setup_helper.DYNAMODB_SCHEMA)
 
         try:
             cls.setup_helper.create_index_table(cls.object_store_config["id_index_table"], cls.setup_helper.ID_INDEX_SCHEMA )
         except ClientError:
-            cls.setup_helper.delete_s3_index_table(cls.object_store_config["id_index_table"])
+            cls.setup_helper.delete_index_table(cls.object_store_config["id_index_table"])
             cls.setup_helper.create_index_table(cls.object_store_config["id_index_table"], cls.setup_helper.ID_INDEX_SCHEMA )
 
         try:
             cls.setup_helper.create_index_table(cls.object_store_config["id_count_table"], cls.setup_helper.ID_COUNT_SCHEMA )
         except ClientError:
-            cls.setup_helper.delete_s3_index_table(cls.object_store_config["id_count_table"])
+            cls.setup_helper.delete_index_table(cls.object_store_config["id_count_table"])
             cls.setup_helper.create_index_table(cls.object_store_config["id_count_table"], cls.setup_helper.ID_COUNT_SCHEMA )
 
         try:
@@ -313,7 +313,7 @@ class AWSSetupLayer(object):
     def tearDown(cls):
         print('Deleting Temporary AWS Resources', end='', flush=True)
         try:
-            cls.setup_helper.delete_s3_index_table(cls.object_store_config["s3_index_table"])
+            cls.setup_helper.delete_index_table(cls.object_store_config["s3_index_table"])
         except:
             pass
 

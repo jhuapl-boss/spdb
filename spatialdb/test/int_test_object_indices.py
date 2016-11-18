@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from spdb.spatialdb.object_indices import ObjectIndices
+from spdb.c_lib.ndlib import XYZMorton
 from spdb.spatialdb.object import AWSObjectStore
 from spdb.project import BossResourceBasic
 from spdb.project.test.resource_setup import get_anno_dict
@@ -51,6 +52,8 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
 
         cls.s3_index = 'test_s3_index{}'.format(randint(1, 999))
         cls.id_index = 'test_id_index{}'.format(randint(1, 999))
+        cls.id_count_index = 'test_id_count_index{}'.format(randint(1, 999))
+
         cls.s3_index_schema = resource_filename(
             'spdb', 'spatialdb/dynamo/s3_index_table.json')
         cls.id_index_schema = resource_filename(
@@ -134,7 +137,8 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
 
     def setUp(self):
         self.obj_ind = ObjectIndices(
-            self.s3_index, self.id_index, self.region, self.endpoint_url)
+            self.s3_index, self.id_index, self.id_count_index, self.region,
+            self.endpoint_url)
 
     def test_update_id_indices_new_entry_in_cuboid_index(self):
         """
@@ -299,13 +303,66 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
             ConsistentRead=True,
             ReturnConsumedCapacity='NONE')
 
-        print(response2)
-
         self.assertIn('Item', response2)
         self.assertIn('cuboid-set', response2['Item'])
         self.assertIn('SS', response2['Item']['cuboid-set'])
         self.assertIn(object_key, response2['Item']['cuboid-set']['SS'])
         self.assertIn(new_object_key, response2['Item']['cuboid-set']['SS'])
+
+    def test_get_cuboids(self):
+        id = 22222
+        bytes = np.zeros(10, dtype='uint64')
+        bytes[1] = id
+        key = 'hash_coll_exp_chan_key_cuboids'
+        version = 0
+        resource = BossResourceBasic(data=get_anno_dict())
+        resolution = 1
+
+        new_bytes = np.zeros(4, dtype='uint64')
+        new_bytes[0] = id     # Pre-existing id.
+        new_key = 'hash_coll_exp_chan_key_cuboids2'
+
+        self.obj_ind.update_id_indices(
+            resource, resolution, [key, new_key], [bytes, new_bytes], version)
+
+        # Method under test.
+        actual = self.obj_ind.get_cuboids(resource, resolution, id)
+
+        expected = [key, new_key]
+        self.assertCountEqual(expected, actual)
+
+    def test_get_bounding_box_loose(self):
+        id = 33333
+        resource = BossResourceBasic(data=get_anno_dict())
+        resolution = 1
+        time_sample = 0
+        version = 0
+
+        bytes0 = np.zeros(10, dtype='uint64')
+        bytes0[1] = id
+        pos0 = [1, 2, 3]
+        morton_id0 = XYZMorton(pos0)
+        key0 = self.obj_store.generate_object_key(
+            resource, resolution, time_sample, morton_id0)
+
+        bytes1 = np.zeros(4, dtype='uint64')
+        bytes1[0] = id     # Pre-existing id.
+        pos1 = [3, 5, 6]
+        morton_id1 = XYZMorton(pos1)
+        key1 = self.obj_store.generate_object_key(
+            resource, resolution, time_sample, morton_id1)
+
+        self.obj_ind.update_id_indices(
+            resource, resolution, [key0, key1], [bytes0, bytes1], version)
+
+        actual = self.obj_ind.get_bounding_box(resource, resolution, id, 'loose')
+        expected = {
+            'x_range': [pos0[0], pos1[0]+1],
+            'y_range': [pos0[1], pos1[1]+1],
+            'z_range': [pos0[2], pos1[2]+1],
+            't_range': [0, 1]
+        }
+        self.assertEqual(expected, actual)
 
 if __name__ == '__main__':
     unittest.main()

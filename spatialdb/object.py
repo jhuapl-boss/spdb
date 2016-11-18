@@ -479,6 +479,27 @@ class AWSObjectStore(ObjectStore):
         self.obj_ind.update_id_indices(
             resource, resolution, key_list, cube_list, version)
 
+    def get_bounding_box(self, resource, resolution, id, bb_type='loose'):
+        """
+        Get the bounding box that contains the object labeled with id.
+
+        Bounding box ranges follow the Python range convention.  For example,
+        if x_range = [0, 10], then x >= 0 and x < 10.
+
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            id (uint64|string): object's id
+            bb_type (optional[string]): 'loose' | 'tight'. Defaults to 'loose'
+
+        Returns:
+            (dict): {'x_range': [0, 10], 'y_range': [0, 10], 'z_range': [0, 10], 't_range': [0, 10]}
+
+        Raises:
+            (SpdbError): Can't talk to id index database or database corrupt.
+        """
+        return self.obj_ind.get_bounding_box(resource, resolution, id, bb_type)
+
     def trigger_page_out(self, config_data, write_cuboid_key, resource):
         """
         Method to invoke lambda function to page out via data in an SQS message

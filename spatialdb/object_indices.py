@@ -13,7 +13,8 @@
 # limitations under the License.
 
 from spdb.c_lib.ndlib import unique
-from bossutils.aws import get_region
+from spdb.c_lib.ndlib import MortonXYZ, XYZMorton
+from .error import SpdbError, ErrorCodes
 import boto3
 import botocore
 import hashlib
@@ -98,6 +99,9 @@ class ObjectIndices:
             key_list (list[string]): keys for each cuboid.
             cube_list (list[bytes]): bytes comprising each cuboid.
             version (optional[int]): Defaults to zero, reserved for future use.
+
+        Raises:
+            (SpdbError): Failure performing update_item operation on DynamoDB.
         """
         for obj_key, cube in zip(key_list, cube_list):
             # Find unique ids in this cube.
@@ -105,6 +109,11 @@ class ObjectIndices:
 
             # Convert ids to a string.
             ids_str_list = self._make_ids_strings(ids)
+
+            if len(ids_str_list) == 0:
+                # No need to update if there are no non-zero ids in the cuboid.
+                print('Object key: {} has no ids'.format(obj_key))
+                continue
 
             # Add these ids to the s3 cuboid index table.
             response = self.dynamodb.update_item(
@@ -114,6 +123,10 @@ class ObjectIndices:
                 ExpressionAttributeNames={'#idset': 'id-set'},
                 ExpressionAttributeValues={':ids': {'SS': ids_str_list}},
                 ReturnConsumedCapacity='NONE')
+            if response['ResponseMetadata']['HTTPStatusCode'] != 200:
+                raise SpdbError(
+                    "Error updating {} in cuboid index table in DynamoDB.".format(obj_key),
+                    ErrorCodes.OBJECT_STORE_ERROR)
 
             # Add object key to this id's cuboid set.
             for id in ids:
@@ -125,6 +138,115 @@ class ObjectIndices:
                     ExpressionAttributeNames={'#cuboidset': 'cuboid-set'},
                     ExpressionAttributeValues={':objkey': {'SS': [obj_key]}},
                     ReturnConsumedCapacity='NONE')
+
+                if response['ResponseMetadata']['HTTPStatusCode'] != 200:
+                    raise SpdbError(
+                        "Error updating {} in id index table in DynamoDB.".format(channel_id_key),
+                        ErrorCodes.OBJECT_STORE_ERROR)
+
+    def get_cuboids(self, resource, resolution, id, version=0):
+        """
+        Get object keys of cuboids that contain the given id.
+
+        Args:
+            resource (BossResource): Data model info based on the request or target resource.
+            resolution (int): Resolution level.
+            id (string|uint64): Object id.
+            version (optional[int]): Defaults to zero, reserved for future use.
+
+        Returns:
+            (list[string]): List of object keys of cuboids that contain the given id.
+
+        Raises:
+            (SpdbError): Can't talk to DynamoDB or table data corrupted.
+        """
+
+        channel_id_key = self.generate_channel_id_key(resource, resolution, id)
+
+        #TODO: consider using batch_get_items() in the future.
+        response = self.dynamodb.get_item(
+            TableName=self.id_index_table,
+            Key={'channel-id-key': {'S': channel_id_key}, 'version': {'N': '{}'.format(version)}},
+            ConsistentRead=True,
+            ReturnConsumedCapacity='NONE')
+
+        if response['ResponseMetadata']['HTTPStatusCode'] != 200:
+            raise SpdbError(
+                "Error reading id index table from DynamoDB.",
+                ErrorCodes.OBJECT_STORE_ERROR)
+
+        # Id not in table.  Should we raise instead?
+        if 'Item' not in response:
+            return []
+
+        # This is not an error condition.  DynamoDB does not allow a set to be
+        # empty.
+        if 'cuboid-set' not in response['Item']:
+            return []
+
+        if 'SS' not in response['Item']['cuboid-set']:
+            raise SpdbError(
+                "Error cuboid-set attribute is not string set in id index table of DynamoDB.",
+                ErrorCodes.OBJECT_STORE_ERROR)
+
+        return response['Item']['cuboid-set']['SS']
+
+    def get_bounding_box(self, resource, resolution, id, bb_type='loose'):
+        """
+        Get the bounding box that contains the object labeled with id.
+
+        Bounding box ranges follow the Python range convention.  For example,
+        if x_range = [0, 10], then x >= 0 and x < 10.
+
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            id (uint64|string): object's id
+            bb_type (optional[string]): 'loose' | 'tight'. Defaults to 'loose'
+
+        Returns:
+            (dict): {'x_range': [0, 10], 'y_range': [0, 10], 'z_range': [0, 10], 't_range': [0, 10]}
+
+        Raises:
+            (SpdbError): Can't talk to id index database or database corrupt.
+        """
+        if not bb_type == 'loose':
+            raise SpdbError(
+                "Only loose bounding box currently supported",
+                ErrorCodes.SPDB_ERROR )
+
+        cf = resource.get_coord_frame()
+        x_min = cf.x_stop
+        x_max = cf.x_start
+        y_min = cf.y_stop
+        y_max = cf.y_start
+        z_min = cf.z_stop
+        z_max = cf.z_start
+
+        obj_keys = self.get_cuboids(resource, resolution, id)
+        for key in obj_keys:
+            morton = int(key.split('&')[6])
+            xyz = MortonXYZ(morton)
+            if xyz[0] < x_min:
+                x_min = xyz[0]
+            if xyz[0] > x_max:
+                x_max = xyz[0]
+            if xyz[1] < y_min:
+                y_min = xyz[1]
+            if xyz[1] > z_max:
+                y_max = xyz[1]
+            if xyz[2] < z_min:
+                z_min = xyz[2]
+            if xyz[2] > z_max:
+                z_max = xyz[2]
+
+        return {
+            'x_range': [x_min, x_max+1],
+            'y_range': [y_min, y_max+1],
+            'z_range': [z_min, z_max+1],
+            't_range': [0, 1]
+        }
+
 
     def reserve_ids(self, resource, num_ids, version=0):
         """Method to reserve a block of ids for a given channel at a version.
