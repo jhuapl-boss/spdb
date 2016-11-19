@@ -247,6 +247,28 @@ class ObjectIndices:
             't_range': [0, 1]
         }
 
+    def get_ids_in_region(self, resource, resolution, x_range, y_range, z_range, t_range):
+        """
+        Get all ids in the given region.
+
+        Ranges follow the Python range convention.  For example,
+        if x_range = [0, 10], then x >= 0 and x < 10.
+
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            x_range (list(int]): x range
+            y_range (list(int]): y range
+            z_range (list(int]): z range
+            t_range (list(int]): time range
+
+        Returns:
+            (dict): { 'ids': ['1', '4', '8'] }
+
+        Raises:
+            (SpdbError): Can't talk to id index database or database corrupt.
+        """
+
 
     def reserve_ids(self, resource, num_ids, version=0):
         """Method to reserve a block of ids for a given channel at a version.
