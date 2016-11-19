@@ -19,6 +19,7 @@ import boto3
 import botocore
 import hashlib
 import datetime
+import numpy as np
 
 from spdb.spatialdb.error import SpdbError, ErrorCodes
 
@@ -299,23 +300,27 @@ class ObjectIndices:
                                              ConsistentRead=True)
             if "Item" not in next_id:
                 # Initialize the key since it doesn't exist yet
+                result = self.dynamodb.put_item(TableName=self.id_count_table,
+                                                Item={'channel-key': {'S': ch_key},
+                                                      'version': {'N': "{}".format(version)},
+                                                      'next-id': {'N': '1'}})
+
                 next_id = 1
-                new_next_id = next_id + num_ids
-                # Dynamo starts at 0, so add an additional 1
-                num_ids += 1
             else:
-                next_id = next_id["Item"]['next-id']
-                new_next_id = next_id + num_ids
+                next_id = np.fromstring(next_id["Item"]['next-id']['N'], dtype=np.uint64, sep=' ')
+
+            new_next_id = next_id + num_ids
 
             # Increment value conditionally, if failed try again until timeout
             try:
-                result = self.dynamodb.update_item(TableName=self.id_count_table,
-                                                   Key={'channel-key': {'S': ch_key},
-                                                        'version': {'N': "{}".format(version)}},
-                                                   ConditionExpression="next-id = :expected_val",
-                                                   UpdateExpression="set next-id = next-id + :increment_val",
-                                                   ExpressionAttributeValues={":increment_val": {"N": str(num_ids)},
-                                                                              ":expected_val": {"N": str(new_next_id)}})
+                result2 = self.dynamodb.update_item(TableName=self.id_count_table,
+                                                    Key={'channel-key': {'S': ch_key},
+                                                         'version': {'N': "{}".format(version)}},
+                                                    ExpressionAttributeValues={":inc": {"N": str(num_ids)},
+                                                                               ":exp": {"N": str(new_next_id)}},
+                                                    ConditionExpression="next-id = :exp",
+                                                    UpdateExpression="set next-id = next-id + :inc",
+                                                    ReturnValues="ALL_NEW")
 
                 start_id = new_next_id
                 break

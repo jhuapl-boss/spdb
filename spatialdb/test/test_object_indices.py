@@ -31,11 +31,10 @@ from spdb.spatialdb.test.setup import SetupTests
 from spdb.spatialdb.error import SpdbError
 
 
-class TestObjectIndicesMixin(object):
+class ObjectIndicesTestMixin(object):
     def setUp(self):
         # Randomize the look-up key so tests don't mess with each other
         self.resource._lookup_key = "1&2&{}".format(random.randint(4, 1000))
-
 
     def test_make_ids_strings_ignore_zeros(self):
         zeros = np.zeros(4, dtype='uint64')
@@ -101,18 +100,8 @@ class TestObjectIndicesMixin(object):
         with self.assertRaises(SpdbError):
             start_id = self.obj_ind.reserve_ids(img_resource, 10)
 
-    def test_reserve_id_init(self):
-        start_id = self.obj_ind.reserve_ids(self.resource, 10)
-        self.assertEqual(start_id, 11)
 
-    def test_reserve_id_increment(self):
-        start_id = self.obj_ind.reserve_ids(self.resource, 10)
-        self.assertEqual(start_id, 11)
-        start_id = self.obj_ind.reserve_ids(self.resource, 5)
-        self.assertEqual(start_id, 16)
-
-
-class TestObjectIndices(TestObjectIndicesMixin, unittest.TestCase):
+class TestObjectIndices(ObjectIndicesTestMixin, unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """ Create a diction of configuration values for the test resource. """
@@ -140,7 +129,6 @@ class TestObjectIndices(TestObjectIndicesMixin, unittest.TestCase):
                                     cls.object_store_config["id_index_table"],
                                     cls.object_store_config["id_count_table"],
                                     'us-east-1')
-
 
     @classmethod
     def tearDownClass(cls):
