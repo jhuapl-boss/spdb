@@ -218,7 +218,10 @@ class TestAWSObjectStore(AWSObjectStoreTestMixin, unittest.TestCase):
                                    "cuboid_bucket": "test_bucket",
                                    "page_in_lambda_function": "page_in.test.boss",
                                    "page_out_lambda_function": "page_out.test.boss",
-                                   "s3_index_table": "test_table"}
+                                   "s3_index_table": "test_table",
+                                   "id_index_table": "test_id_table",
+                                   "id_count_table": "test_count_table",
+                                   }
 
         # Create AWS Resources needed for tests
         cls.setup_helper.start_mocking()

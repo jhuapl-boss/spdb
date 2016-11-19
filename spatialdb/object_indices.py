@@ -19,6 +19,7 @@ import boto3
 import botocore
 import hashlib
 import datetime
+import numpy as np
 
 from spdb.spatialdb.error import SpdbError, ErrorCodes
 
@@ -284,7 +285,7 @@ class ObjectIndices:
 
                 next_id = 1
             else:
-                next_id = next_id["Item"]['next-id']
+                next_id = np.fromstring(next_id["Item"]['next-id']['N'], dtype=np.uint64, sep=' ')
 
             new_next_id = next_id + num_ids
 
