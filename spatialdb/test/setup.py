@@ -30,6 +30,7 @@ from spdb.project import BossResourceBasic
 from bossutils import configuration
 
 import random
+import os
 
 
 class SetupTests(object):
@@ -71,8 +72,12 @@ class SetupTests(object):
             json_str = handle.read()
             table_params = json.loads(json_str)
 
+        endpoint_url = None
+        if 'LOCAL_DYNAMODB_URL' in os.environ:
+            endpoint_url = os.environ['LOCAL_DYNAMODB_URL']
+
         # Create table
-        client = boto3.client('dynamodb', region_name=get_region())
+        client = boto3.client('dynamodb', region_name=get_region(), endpoint_url=endpoint_url)
         _ = client.create_table(TableName=table_name, **table_params)
 
         return client.get_waiter('table_exists')
@@ -89,7 +94,12 @@ class SetupTests(object):
 
     def _delete_index_table(self, table_name):
         """Method to delete the S3 index table"""
-        client = boto3.client('dynamodb', region_name=get_region())
+
+        endpoint_url = None
+        if 'LOCAL_DYNAMODB_URL' in os.environ:
+            endpoint_url = os.environ['LOCAL_DYNAMODB_URL']
+
+        client = boto3.client('dynamodb', region_name=get_region(), endpoint_url=endpoint_url)
         client.delete_table(TableName=table_name)
 
     def delete_index_table(self, table_name):
@@ -104,7 +114,11 @@ class SetupTests(object):
 
     def wait_table_create(self, table_name):
         """Poll dynamodb at a 2s interval until the table creates."""
-        client = boto3.client('dynamodb', region_name=get_region())
+        endpoint_url = None
+        if 'LOCAL_DYNAMODB_URL' in os.environ:
+            endpoint_url = os.environ['LOCAL_DYNAMODB_URL']
+
+        client = boto3.client('dynamodb', region_name=get_region(), endpoint_url=endpoint_url)
         cnt = 0
         while True:
             time.sleep(2)
@@ -123,7 +137,11 @@ class SetupTests(object):
 
     def wait_table_delete(self, table_name):
         """Poll dynamodb at a 2s interval until the table deletes."""
-        client = boto3.client('dynamodb', region_name=get_region())
+        endpoint_url = None
+        if 'LOCAL_DYNAMODB_URL' in os.environ:
+            endpoint_url = os.environ['LOCAL_DYNAMODB_URL']
+
+        client = boto3.client('dynamodb', region_name=get_region(), endpoint_url=endpoint_url)
         cnt = 0
         while True:
             time.sleep(2)
@@ -265,7 +283,8 @@ class AWSSetupLayer(object):
         _, domain = config['aws']['cuboid_bucket'].split('.', 1)
         cls.s3_flush_queue_name = "intTest.S3FlushQueue.{}".format(domain).replace('.', '-')
         cls.object_store_config = {"s3_flush_queue": "",
-                                   "cuboid_bucket": "intTest{}.{}".format(random.randint(0,999), config['aws']['cuboid_bucket']),
+                                   "cuboid_bucket": "intTest{}.{}".format(random.randint(0, 999),
+                                                                          config['aws']['cuboid_bucket']),
                                    "page_in_lambda_function": config['lambda']['page_in_function'],
                                    "page_out_lambda_function": config['lambda']['flush_function'],
                                    "s3_index_table": "intTest.{}".format(config['aws']['s3-index-table']),
@@ -275,22 +294,28 @@ class AWSSetupLayer(object):
         # Setup AWS
         print('Creating Temporary AWS Resources', end='', flush=True)
         try:
-            cls.setup_helper.create_index_table(cls.object_store_config["s3_index_table"], cls.setup_helper.DYNAMODB_SCHEMA )
+            cls.setup_helper.create_index_table(cls.object_store_config["s3_index_table"],
+                                                cls.setup_helper.DYNAMODB_SCHEMA )
         except ClientError:
             cls.setup_helper.delete_index_table(cls.object_store_config["s3_index_table"])
-            cls.setup_helper.create_index_table(cls.object_store_config["s3_index_table"], cls.setup_helper.DYNAMODB_SCHEMA)
+            cls.setup_helper.create_index_table(cls.object_store_config["s3_index_table"],
+                                                cls.setup_helper.DYNAMODB_SCHEMA)
 
         try:
-            cls.setup_helper.create_index_table(cls.object_store_config["id_index_table"], cls.setup_helper.ID_INDEX_SCHEMA )
+            cls.setup_helper.create_index_table(cls.object_store_config["id_index_table"],
+                                                cls.setup_helper.ID_INDEX_SCHEMA )
         except ClientError:
             cls.setup_helper.delete_index_table(cls.object_store_config["id_index_table"])
-            cls.setup_helper.create_index_table(cls.object_store_config["id_index_table"], cls.setup_helper.ID_INDEX_SCHEMA )
+            cls.setup_helper.create_index_table(cls.object_store_config["id_index_table"],
+                                                cls.setup_helper.ID_INDEX_SCHEMA )
 
         try:
-            cls.setup_helper.create_index_table(cls.object_store_config["id_count_table"], cls.setup_helper.ID_COUNT_SCHEMA )
+            cls.setup_helper.create_index_table(cls.object_store_config["id_count_table"],
+                                                cls.setup_helper.ID_COUNT_SCHEMA )
         except ClientError:
             cls.setup_helper.delete_index_table(cls.object_store_config["id_count_table"])
-            cls.setup_helper.create_index_table(cls.object_store_config["id_count_table"], cls.setup_helper.ID_COUNT_SCHEMA )
+            cls.setup_helper.create_index_table(cls.object_store_config["id_count_table"],
+                                                cls.setup_helper.ID_COUNT_SCHEMA )
 
         try:
             cls.setup_helper.create_cuboid_bucket(cls.object_store_config["cuboid_bucket"])
@@ -314,6 +339,14 @@ class AWSSetupLayer(object):
         print('Deleting Temporary AWS Resources', end='', flush=True)
         try:
             cls.setup_helper.delete_index_table(cls.object_store_config["s3_index_table"])
+        except:
+            pass
+        try:
+            cls.setup_helper.delete_index_table(cls.object_store_config["id_index_table"])
+        except:
+            pass
+        try:
+            cls.setup_helper.delete_index_table(cls.object_store_config["id_count_table"])
         except:
             pass
 

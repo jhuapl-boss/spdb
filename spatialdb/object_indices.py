@@ -21,6 +21,7 @@ import botocore
 import hashlib
 import datetime
 import numpy as np
+import time
 
 from spdb.spatialdb.error import SpdbError, ErrorCodes
 
@@ -292,7 +293,6 @@ class ObjectIndices:
 
         return list(id_set)
 
-
     def reserve_ids(self, resource, num_ids, version=0):
         """Method to reserve a block of ids for a given channel at a version.
 
@@ -302,7 +302,7 @@ class ObjectIndices:
             version (optional[int]): Defaults to zero, reserved for future use.
 
         Returns:
-            (int): starting ID for the block of ID successfully reserved
+            (np.array): starting ID for the block of ID successfully reserved as a numpy array to insure uint64
         """
         # Make sure this is an annotation channel
         if resource.get_channel().is_image():
@@ -318,20 +318,20 @@ class ObjectIndices:
             next_id = self.dynamodb.get_item(TableName=self.id_count_table,
                                              Key={'channel-key': {'S': ch_key},
                                                   'version': {'N': "{}".format(version)}},
-                                             AttributesToGet=['next-id'],
+                                             AttributesToGet=['next_id'],
                                              ConsistentRead=True)
             if "Item" not in next_id:
                 # Initialize the key since it doesn't exist yet
                 result = self.dynamodb.put_item(TableName=self.id_count_table,
                                                 Item={'channel-key': {'S': ch_key},
                                                       'version': {'N': "{}".format(version)},
-                                                      'next-id': {'N': '1'}})
+                                                      'next_id': {'N': '1'}})
 
-                next_id = 1
+                next_id = np.fromstring("1", dtype=np.uint64, sep=' ')
             else:
-                next_id = np.fromstring(next_id["Item"]['next-id']['N'], dtype=np.uint64, sep=' ')
+                next_id = np.fromstring(next_id["Item"]['next_id']['N'], dtype=np.uint64, sep=' ')
 
-            new_next_id = next_id + num_ids
+            new_next_id = "{}".format((next_id + num_ids)[0])
 
             # Increment value conditionally, if failed try again until timeout
             try:
@@ -339,9 +339,9 @@ class ObjectIndices:
                                                     Key={'channel-key': {'S': ch_key},
                                                          'version': {'N': "{}".format(version)}},
                                                     ExpressionAttributeValues={":inc": {"N": str(num_ids)},
-                                                                               ":exp": {"N": str(new_next_id)}},
-                                                    ConditionExpression="next-id = :exp",
-                                                    UpdateExpression="set next-id = next-id + :inc",
+                                                                               ":exp": {"N": "{}".format(next_id[0])}},
+                                                    ConditionExpression="next_id = :exp",
+                                                    UpdateExpression="set next_id = next_id + :inc",
                                                     ReturnValues="ALL_NEW")
 
                 start_id = new_next_id
@@ -357,4 +357,4 @@ class ObjectIndices:
             raise SpdbError('Reserve ID Fail', 'Failed to reserve the requested ID block within 10 seconds',
                             ErrorCodes.SPDB_ERROR)
 
-        return start_id
+        return np.fromstring(start_id, dtype=np.uint64, sep=' ')

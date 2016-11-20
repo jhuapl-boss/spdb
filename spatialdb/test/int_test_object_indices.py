@@ -15,131 +15,46 @@
 from spdb.spatialdb.object_indices import ObjectIndices
 from spdb.c_lib.ndlib import XYZMorton
 from spdb.c_lib.ndtype import CUBOIDSIZE
-from spdb.spatialdb.object import AWSObjectStore
 from spdb.project import BossResourceBasic
 from spdb.project.test.resource_setup import get_anno_dict
 
-from bossutils.aws import get_region
 import boto3
-import json
 import numpy as np
 import os
-from pkg_resources import resource_filename
-from random import randint
-import time
 import unittest
-from unittest.mock import patch
-import warnings
+from spdb.spatialdb.test.setup import AWSSetupLayer, SetupTests
+from spdb.spatialdb.object import AWSObjectStore
+import random
+
 
 class TestObjectIndicesWithDynamoDb(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        warnings.simplefilter('ignore')
-
-        # Only need for the AWSObjectStore's generate_object_key() method, so
-        # can provide dummy values to initialize it.
-        with patch('spdb.spatialdb.object.get_region') as fake_get_region:
-            # Force us-east-1 region for testing.
-            fake_get_region.return_value = 'us-east-1'
-            cls.obj_store = AWSObjectStore({
-                's3_flush_queue': 'foo',
-                'cuboid_bucket': 'foo',
-                'page_in_lambda_function': 'foo',
-                'page_out_lambda_function': 'foo',
-                's3_index_table': 'foo',
-                'id_index_table': 'foo',
-                'id_count_table': 'foo'
-            })
-
-        cls.s3_index = 'test_s3_index{}'.format(randint(1, 999))
-        cls.id_index = 'test_id_index{}'.format(randint(1, 999))
-        cls.id_count_index = 'test_id_count_index{}'.format(randint(1, 999))
-
-        cls.s3_index_schema = resource_filename(
-            'spdb', 'spatialdb/dynamo/s3_index_table.json')
-        cls.id_index_schema = resource_filename(
-            'spdb', 'spatialdb/dynamo/id_index_schema.json')
-
-        # Use local DynamoDB if env variable set.
-        cls.endpoint_url = None
-        if 'LOCAL_DYNAMODB_URL' in os.environ:
-            cls.endpoint_url = os.environ['LOCAL_DYNAMODB_URL']
-
-        cls.region = 'us-east-1'
-        cls.dynamodb = boto3.client(
-            'dynamodb', region_name=cls.region, endpoint_url=cls.endpoint_url)
-
-        with open(cls.s3_index_schema) as handle:
-            json_str = handle.read()
-            s3_index_params = json.loads(json_str)
-
-        cls.dynamodb.create_table(TableName=cls.s3_index, **s3_index_params)
-
-        with open(cls.id_index_schema) as handle:
-            json_str = handle.read()
-            id_index_params = json.loads(json_str)
-
-        cls.dynamodb.create_table(TableName=cls.id_index, **id_index_params)
-
-        # Don't start tests until tables are done creating.
-        cls.wait_table_create(cls.id_index)
-        cls.wait_table_create(cls.s3_index)
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.dynamodb.delete_table(TableName=cls.id_index)
-        cls.dynamodb.delete_table(TableName=cls.s3_index)
-
-        # Don't exit until tables actually deleted.
-        cls.wait_table_delete(cls.id_index)
-        cls.wait_table_delete(cls.s3_index)
-
-    @classmethod
-    def wait_table_create(cls, table_name):
-        """Poll dynamodb at a 2s interval until the table creates."""
-        print('Waiting for creation of table {}'.format(
-            table_name), end='', flush=True)
-        cnt = 0
-        while True:
-            cnt += 1
-            if cnt > 50:
-                # Give up waiting.
-                return
-            try:
-                print('.', end='', flush=True)
-                resp = cls.dynamodb.describe_table(TableName=table_name)
-                if resp['Table']['TableStatus'] == 'ACTIVE':
-                    print('')
-                    return
-            except:
-                # May get an exception if table doesn't currently exist.
-                pass
-            time.sleep(2)
-
-    @classmethod
-    def wait_table_delete(cls, table_name):
-        """Poll dynamodb at a 2s interval until the table deletes."""
-        print('Waiting for deletion of table {}'.format(
-            table_name), end='', flush=True)
-        cnt = 0
-        while True:
-            cnt += 1
-            if cnt > 50:
-                # Give up waiting.
-                return
-            try:
-                print('.', end='', flush=True)
-                resp = cls.dynamodb.describe_table(TableName=table_name)
-            except:
-                # Exception thrown when table doesn't exist.
-                print('')
-                return
-            time.sleep(2)
+    layer = AWSSetupLayer
 
     def setUp(self):
-        self.obj_ind = ObjectIndices(
-            self.s3_index, self.id_index, self.id_count_index, self.region,
-            self.endpoint_url)
+        """ Copy params from the Layer setUpClass
+        """
+        self.data = self.layer.setup_helper.get_anno64_dict()
+        self.data['lookup_key'] = "1&2&{}".format(random.randint(3, 999))
+        self.resource = BossResourceBasic(self.data)
+        self.kvio_config = self.layer.kvio_config
+        self.state_config = self.layer.state_config
+        self.object_store_config = self.layer.object_store_config
+        self.region = 'us-east-1'
+
+        self.endpoint_url = None
+        if 'LOCAL_DYNAMODB_URL' in os.environ:
+            self.endpoint_url = os.environ['LOCAL_DYNAMODB_URL']
+
+        self.dynamodb = boto3.client(
+            'dynamodb', region_name=self.region, endpoint_url=self.endpoint_url)
+
+        self.obj_ind = ObjectIndices(self.object_store_config["s3_index_table"],
+                                     self.object_store_config["id_index_table"],
+                                     self.object_store_config["id_count_table"],
+                                     self.region,
+                                     self.endpoint_url)
+
+        self.obj_store = AWSObjectStore(self.object_store_config)
 
     def test_update_id_indices_new_entry_in_cuboid_index(self):
         """
@@ -161,7 +76,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         self.obj_ind.update_id_indices(resource, resolution, [key], [bytes], version)
 
         response = self.dynamodb.get_item(
-            TableName=self.s3_index,
+            TableName=self.object_store_config["s3_index_table"],
             Key={'object-key': {'S': key}, 'version-node': {'N': "{}".format(version)}},
             ConsistentRead=True,
             ReturnConsumedCapacity='NONE')
@@ -198,7 +113,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         self.obj_ind.update_id_indices(resource, resolution, [key], [new_bytes], version)
 
         response = self.dynamodb.get_item(
-            TableName=self.s3_index,
+            TableName=self.object_store_config["s3_index_table"],
             Key={'object-key': {'S': key}, 'version-node': {'N': "{}".format(version)}},
             ConsistentRead=True,
             ReturnConsumedCapacity='NONE')
@@ -237,7 +152,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
             key = self.obj_ind.generate_channel_id_key(resource, resolution, id)
 
             response = self.dynamodb.get_item(
-                TableName=self.id_index,
+                TableName=self.object_store_config["id_index_table"],
                 Key={'channel-id-key': {'S': key}, 'version': {'N': "{}".format(version)}},
                 ConsistentRead=True,
                 ReturnConsumedCapacity='NONE')
@@ -284,7 +199,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         key55 = self.obj_ind.generate_channel_id_key(resource, resolution, 55)
 
         response = self.dynamodb.get_item(
-            TableName=self.id_index,
+            TableName=self.object_store_config["id_index_table"],
             Key={'channel-id-key': {'S': key55}, 'version': {'N': '{}'.format(version)}},
             ConsistentRead=True,
             ReturnConsumedCapacity='NONE')
@@ -299,7 +214,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         key1000 = self.obj_ind.generate_channel_id_key(resource, resolution, 1000)
 
         response2 = self.dynamodb.get_item(
-            TableName=self.id_index,
+            TableName=self.object_store_config["id_index_table"],
             Key={'channel-id-key': {'S': key1000}, 'version': {'N': '{}'.format(version)}},
             ConsistentRead=True,
             ReturnConsumedCapacity='NONE')
@@ -366,6 +281,16 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
             't_range': [0, 1]
         }
         self.assertEqual(expected, actual)
+
+    def test_reserve_id_init(self):
+        start_id = self.obj_ind.reserve_ids(self.resource, 10)
+        self.assertEqual(start_id, 11)
+
+    def test_reserve_id_increment(self):
+        start_id = self.obj_ind.reserve_ids(self.resource, 10)
+        self.assertEqual(start_id, 11)
+        start_id = self.obj_ind.reserve_ids(self.resource, 5)
+        self.assertEqual(start_id, 16)
 
 if __name__ == '__main__':
     unittest.main()
