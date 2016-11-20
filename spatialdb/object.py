@@ -534,3 +534,16 @@ class AWSObjectStore(ObjectStore):
             FunctionName=self.config["page_out_lambda_function"],
             InvocationType='Event',
             Payload=json.dumps(msg_data).encode())
+
+    def reserve_ids(self, resource, num_ids, version=0):
+        """Method to reserve a block of ids for a given channel at a version.
+
+        Args:
+            resource (spdb.project.resource.BossResource): Data model info based on the request or target resource.
+            num_ids (int): Number of IDs to reserve
+            version (optional[int]): Defaults to zero, reserved for future use.
+
+        Returns:
+            (np.array): starting ID for the block of ID successfully reserved as a numpy array to insure uint64
+        """
+        return self.obj_ind.reserve_ids(resource, num_ids, version)

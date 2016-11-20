@@ -15,6 +15,7 @@
 import unittest
 import numpy as np
 import time
+import random
 
 from spdb.spatialdb.test.test_spatialdb import SpatialDBImageDataTestMixin
 from spdb.spatialdb import Cube, SpatialDB
@@ -187,6 +188,28 @@ class SpatialDBImageDataIntegrationTestMixin(object):
         cube2 = sp.cutout(self.resource, (200, 600, 3), (400, 400, 8), 0)
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
+
+    def test_reserve_id_init(self):
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        data = self.layer.setup_helper.get_anno64_dict()
+        data['lookup_key'] = "1&2&{}".format(random.randint(3, 999))
+        resource = BossResourceBasic(data)
+
+        start_id = sp.reserve_ids(resource, 10)
+        self.assertEqual(start_id, 11)
+
+    def test_reserve_id_increment(self):
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        data = self.layer.setup_helper.get_anno64_dict()
+        data['lookup_key'] = "1&2&{}".format(random.randint(3, 999))
+        resource = BossResourceBasic(data)
+
+        start_id = sp.reserve_ids(resource, 10)
+        self.assertEqual(start_id, 11)
+        start_id = sp.reserve_ids(resource, 5)
+        self.assertEqual(start_id, 16)
 
 
 class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
