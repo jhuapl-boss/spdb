@@ -166,8 +166,11 @@ class TestIntegrationLambdaPageInImage8Data(unittest.TestCase):
     def setUp(self):
         """ Copy params from the nose2 Layer setUpClass
         """
-        self.data = self.layer.data
-        self.resource = self.layer.resource
+        # Setup Data
+        self.data = self.layer.setup_helper.get_image8_dict()
+        self.resource = BossResourceBasic(self.data)
+
+        # Setup config
         self.kvio_config = self.layer.kvio_config
         self.state_config = self.layer.state_config
         self.object_store_config = self.layer.object_store_config

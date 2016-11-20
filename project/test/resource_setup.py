@@ -64,10 +64,10 @@ def get_anno_dict():
     data['channel']['description'] = "Test annotation channel 1"
     data['channel']['type'] = "annotation"
     data['channel']['datatype'] = 'uint64'
-    data['channel']['base_resolution'] = 1
+    data['channel']['base_resolution'] = 0
     data['channel']['sources'] = ["ch1"]
     data['channel']['default_time_sample'] = 0
     data['boss_key'] = 'col1&exp1&ch2'
-    data['lookup_key'] = '4&3&6'
+    data['lookup_key'] = '4&3&345'
 
     return data
