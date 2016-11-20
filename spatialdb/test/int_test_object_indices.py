@@ -14,6 +14,7 @@
 
 from spdb.spatialdb.object_indices import ObjectIndices
 from spdb.c_lib.ndlib import XYZMorton
+from spdb.c_lib.ndtype import CUBOIDSIZE
 from spdb.spatialdb.object import AWSObjectStore
 from spdb.project import BossResourceBasic
 from spdb.project.test.resource_setup import get_anno_dict
@@ -338,16 +339,18 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         time_sample = 0
         version = 0
 
+        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
+
         bytes0 = np.zeros(10, dtype='uint64')
         bytes0[1] = id
-        pos0 = [1, 2, 3]
+        pos0 = [x_cube_dim, 2*y_cube_dim, 3*z_cube_dim]
         morton_id0 = XYZMorton(pos0)
         key0 = self.obj_store.generate_object_key(
             resource, resolution, time_sample, morton_id0)
 
         bytes1 = np.zeros(4, dtype='uint64')
         bytes1[0] = id     # Pre-existing id.
-        pos1 = [3, 5, 6]
+        pos1 = [3*x_cube_dim, 5*y_cube_dim, 6*z_cube_dim]
         morton_id1 = XYZMorton(pos1)
         key1 = self.obj_store.generate_object_key(
             resource, resolution, time_sample, morton_id1)
@@ -357,12 +360,42 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
 
         actual = self.obj_ind.get_bounding_box(resource, resolution, id, 'loose')
         expected = {
-            'x_range': [pos0[0], pos1[0]+1],
-            'y_range': [pos0[1], pos1[1]+1],
-            'z_range': [pos0[2], pos1[2]+1],
+            'x_range': [pos0[0], pos1[0]+x_cube_dim],
+            'y_range': [pos0[1], pos1[1]+y_cube_dim],
+            'z_range': [pos0[2], pos1[2]+z_cube_dim],
             't_range': [0, 1]
         }
         self.assertEqual(expected, actual)
+
+    def test_get_ids_in_cuboids(self):
+        # TODO: finish test.
+        return
+
+
+
+
+        id0 = 33333
+        resource = BossResourceBasic(data=get_anno_dict())
+        resolution = 1
+        time_sample = 0
+        version = 0
+
+        bytes0 = np.zeros(10, dtype='uint64')
+        bytes0[1] = id0
+        pos0 = [1, 2, 3]
+        morton_id0 = XYZMorton(pos0)
+        key0 = self.obj_store.generate_object_key(
+            resource, resolution, time_sample, morton_id0)
+
+        bytes1 = np.zeros(4, dtype='uint64')
+        bytes1[0] = id0     # Pre-existing id.
+        pos1 = [3, 5, 6]
+        morton_id1 = XYZMorton(pos1)
+        key1 = self.obj_store.generate_object_key(
+            resource, resolution, time_sample, morton_id1)
+
+        self.obj_ind.update_id_indices(
+            resource, resolution, [key0, key1], [bytes0, bytes1], version)
 
 if __name__ == '__main__':
     unittest.main()

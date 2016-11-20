@@ -14,6 +14,7 @@
 
 from spdb.c_lib.ndlib import unique
 from spdb.c_lib.ndlib import MortonXYZ, XYZMorton
+from spdb.c_lib.ndtype import CUBOIDSIZE
 from .error import SpdbError, ErrorCodes
 import boto3
 import botocore
@@ -234,34 +235,29 @@ class ObjectIndices:
                 x_max = xyz[0]
             if xyz[1] < y_min:
                 y_min = xyz[1]
-            if xyz[1] > z_max:
+            if xyz[1] > y_max:
                 y_max = xyz[1]
             if xyz[2] < z_min:
                 z_min = xyz[2]
             if xyz[2] > z_max:
                 z_max = xyz[2]
 
+        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
+
         return {
-            'x_range': [x_min, x_max+1],
-            'y_range': [y_min, y_max+1],
-            'z_range': [z_min, z_max+1],
+            'x_range': [x_min, x_max+x_cube_dim],
+            'y_range': [y_min, y_max+y_cube_dim],
+            'z_range': [z_min, z_max+z_cube_dim],
             't_range': [0, 1]
         }
 
-    def get_ids_in_region(self, resource, resolution, x_range, y_range, z_range, t_range):
+    def get_ids_in_cuboids(self, obj_keys, version=0):
         """
-        Get all ids in the given region.
-
-        Ranges follow the Python range convention.  For example,
-        if x_range = [0, 10], then x >= 0 and x < 10.
+        Get all ids from the given cuboids.
 
         Args:
-            resource (project.BossResource): Data model info based on the request or target resource
-            resolution (int): the resolution level
-            x_range (list(int]): x range
-            y_range (list(int]): y range
-            z_range (list(int]): z range
-            t_range (list(int]): time range
+            obj_keys (list[string]): List of cuboid object keys to aggregate ids from.
+            version (optional[int]): Defaults to zero, reserved for future use.
 
         Returns:
             (dict): { 'ids': ['1', '4', '8'] }
@@ -269,6 +265,32 @@ class ObjectIndices:
         Raises:
             (SpdbError): Can't talk to id index database or database corrupt.
         """
+        id_set = set()
+        for key in obj_keys:
+            response = self.dynamodb.get_item(
+                TableName=self.s3_index,
+                Key={'object-key': {'S': key}, 'version-node': {'N': "{}".format(version)}},
+                ConsistentRead=True,
+                ReturnConsumedCapacity='NONE')
+
+            if response['ResponseMetadata']['HTTPStatusCode'] != 200:
+                raise SpdbError(
+                    "Error reading cuboid index table from DynamoDB.",
+                    ErrorCodes.OBJECT_STORE_ERROR)
+
+            if 'Item' not in response:
+                continue
+            if 'id-set' not in response['Item']:
+                continue
+            if 'SS' not in response['Item']['id-set']:
+                raise SpdbError(
+                    "Error id-set attribute is not string set in cuboid index table of DynamoDB.",
+                    ErrorCodes.OBJECT_STORE_ERROR)
+
+            for id in response['Item']['id-set']:
+                id_set.add(id)
+
+        return list(id_set)
 
 
     def reserve_ids(self, resource, num_ids, version=0):

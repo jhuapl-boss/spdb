@@ -17,6 +17,7 @@ from spdb.spatialdb.object_indices import ObjectIndices
 from bossutils.aws import get_region
 import numpy as np
 from spdb.c_lib.ndlib import XYZMorton
+from spdb.c_lib.ndtype import CUBOIDSIZE
 from spdb.project import BossResourceBasic
 from spdb.project.test.resource_setup import get_anno_dict
 from spdb.spatialdb.object import AWSObjectStore
@@ -60,16 +61,19 @@ class ObjectIndicesTestMixin(object):
             fake_get_region.return_value = 'us-east-1'
             obj_store = AWSObjectStore(self.object_store_config)
 
-        pos0 = [4, 4, 4]
-        pos1 = [2, 1, 3]
-        pos2 = [6, 7, 5]
+        resolution = 0
+        time_sample = 0
+
+        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
+
+        pos0 = [4*x_cube_dim, 4*y_cube_dim, 4*z_cube_dim]
+        pos1 = [2*x_cube_dim, 1*y_cube_dim, 3*z_cube_dim]
+        pos2 = [6*x_cube_dim, 7*y_cube_dim, 5*z_cube_dim]
 
         mort0 = XYZMorton(pos0)
         mort1 = XYZMorton(pos1)
         mort2 = XYZMorton(pos2)
 
-        resolution = 0
-        time_sample = 0
 
         key0 = obj_store.generate_object_key(self.resource, resolution, time_sample, mort0)
         key1 = obj_store.generate_object_key(self.resource, resolution, time_sample, mort1)
@@ -81,9 +85,9 @@ class ObjectIndicesTestMixin(object):
             fake_get_cuboids.return_value = [key0, key1, key2]
             actual = self.obj_ind.get_bounding_box(self.resource, resolution, id, 'loose')
             expected = {
-                'x_range': [2, 6+1],
-                'y_range': [1, 7+1],
-                'z_range': [3, 5+1],
+                'x_range': [2*x_cube_dim, (6+1)*x_cube_dim],
+                'y_range': [1*y_cube_dim, (7+1)*y_cube_dim],
+                'z_range': [3*z_cube_dim, (5+1)*z_cube_dim],
                 't_range': [0, 1]
             }
             self.assertEqual(expected, actual)
