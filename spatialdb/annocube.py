@@ -54,7 +54,8 @@ class AnnotateCube64(Cube):
         Returns:
             None
         """
-        self.data = np.random.randint(1, 2**64 - 1,
+        # TODO: Change back to 2**64 - 1 once index max size is updated
+        self.data = np.random.randint(1, 256,
                                       size=[self.time_range[1]-self.time_range[0]] + self.cube_size,
                                       dtype=np.uint64)
 

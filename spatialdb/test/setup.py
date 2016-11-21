@@ -24,7 +24,7 @@ import boto3
 from botocore.exceptions import ClientError
 
 import time
-from spdb.project.test.resource_setup import get_image_dict
+from spdb.project.test.resource_setup import get_image_dict, get_anno_dict
 from spdb.project import BossResourceBasic
 
 from bossutils import configuration
@@ -239,21 +239,19 @@ class SetupTests(object):
         """Method to get the config dictionary for an image16 resource"""
         data = self.get_image8_dict()
         data['channel']['datatype'] = 'uint16'
+        data['boss_key'] = 'col1&exp1&ch5'
+        data['lookup_key'] = '4&3&23'
         return data
 
     def get_anno64_dict(self):
         """Method to get the config dictionary for an image16 resource"""
-        data = self.get_image8_dict()
-        data['channel']['datatype'] = 'uint64'
-        data['channel']['type'] = 'annotation'
+        data = get_anno_dict()
         return data
 
 
 class AWSSetupLayer(object):
     """A nose2 layer for setting up temporary AWS resources for testing ONCE per run"""
     setup_helper = SetupTests()
-    data = None
-    resource = None
     kvio_config = None
     state_config = None
     object_store_config = None
@@ -261,10 +259,6 @@ class AWSSetupLayer(object):
     @classmethod
     def setUp(cls):
         cls.setup_helper.mock = False
-
-        # Setup Data
-        cls.data = get_image_dict()
-        cls.resource = BossResourceBasic(cls.data)
 
         config = configuration.BossConfig()
 
@@ -295,7 +289,7 @@ class AWSSetupLayer(object):
         print('Creating Temporary AWS Resources', end='', flush=True)
         try:
             cls.setup_helper.create_index_table(cls.object_store_config["s3_index_table"],
-                                                cls.setup_helper.DYNAMODB_SCHEMA )
+                                                cls.setup_helper.DYNAMODB_SCHEMA)
         except ClientError:
             cls.setup_helper.delete_index_table(cls.object_store_config["s3_index_table"])
             cls.setup_helper.create_index_table(cls.object_store_config["s3_index_table"],
@@ -303,19 +297,19 @@ class AWSSetupLayer(object):
 
         try:
             cls.setup_helper.create_index_table(cls.object_store_config["id_index_table"],
-                                                cls.setup_helper.ID_INDEX_SCHEMA )
+                                                cls.setup_helper.ID_INDEX_SCHEMA)
         except ClientError:
             cls.setup_helper.delete_index_table(cls.object_store_config["id_index_table"])
             cls.setup_helper.create_index_table(cls.object_store_config["id_index_table"],
-                                                cls.setup_helper.ID_INDEX_SCHEMA )
+                                                cls.setup_helper.ID_INDEX_SCHEMA)
 
         try:
             cls.setup_helper.create_index_table(cls.object_store_config["id_count_table"],
-                                                cls.setup_helper.ID_COUNT_SCHEMA )
+                                                cls.setup_helper.ID_COUNT_SCHEMA)
         except ClientError:
             cls.setup_helper.delete_index_table(cls.object_store_config["id_count_table"])
             cls.setup_helper.create_index_table(cls.object_store_config["id_count_table"],
-                                                cls.setup_helper.ID_COUNT_SCHEMA )
+                                                cls.setup_helper.ID_COUNT_SCHEMA)
 
         try:
             cls.setup_helper.create_cuboid_bucket(cls.object_store_config["cuboid_bucket"])

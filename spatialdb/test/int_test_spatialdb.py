@@ -15,6 +15,7 @@
 import unittest
 import numpy as np
 import time
+import random
 
 from spdb.spatialdb.test.test_spatialdb import SpatialDBImageDataTestMixin
 from spdb.spatialdb import Cube, SpatialDB
@@ -206,8 +207,11 @@ class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
     def setUp(self):
         """ Copy params from the Layer setUpClass
         """
-        self.data = self.layer.data
-        self.resource = self.layer.resource
+        # Setup Data
+        self.data = self.layer.setup_helper.get_image8_dict()
+        self.resource = BossResourceBasic(self.data)
+
+        # Setup config
         self.kvio_config = self.layer.kvio_config
         self.state_config = self.layer.state_config
         self.object_store_config = self.layer.object_store_config
@@ -239,9 +243,11 @@ class TestIntegrationSpatialDBImage16Data(SpatialDBImageDataTestMixin,
     def setUp(self):
         """ Copy params from the Layer setUpClass
         """
-        self.data = self.layer.data
-        self.data['channel']['datatype'] = 'uint16'
-        self.resource = self.layer.resource
+        # Setup Data
+        self.data = self.layer.setup_helper.get_image16_dict()
+        self.resource = BossResourceBasic(self.data)
+
+        # Setup config
         self.kvio_config = self.layer.kvio_config
         self.state_config = self.layer.state_config
         self.object_store_config = self.layer.object_store_config
@@ -260,6 +266,28 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
                                           SpatialDBImageDataIntegrationTestMixin, unittest.TestCase):
     layer = AWSSetupLayer
 
+    def test_reserve_id_init(self):
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        data = self.layer.setup_helper.get_anno64_dict()
+        data['lookup_key'] = "100&20124&{}".format(random.randint(3, 999))
+        resource = BossResourceBasic(data)
+
+        start_id = sp.reserve_ids(resource, 10)
+        self.assertEqual(start_id, 1)
+
+    def test_reserve_id_increment(self):
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        data = self.layer.setup_helper.get_anno64_dict()
+        data['lookup_key'] = "100&20124&{}".format(random.randint(3, 999))
+        resource = BossResourceBasic(data)
+
+        start_id = sp.reserve_ids(resource, 10)
+        self.assertEqual(start_id, 1)
+        start_id = sp.reserve_ids(resource, 5)
+        self.assertEqual(start_id, 11)
+
     @classmethod
     def setUpClass(cls):
         """Clean kv store in between tests"""
@@ -273,9 +301,11 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
     def setUp(self):
         """ Copy params from the Layer setUpClass
         """
-        self.data = get_anno_dict()
-        self.data['channel']['base_resolution'] = 0
+        # Setup Data
+        self.data = self.layer.setup_helper.get_anno64_dict()
         self.resource = BossResourceBasic(self.data)
+
+        # Setup config
         self.kvio_config = self.layer.kvio_config
         self.state_config = self.layer.state_config
         self.object_store_config = self.layer.object_store_config
@@ -286,5 +316,5 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
                                    port=6379, db=1, decode_responses=False)
         client.flushdb()
         client = redis.StrictRedis(host=self.state_config['cache_state_host'],
-                                   port=6379, db=1, decode_responses=False)
+                                  port=6379, db=1, decode_responses=False)
         client.flushdb()

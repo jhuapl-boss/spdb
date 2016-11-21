@@ -124,7 +124,7 @@ class ObjectIndices:
                 Key={'object-key': {'S': obj_key}, 'version-node': {'N': "{}".format(version)}},
                 UpdateExpression='ADD #idset :ids',
                 ExpressionAttributeNames={'#idset': 'id-set'},
-                ExpressionAttributeValues={':ids': {'SS': ids_str_list}},
+                ExpressionAttributeValues={':ids': {'NS': ids_str_list}},
                 ReturnConsumedCapacity='NONE')
             if response['ResponseMetadata']['HTTPStatusCode'] != 200:
                 raise SpdbError(
@@ -310,9 +310,9 @@ class ObjectIndices:
                             ErrorCodes.DATATYPE_NOT_SUPPORTED)
 
         time_start = datetime.datetime.now()
-        start_id = None
         # Try to get a block of IDs for 10 seconds
         ch_key = self.generate_reserve_id_key(resource)
+        next_id = None
         while (datetime.datetime.now() - time_start).seconds < 10:
             # Get the current value
             next_id = self.dynamodb.get_item(TableName=self.id_count_table,
@@ -322,29 +322,26 @@ class ObjectIndices:
                                              ConsistentRead=True)
             if "Item" not in next_id:
                 # Initialize the key since it doesn't exist yet
-                result = self.dynamodb.put_item(TableName=self.id_count_table,
-                                                Item={'channel-key': {'S': ch_key},
-                                                      'version': {'N': "{}".format(version)},
-                                                      'next_id': {'N': '1'}})
+                self.dynamodb.put_item(TableName=self.id_count_table,
+                                       Item={'channel-key': {'S': ch_key},
+                                             'version': {'N': "{}".format(version)},
+                                             'next_id': {'N': '1'}})
 
                 next_id = np.fromstring("1", dtype=np.uint64, sep=' ')
             else:
                 next_id = np.fromstring(next_id["Item"]['next_id']['N'], dtype=np.uint64, sep=' ')
 
-            new_next_id = "{}".format((next_id + num_ids)[0])
-
             # Increment value conditionally, if failed try again until timeout
             try:
-                result2 = self.dynamodb.update_item(TableName=self.id_count_table,
-                                                    Key={'channel-key': {'S': ch_key},
-                                                         'version': {'N': "{}".format(version)}},
-                                                    ExpressionAttributeValues={":inc": {"N": str(num_ids)},
-                                                                               ":exp": {"N": "{}".format(next_id[0])}},
-                                                    ConditionExpression="next_id = :exp",
-                                                    UpdateExpression="set next_id = next_id + :inc",
-                                                    ReturnValues="ALL_NEW")
+                self.dynamodb.update_item(TableName=self.id_count_table,
+                                          Key={'channel-key': {'S': ch_key},
+                                               'version': {'N': "{}".format(version)}},
+                                          ExpressionAttributeValues={":inc": {"N": str(num_ids)},
+                                                                     ":exp": {"N": "{}".format(next_id[0])}},
+                                          ConditionExpression="next_id = :exp",
+                                          UpdateExpression="set next_id = next_id + :inc",
+                                          ReturnValues="ALL_NEW")
 
-                start_id = new_next_id
                 break
 
             except botocore.exceptions.ClientError as e:
@@ -353,8 +350,8 @@ class ObjectIndices:
                 if e.response['Error']['Code'] != 'ConditionalCheckFailedException':
                     raise
 
-        if not start_id:
+        if not next_id:
             raise SpdbError('Reserve ID Fail', 'Failed to reserve the requested ID block within 10 seconds',
                             ErrorCodes.SPDB_ERROR)
 
-        return np.fromstring(start_id, dtype=np.uint64, sep=' ')
+        return next_id

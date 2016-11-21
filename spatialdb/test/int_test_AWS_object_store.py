@@ -18,6 +18,7 @@ from spdb.spatialdb import AWSObjectStore
 from .test_AWS_object_store import AWSObjectStoreTestMixin
 
 from spdb.spatialdb.test.setup import AWSSetupLayer
+from spdb.project import BossResourceBasic
 
 
 class AWSObjectStoreTestIntegrationMixin(object):
@@ -77,8 +78,11 @@ class TestAWSObjectStoreInt(AWSObjectStoreTestIntegrationMixin, AWSObjectStoreTe
     def setUp(self):
         """ Copy params from the Layer setUpClass
         """
-        self.data = self.layer.data
-        self.resource = self.layer.resource
+        # Setup Data
+        self.data = self.layer.setup_helper.get_image8_dict()
+        self.resource = BossResourceBasic(self.data)
+
+        # Setup config
         self.object_store_config = self.layer.object_store_config
 
 
