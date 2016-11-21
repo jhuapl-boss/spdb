@@ -780,7 +780,9 @@ class SpatialDB:
         id_arr = np.unique(cube.data)
         ids = []
         for id in id_arr:
-            ids.append('{}'.format(id))
+            if id != 0:
+                # 0 is not a valid id.
+                ids.append('{}'.format(id))
         return {'ids': ids}
 
     def get_ids_in_region(
