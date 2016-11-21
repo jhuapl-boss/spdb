@@ -264,7 +264,7 @@ class TestIntegrationSpatialDBImage16Data(SpatialDBImageDataTestMixin,
 
 
 class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
-                                          #SpatialDBImageDataIntegrationTestMixin, 
+                                          SpatialDBImageDataIntegrationTestMixin,
                                           unittest.TestCase):
     layer = AWSSetupLayer
 
