@@ -329,6 +329,9 @@ class SpatialDB:
     def cutout(self, resource, corner, extent, resolution, time_sample_range=None):
         """Extract a cube of arbitrary size. Need not be aligned to cuboid boundaries.
 
+        corner represents the location of the cutout and extent the size.  As an example in 1D, if asking for
+        a corner of 3 and extent of 2, this would be the values at 3 and 4.
+
         Args:
             resource (spdb.project.BossResource): Data model info based on the request or target resource
             corner ((int, int, int)): the xyz location of the corner of the cutout
