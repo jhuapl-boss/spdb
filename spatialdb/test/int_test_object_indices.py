@@ -82,8 +82,8 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
 
         self.assertIn('Item', response)
         self.assertIn('id-set', response['Item'])
-        self.assertIn('SS', response['Item']['id-set'])
-        self.assertCountEqual(expected, response['Item']['id-set']['SS'])
+        self.assertIn('NS', response['Item']['id-set'])
+        self.assertCountEqual(expected, response['Item']['id-set']['NS'])
 
     def test_update_id_indices_update_existing_entry_in_cuboid_index(self):
         """
@@ -119,10 +119,10 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
 
         self.assertIn('Item', response)
         self.assertIn('id-set', response['Item'])
-        self.assertIn('SS', response['Item']['id-set'])
+        self.assertIn('NS', response['Item']['id-set'])
 
         expected = ['20', '55', '1000', '4444']
-        self.assertCountEqual(expected, response['Item']['id-set']['SS'])
+        self.assertCountEqual(expected, response['Item']['id-set']['NS'])
 
     def test_update_id_indices_new_entry_for_id_index(self):
         """
@@ -281,13 +281,13 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
 
     def test_reserve_id_init(self):
         start_id = self.obj_ind.reserve_ids(self.resource, 10)
-        self.assertEqual(start_id, 11)
+        self.assertEqual(start_id, 1)
 
     def test_reserve_id_increment(self):
         start_id = self.obj_ind.reserve_ids(self.resource, 10)
-        self.assertEqual(start_id, 11)
+        self.assertEqual(start_id, 1)
         start_id = self.obj_ind.reserve_ids(self.resource, 5)
-        self.assertEqual(start_id, 16)
+        self.assertEqual(start_id, 11)
 
 if __name__ == '__main__':
     unittest.main()

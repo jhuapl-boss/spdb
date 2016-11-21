@@ -266,9 +266,9 @@ class ObjectIndices:
                             ErrorCodes.DATATYPE_NOT_SUPPORTED)
 
         time_start = datetime.datetime.now()
-        start_id = None
         # Try to get a block of IDs for 10 seconds
         ch_key = self.generate_reserve_id_key(resource)
+        next_id = None
         while (datetime.datetime.now() - time_start).seconds < 10:
             # Get the current value
             next_id = self.dynamodb.get_item(TableName=self.id_count_table,
@@ -287,8 +287,6 @@ class ObjectIndices:
             else:
                 next_id = np.fromstring(next_id["Item"]['next_id']['N'], dtype=np.uint64, sep=' ')
 
-            new_next_id = "{}".format((next_id + num_ids)[0])
-
             # Increment value conditionally, if failed try again until timeout
             try:
                 self.dynamodb.update_item(TableName=self.id_count_table,
@@ -300,7 +298,6 @@ class ObjectIndices:
                                           UpdateExpression="set next_id = next_id + :inc",
                                           ReturnValues="ALL_NEW")
 
-                start_id = new_next_id
                 break
 
             except botocore.exceptions.ClientError as e:
@@ -309,8 +306,8 @@ class ObjectIndices:
                 if e.response['Error']['Code'] != 'ConditionalCheckFailedException':
                     raise
 
-        if not start_id:
+        if not next_id:
             raise SpdbError('Reserve ID Fail', 'Failed to reserve the requested ID block within 10 seconds',
                             ErrorCodes.SPDB_ERROR)
 
-        return np.fromstring(start_id, dtype=np.uint64, sep=' ')
+        return next_id
