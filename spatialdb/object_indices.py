@@ -123,7 +123,7 @@ class ObjectIndices:
                 Key={'object-key': {'S': obj_key}, 'version-node': {'N': "{}".format(version)}},
                 UpdateExpression='ADD #idset :ids',
                 ExpressionAttributeNames={'#idset': 'id-set'},
-                ExpressionAttributeValues={':ids': {'SS': ids_str_list}},
+                ExpressionAttributeValues={':ids': {'NS': ids_str_list}},
                 ReturnConsumedCapacity='NONE')
             if response['ResponseMetadata']['HTTPStatusCode'] != 200:
                 raise SpdbError(
@@ -278,10 +278,10 @@ class ObjectIndices:
                                              ConsistentRead=True)
             if "Item" not in next_id:
                 # Initialize the key since it doesn't exist yet
-                result = self.dynamodb.put_item(TableName=self.id_count_table,
-                                                Item={'channel-key': {'S': ch_key},
-                                                      'version': {'N': "{}".format(version)},
-                                                      'next_id': {'N': '1'}})
+                self.dynamodb.put_item(TableName=self.id_count_table,
+                                       Item={'channel-key': {'S': ch_key},
+                                             'version': {'N': "{}".format(version)},
+                                             'next_id': {'N': '1'}})
 
                 next_id = np.fromstring("1", dtype=np.uint64, sep=' ')
             else:
@@ -291,14 +291,14 @@ class ObjectIndices:
 
             # Increment value conditionally, if failed try again until timeout
             try:
-                result2 = self.dynamodb.update_item(TableName=self.id_count_table,
-                                                    Key={'channel-key': {'S': ch_key},
-                                                         'version': {'N': "{}".format(version)}},
-                                                    ExpressionAttributeValues={":inc": {"N": str(num_ids)},
-                                                                               ":exp": {"N": "{}".format(next_id[0])}},
-                                                    ConditionExpression="next_id = :exp",
-                                                    UpdateExpression="set next_id = next_id + :inc",
-                                                    ReturnValues="ALL_NEW")
+                self.dynamodb.update_item(TableName=self.id_count_table,
+                                          Key={'channel-key': {'S': ch_key},
+                                               'version': {'N': "{}".format(version)}},
+                                          ExpressionAttributeValues={":inc": {"N": str(num_ids)},
+                                                                     ":exp": {"N": "{}".format(next_id[0])}},
+                                          ConditionExpression="next_id = :exp",
+                                          UpdateExpression="set next_id = next_id + :inc",
+                                          ReturnValues="ALL_NEW")
 
                 start_id = new_next_id
                 break
