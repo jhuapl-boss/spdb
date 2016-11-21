@@ -363,7 +363,7 @@ class TestSpatialDBAnno64Data(SpatialDBImageDataTestMixin, unittest.TestCase):
         actual = db.get_ids_in_region(
             self.resource, resolution, corner, extent, t_range, version)
 
-        self.assertIn('ids' in actual)
+        self.assertIn('ids', actual)
         self.assertCountEqual(expected, actual['ids'])
 
 
