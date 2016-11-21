@@ -33,6 +33,7 @@ from .rediskvio import RedisKVIO
 from .cube import Cube
 from .object import AWSObjectStore
 from .state import CacheStateDB
+from .region import Region
 
 
 class SpatialDB:
@@ -753,20 +754,21 @@ class SpatialDB:
         """
         return self.objectio.get_bounding_box(resource, resolution, id, bb_type)
 
-    def get_ids_in_region(self, resource, resolution, x_range, y_range, z_range, t_range):
+    def _get_ids_in_region_naive(
+            self, resource, resolution, corner, extent, t_range=[0, 1], version=0):
         """
-        Get all ids in the given region.
+        Get all ids in the given region w/o taking advantage of the DynamoDB indexes.
 
-        Ranges follow the Python range convention.  For example,
-        if x_range = [0, 10], then x >= 0 and x < 10.
+        Time ranges follow the Python range convention.  For example,
+        if t_range = [0, 10], then t >= 0 and t < 10.
 
         Args:
             resource (project.BossResource): Data model info based on the request or target resource
             resolution (int): the resolution level
-            x_range (list(int]): x range
-            y_range (list(int]): y range
-            z_range (list(int]): z range
-            t_range (list(int]): time range
+            corner ((int, int, int)): xyz location of the corner of the region
+            extent ((int, int, int)): xyz extents of the region
+            t_range (optional[list[int]]): time range, defaults to [0, 1]
+            version (optional[int]): Reserved for future use.  Defaults to 0
 
         Returns:
             (dict): { 'ids': ['1', '4', '8'] }
@@ -774,8 +776,72 @@ class SpatialDB:
         Raises:
             (SpdbError): Can't talk to id index database or database corrupt.
         """
-        return self.objectio.get_ids_in_region(
-            resource, resolution, x_range, y_range, z_range, t_range)
+        cube = self.cutout(resource, corner, extent, resolution, t_range)
+        id_arr = np.unique(cube.data)
+        ids = []
+        for id in id_arr:
+            ids.append('{}'.format(id))
+        return {'ids': ids}
+
+    def get_ids_in_region(
+            self, resource, resolution, corner, extent, t_range=[0, 1], version=0):
+        """
+        Get all ids in the given region.
+
+        Time ranges follow the Python range convention.  For example,
+        if t_range = [0, 10], then t >= 0 and t < 10.
+
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            corner ((int, int, int)): xyz location of the corner of the region
+            extent ((int, int, int)): xyz extents of the region
+            t_range (optional[list[int]]): time range, defaults to [0, 1]
+            version (optional[int]): Reserved for future use.  Defaults to 0
+
+        Returns:
+            (dict): { 'ids': ['1', '4', '8'] }
+
+        Raises:
+            (SpdbError): Can't talk to id index database or database corrupt.
+        """
+
+        return self._get_ids_in_region_naive(
+            resource, resolution, corner, extent, t_range, version)
+
+        ##################### Beginnings of faster implementation.
+
+        # Identify sub-region entirely contained by cuboids.
+        cuboids = Region.get_cuboid_aligned_sub_region(
+            resolution, corner, extent)
+
+        # Identify non-cuboid aligned sub-region in x-y plane closest to origin.
+        near_x_y_region = Region.get_sub_region_x_y_block_near_side(
+            resolution, corner, extent)
+
+        # Identify non-cuboid aligned sub-region in x-y plane farthest from
+        # origin.
+        far_x_y_region = Region.get_sub_region_x_y_block_far_side(
+            resolution, corner, extent)
+
+        # Identify non-cuboid aligned sub-region in x-z plane closest to origin
+        # (but cuboid aligned in the x-y plane).
+
+        # Identify non-cuboid aligned sub-region in x-z plane farthest from
+        # origin (but cuboid aligned in the x-y plane).
+
+        # Identify non-cuboid aligned sub-region in y-z plane closest to origin
+        # (but cuboid aligned in the x-y and x-z planes).
+
+        # Identify non-cuboid aligned sub-region in y-z plane farthest from
+        # origin (but cuboid aligned in the x-y and x-z planes).
+
+        # Do cutouts on each partial region.
+
+        # Get ids from dynamo for sub-region that's 100% cuboid aligned.
+
+        # Union all ids.
+
 
     def reserve_ids(self, resource, num_ids, version=0):
         """Method to reserve a block of ids for a given channel at a version.
