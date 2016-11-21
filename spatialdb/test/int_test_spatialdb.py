@@ -274,7 +274,7 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         resource = BossResourceBasic(data)
 
         start_id = sp.reserve_ids(resource, 10)
-        self.assertEqual(start_id, 11)
+        self.assertEqual(start_id, 1)
 
     def test_reserve_id_increment(self):
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
@@ -284,9 +284,9 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         resource = BossResourceBasic(data)
 
         start_id = sp.reserve_ids(resource, 10)
-        self.assertEqual(start_id, 11)
+        self.assertEqual(start_id, 1)
         start_id = sp.reserve_ids(resource, 5)
-        self.assertEqual(start_id, 16)
+        self.assertEqual(start_id, 11)
 
     @classmethod
     def setUpClass(cls):
