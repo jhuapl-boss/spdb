@@ -121,8 +121,13 @@ class Region:
         # Set at boundary of next cuboid along the z axis.
         z_end = (1+(corner[2] // z_cube_dim)) * z_cube_dim
 
-        # Make sure next cuboid doesn't exceed extents of region.
-        z_end = min(z_end, corner[2] + extent[2])
+        if z_end + z_cube_dim > corner[2] + extent[2]:
+            # Don't have a full cuboid, so include entire region along this axis.
+            z_end = corner[2] + extent[2]
+        else:
+            # Make sure setting edge at next cuboid boundary doesn't exceed
+            # extents of region.
+            z_end = min(z_end, corner[2] + extent[2])
 
         return {
             'corner': corner,
@@ -176,8 +181,13 @@ class Region:
         # Set at boundary of next cuboid along the y axis.
         y_end = (1+(corner[1] // y_cube_dim)) * y_cube_dim
 
-        # Make sure next cuboid doesn't exceed extents of region.
-        y_end = min(y_end, corner[1] + extent[1])
+        if y_end + y_cube_dim > corner[1] + extent[1]:
+            # Don't have a full cuboid, so include entire region along this axis.
+            y_end = corner[1] + extent[1]
+        else:
+            # Make sure setting edge at next cuboid boundary doesn't exceed
+            # extents of region.
+            y_end = min(y_end, corner[1] + extent[1])
 
         return {
             'corner': corner,
@@ -209,5 +219,38 @@ class Region:
         return {
             'corner': (corner[0], y_start, corner[2]),
             'extent': (extent[0], y_extent, extent[2])
+        }
+
+    @classmethod
+    def get_sub_region_y_z_block_near_side(cls, resolution, corner, extent):
+        """
+        Get the non-cuboid aligned sub-region in the y-z plane closest to the origin.
+
+        Args:
+            resolution (int): Resolution level.
+            corner ((int, int, int)): xyz location of the corner of the region.
+            extent ((int, int, int)): xyz extents of the region (equivalent to size).
+
+        """
+        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
+
+        if corner[0] % x_cube_dim == 0 and extent[0] >= x_cube_dim:
+            # No sub-region, already cuboid aligned on the near side.
+            return { 'corner': corner, 'extent': (0, extent[1], extent[2]) }
+
+        # Set at boundary of next cuboid along the x axis.
+        x_end = (1+(corner[0] // x_cube_dim)) * x_cube_dim
+
+        if x_end + x_cube_dim > corner[0] + extent[0]:
+            # Don't have a full cuboid, so include entire region along this axis.
+            x_end = corner[0] + extent[0]
+        else:
+            # Make sure setting edge at next cuboid boundary doesn't exceed
+            # extents of region.
+            x_end = min(x_end, corner[0] + extent[0])
+
+        return {
+            'corner': corner,
+            'extent': (x_end - corner[0], extent[1], extent[2])
         }
 

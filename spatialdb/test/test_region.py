@@ -103,10 +103,26 @@ class TestRegion(unittest.TestCase):
         """Near side non-cuboid aligned along z axis."""
         resolution = 0
         corner = (512, 1024, 14)
-        extent = (1024, 512, 16)
+        extent = (1024, 512, 18)
         expected = {
             'corner': corner,
             'extent': (1024, 512, 2)
+        }
+        actual = Region.get_sub_region_x_y_block_near_side(resolution, corner, extent)
+
+        self.assertEqual(expected, actual)
+
+    def test_get_sub_region_x_y_block_near_side_small_extents(self):
+        """
+        Near side non-cuboid aligned along z axis and extents less than a
+        cuboid, but a cuboid boundary is crossed.
+        """
+        resolution = 0
+        corner = (512, 490, 14)
+        extent = (100, 100, 16)
+        expected = {
+            'corner': corner,
+            'extent': extent
         }
         actual = Region.get_sub_region_x_y_block_near_side(resolution, corner, extent)
 
@@ -119,7 +135,7 @@ class TestRegion(unittest.TestCase):
         extent = (1024, 512, 10)
         expected = {
             'corner': corner,
-            'extent': (1024, 512, 10)
+            'extent': extent
         }
         actual = Region.get_sub_region_x_y_block_near_side(resolution, corner, extent)
 
@@ -132,7 +148,7 @@ class TestRegion(unittest.TestCase):
         extent = (1024, 512, 10)
         expected = {
             'corner': corner,
-            'extent': (1024, 512, 10)
+            'extent': extent
         }
         actual = Region.get_sub_region_x_y_block_near_side(resolution, corner, extent)
 
@@ -199,10 +215,26 @@ class TestRegion(unittest.TestCase):
         """Near side non-cuboid aligned along y axis."""
         resolution = 0
         corner = (512, 1022, 16)
-        extent = (1024, 512, 16)
+        extent = (1024, 514, 16)
         expected = {
             'corner': corner,
             'extent': (1024, 2, 16)
+        }
+        actual = Region.get_sub_region_x_z_block_near_side(resolution, corner, extent)
+
+        self.assertEqual(expected, actual)
+
+    def test_get_sub_region_x_z_block_near_side_small_extents(self):
+        """
+        Near side non-cuboid aligned along x axis and extents less than a
+        cuboid, but a cuboid boundary is crossed.
+        """
+        resolution = 0
+        corner = (512, 490, 14)
+        extent = (100, 100, 16)
+        expected = {
+            'corner': corner,
+            'extent': extent
         }
         actual = Region.get_sub_region_x_z_block_near_side(resolution, corner, extent)
 
@@ -215,7 +247,7 @@ class TestRegion(unittest.TestCase):
         extent = (1024, 128, 32)
         expected = {
             'corner': corner,
-            'extent': (1024, 128, 32)
+            'extent': extent
         }
         actual = Region.get_sub_region_x_z_block_near_side(resolution, corner, extent)
 
@@ -232,7 +264,7 @@ class TestRegion(unittest.TestCase):
         extent = (1024, 12, 50)
         expected = {
             'corner': corner,
-            'extent': (1024, 12, 50)
+            'extent': extent
         }
         actual = Region.get_sub_region_x_z_block_near_side(resolution, corner, extent)
 
@@ -281,6 +313,74 @@ class TestRegion(unittest.TestCase):
             'extent': (1024, 0, 50)
         }
         actual = Region.get_sub_region_x_z_block_far_side(resolution, corner, extent)
+
+        self.assertEqual(expected, actual)
+
+    def test_get_sub_region_y_z_block_near_side_none(self):
+        """Near side cuboid aligned along x axis, so x extent is 0."""
+        resolution = 0
+        corner = (512, 1024, 16)
+        extent = (1024, 512, 16)
+        expected = {
+            'corner': corner,
+            'extent': (0, 512, 16)
+        }
+        actual = Region.get_sub_region_y_z_block_near_side(resolution, corner, extent)
+
+        self.assertEqual(expected, actual)
+
+    def test_get_sub_region_y_z_block_near_side(self):
+        """Near side non-cuboid aligned along x axis."""
+        resolution = 0
+        corner = (509, 1024, 14)
+        extent = (1027, 512, 16)
+        expected = {
+            'corner': corner,
+            'extent': (3, 512, 16)
+        }
+        actual = Region.get_sub_region_y_z_block_near_side(resolution, corner, extent)
+
+        self.assertEqual(expected, actual)
+
+    def test_get_sub_region_y_z_block_near_side_small_extents(self):
+        """
+        Near side non-cuboid aligned along x axis and extents less than a
+        cuboid, but a cuboid boundary is crossed.
+        """
+        resolution = 0
+        corner = (509, 1024, 14)
+        extent = (100, 512, 16)
+        expected = {
+            'corner': corner,
+            'extent': extent
+        }
+        actual = Region.get_sub_region_y_z_block_near_side(resolution, corner, extent)
+
+        self.assertEqual(expected, actual)
+
+    def test_get_sub_region_y_z_block_near_side_less_than_cuboid(self):
+        """Near side non-cuboid aligned along x axis - extents less than a cuboid."""
+        resolution = 0
+        corner = (400, 1024, 4)
+        extent = (80, 512, 10)
+        expected = {
+            'corner': corner,
+            'extent': extent
+        }
+        actual = Region.get_sub_region_y_z_block_near_side(resolution, corner, extent)
+
+        self.assertEqual(expected, actual)
+
+    def test_get_sub_region_y_z_block_near_side_less_than_cuboid2(self):
+        """Cuboid aligned on near side but extents less than a cuboid."""
+        resolution = 0
+        corner = (512, 1024, 16)
+        extent = (200, 512, 10)
+        expected = {
+            'corner': corner,
+            'extent': extent
+        }
+        actual = Region.get_sub_region_y_z_block_near_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
 
