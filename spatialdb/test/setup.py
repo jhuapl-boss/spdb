@@ -277,7 +277,7 @@ class AWSSetupLayer(object):
         _, domain = config['aws']['cuboid_bucket'].split('.', 1)
         cls.s3_flush_queue_name = "intTest.S3FlushQueue.{}".format(domain).replace('.', '-')
         cls.object_store_config = {"s3_flush_queue": "",
-                                   "cuboid_bucket": "intTest{}.{}".format(random.randint(0, 999),
+                                   "cuboid_bucket": "intTest{}.{}".format(random.randint(0, 9999),
                                                                           config['aws']['cuboid_bucket']),
                                    "page_in_lambda_function": config['lambda']['page_in_function'],
                                    "page_out_lambda_function": config['lambda']['flush_function'],
