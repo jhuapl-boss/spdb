@@ -248,8 +248,6 @@ class ObjectIndices:
             if z > z_max:
                 z_max = z
 
-        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
-
         return {
             'x_range': [x_min, x_max+x_cube_dim],
             'y_range': [y_min, y_max+y_cube_dim],
