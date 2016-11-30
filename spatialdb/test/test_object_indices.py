@@ -66,9 +66,9 @@ class ObjectIndicesTestMixin(object):
 
         [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
 
-        pos0 = [4*x_cube_dim, 4*y_cube_dim, 4*z_cube_dim]
-        pos1 = [2*x_cube_dim, 1*y_cube_dim, 3*z_cube_dim]
-        pos2 = [6*x_cube_dim, 7*y_cube_dim, 5*z_cube_dim]
+        pos0 = [4, 4, 4]
+        pos1 = [2, 1, 3]
+        pos2 = [6, 7, 5]
 
         mort0 = XYZMorton(pos0)
         mort1 = XYZMorton(pos1)

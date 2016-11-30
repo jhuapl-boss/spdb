@@ -226,22 +226,27 @@ class ObjectIndices:
         z_min = cf.z_stop
         z_max = cf.z_start
 
+        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
         obj_keys = self.get_cuboids(resource, resolution, id)
         for key in obj_keys:
             morton = int(key.split('&')[6])
             xyz = MortonXYZ(morton)
-            if xyz[0] < x_min:
-                x_min = xyz[0]
-            if xyz[0] > x_max:
-                x_max = xyz[0]
-            if xyz[1] < y_min:
-                y_min = xyz[1]
-            if xyz[1] > y_max:
-                y_max = xyz[1]
-            if xyz[2] < z_min:
-                z_min = xyz[2]
-            if xyz[2] > z_max:
-                z_max = xyz[2]
+            x = xyz[0] * x_cube_dim
+            y = xyz[1] * y_cube_dim
+            z = xyz[2] * z_cube_dim
+
+            if x < x_min:
+                x_min = x
+            if x > x_max:
+                x_max = x
+            if y < y_min:
+                y_min = y
+            if y > y_max:
+                y_max = y
+            if z < z_min:
+                z_min = z
+            if z > z_max:
+                z_max = z
 
         [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
 

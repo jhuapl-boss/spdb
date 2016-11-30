@@ -185,7 +185,14 @@ def locate_ctype(locations, dims):
 
 
 def XYZMorton(xyz):
-    """ Get morton order from XYZ coordinates """
+    """ Get morton order from XYZ coordinates
+
+    Args:
+        xyz (list): Index of the cuboid in the x, y, z dimensions.
+
+    Returns:
+        (int): Morton id.
+    """
 
     # Calling the C native function
     xyz = np.uint64(xyz)
@@ -195,7 +202,14 @@ def XYZMorton(xyz):
 
 
 def MortonXYZ(morton):
-    """ Get morton order from XYZ coordinates """
+    """ Get XYZ indices from Morton id
+
+    Args:
+        morton (int): Morton id.
+
+    Returns:
+        (list): Index of the cuboid in the x, y, z dimensions.
+    """
 
     # Calling the C native function
     morton = np.uint64(morton)
