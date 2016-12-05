@@ -24,7 +24,8 @@
 void filterCutout ( uint32_t * , int , uint32_t *, int );
 
 // Declaring the OpenMP implementation for filterCutout
-void filterCutoutOMP ( uint32_t *, int , uint32_t *, int );
+void filterCutoutOMP32 ( uint32_t *, int , uint32_t *, int );
+void filterCutoutOMP64 ( uint64_t *, int , uint64_t *, int );
 
 // Decalring the OpenMP cache optimized implementation for filterCutout
 void filterCutoutOMPCache ( uint32_t *, int, uint32_t *, int );
