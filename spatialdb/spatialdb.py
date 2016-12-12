@@ -326,11 +326,14 @@ class SpatialDB:
         return result_tuple(effcorner, effdim, None, None)
 
     # Main Interface Methods
-    def cutout(self, resource, corner, extent, resolution, time_sample_range=None):
+    def cutout(self, resource, corner, extent, resolution, time_sample_range=None, filter_ids=None):
         """Extract a cube of arbitrary size. Need not be aligned to cuboid boundaries.
 
         corner represents the location of the cutout and extent the size.  As an example in 1D, if asking for
         a corner of 3 and extent of 2, this would be the values at 3 and 4.
+
+        Provide a list of ids to filter the cutout contents if desired.  The list must be convertible to a numpy array
+        via numpy.asarray().
 
         Args:
             resource (spdb.project.BossResource): Data model info based on the request or target resource
@@ -338,9 +341,13 @@ class SpatialDB:
             extent ((int, int, int)): the xyz extents
             resolution (int): the resolution level
             time_sample_range list((int)):  a range of time samples to get [start, stop). Default is [0,1) if omitted
+            filter_ids (optional[list]): Defaults to None. Otherwise, is a list of uint64 ids to filter cutout by.
 
         Returns:
             cube.Cube: The cutout data stored in a Cube instance
+
+        Raises:
+            (SPDBError):
         """
         boss_logger = BossLogger()
         boss_logger.setLevel("info")
@@ -605,6 +612,17 @@ class SpatialDB:
                           extent[1],
                           corner[2] % z_cube_dim,
                           extent[2])
+
+        # Filter out ids not in list.
+        if filter_ids is not None:
+            try:
+                out_cube.data = ndlib.filter_ctype_OMP(out_cube.data, filter_ids)
+            except ValueError as ve:
+                raise SpdbError(
+                    'filter_ids probably not convertible to numpy uint64 array: {}'.format(ve.message),
+                    ErrorCodes.DATATYPE_MISMATCH) from ve
+            except:
+                raise SpdbError('unknown error filtering cutout', ErrorCodes.SPDB_ERROR)
 
         return out_cube
 

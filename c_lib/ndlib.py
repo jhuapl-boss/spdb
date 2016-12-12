@@ -139,7 +139,7 @@ def filter_ctype_OMP(cutout, filterlist):
                                        np.sort(filterlist),
                                        cp.c_int(len(filterlist)))
     else:
-        raise
+        raise ValueError('cutout must be uint32 or uint64 data type')
     return cutout.reshape(cutout_shape)
 
 

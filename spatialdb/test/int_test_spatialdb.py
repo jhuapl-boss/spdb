@@ -290,6 +290,36 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         start_id = sp.reserve_ids(resource, 5)
         self.assertEqual(start_id, 11)
 
+    def test_filtered_cutout(self):
+        cube_dim = [self.x_dim, self.y_dim, self.z_dim]
+        cube1 = Cube.create_cube(self.resource, cube_dim)
+        cube1.data = np.ones(cube_dim, dtype='uint64')
+        cube1.morton_id = 0
+        corner = [0, 0, 0]
+
+        expected = np.zeros(cube_dim, dtype='uint64')
+
+        # Will filter by these ids.
+        id1 = 55555
+        id2 = 66666
+        cube1.data[0][0][40][0] = id1
+        cube1.data[0][0][50][0] = id2
+        expected[0][0][40][0] = id1
+        expected[0][0][50][0] = id2
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+        resolution = 0
+        sp.write_cuboid(self.resource, corner, resolution, cube1.data, time_sample_start=0)
+
+        # Make sure cube written correctly.
+        actual_cube = sp.cutout(self.resource, corner, cube_dim, resolution)
+        np.testing.assert_array_equal(cube1.data, actual_cube.data)
+
+        # Method under test.
+        actual_filtered = sp.cutout(self.resource, corner, cube_dim, resolution, filter_ids=[id1, id2])
+
+        np.testing.assert_array_equal(expected, actual_filtered.data)
+
     def test_get_ids_in_region_single_cube(self):
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
         cube1.zeros()
