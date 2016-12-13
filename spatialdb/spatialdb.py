@@ -619,7 +619,7 @@ class SpatialDB:
                 out_cube.data = ndlib.filter_ctype_OMP(out_cube.data, filter_ids)
             except ValueError as ve:
                 raise SpdbError(
-                    'filter_ids probably not convertible to numpy uint64 array: {}'.format(ve.message),
+                    'filter_ids probably not convertible to numpy uint64 array: {}'.format(ve),
                     ErrorCodes.DATATYPE_MISMATCH) from ve
             except:
                 raise SpdbError('unknown error filtering cutout', ErrorCodes.SPDB_ERROR)
