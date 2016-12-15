@@ -232,12 +232,13 @@ class AWSObjectStore(ObjectStore):
         """
         Method to add a cuboid's object_key to the S3 index table
 
-        Currently versioning is not implemented, so a version of "a" is simply used
+        Currently versioning is not implemented, so a version of "0" is simply used
 
         Args:
             object_key (str): An object-keys for a cuboid to add to the index
             version (int): The ID of the version node - Default to 0 until fully implemented, but will eliminate
                            need to do a migration
+            ingest_job (int): Id of ingest job that added this cuboid - default to 0 (if this was added via the cutout service, for example).
 
         Returns:
             None
