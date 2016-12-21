@@ -21,11 +21,11 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 1024, 32)
         extent = (1024, 512, 32)
-        expected = {
-            'x_cuboids': range(1, 4),
-            'y_cuboids': range(2, 4),
-            'z_cuboids': range(2, 5),
-        }
+        expected = Region.Cuboids(
+            x_cuboids=range(1, 4),
+            y_cuboids=range(2, 4),
+            z_cuboids=range(2, 5)
+        )
         actual = Region.get_cuboid_aligned_sub_region(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -35,11 +35,11 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (511, 1024, 32)
         extent = (1026, 512, 32)
-        expected = {
-            'x_cuboids': range(1, 4),
-            'y_cuboids': range(2, 4),
-            'z_cuboids': range(2, 5),
-        }
+        expected = Region.Cuboids(
+            x_cuboids=range(1, 4),
+            y_cuboids=range(2, 4),
+            z_cuboids=range(2, 5)
+        )
         actual = Region.get_cuboid_aligned_sub_region(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -49,11 +49,11 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 1023, 32)
         extent = (1024, 514, 32)
-        expected = {
-            'x_cuboids': range(1, 4),
-            'y_cuboids': range(2, 4),
-            'z_cuboids': range(2, 5),
-        }
+        expected = Region.Cuboids(
+            x_cuboids=range(1, 4),
+            y_cuboids=range(2, 4),
+            z_cuboids=range(2, 5)
+        )
         actual = Region.get_cuboid_aligned_sub_region(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -63,11 +63,11 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 1024, 15)
         extent = (1024, 512, 18)
-        expected = {
-            'x_cuboids': range(1, 4),
-            'y_cuboids': range(2, 4),
-            'z_cuboids': range(1, 3),
-        }
+        expected = Region.Cuboids(
+            x_cuboids=range(1, 4),
+            y_cuboids=range(2, 4),
+            z_cuboids=range(1, 3)
+        )
         actual = Region.get_cuboid_aligned_sub_region(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -77,11 +77,11 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 1024, 16)
         extent = (100, 50, 12)
-        expected = {
-            'x_cuboids': range(1, 1),
-            'y_cuboids': range(2, 2),
-            'z_cuboids': range(1, 1)
-        }
+        expected = Region.Cuboids(
+            x_cuboids=range(1, 1),
+            y_cuboids=range(2, 2),
+            z_cuboids=range(1, 1)
+        )
         actual = Region.get_cuboid_aligned_sub_region(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -91,10 +91,10 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 1024, 16)
         extent = (1024, 512, 16)
-        expected = {
-            'corner': corner,
-            'extent': (1024, 512, 0)
-        }
+        expected = Region.Bounds(
+            corner=corner,
+            extent=(1024, 512, 0)
+        )
         actual = Region.get_sub_region_x_y_block_near_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -104,10 +104,10 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 1024, 14)
         extent = (1024, 512, 18)
-        expected = {
-            'corner': corner,
-            'extent': (1024, 512, 2)
-        }
+        expected = Region.Bounds(
+            corner=corner,
+            extent=(1024, 512, 2)
+        )
         actual = Region.get_sub_region_x_y_block_near_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -120,10 +120,10 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 490, 14)
         extent = (100, 100, 16)
-        expected = {
-            'corner': corner,
-            'extent': extent
-        }
+        expected = Region.Bounds(
+            corner=corner,
+            extent=extent
+        )
         actual = Region.get_sub_region_x_y_block_near_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -133,10 +133,10 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 1024, 4)
         extent = (1024, 512, 10)
-        expected = {
-            'corner': corner,
-            'extent': extent
-        }
+        expected = Region.Bounds(
+            corner=corner,
+            extent=extent
+        )
         actual = Region.get_sub_region_x_y_block_near_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -146,10 +146,10 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 1024, 16)
         extent = (1024, 512, 10)
-        expected = {
-            'corner': corner,
-            'extent': extent
-        }
+        expected = Region.Bounds(
+            corner=corner,
+            extent=extent
+        )
         actual = Region.get_sub_region_x_y_block_near_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -159,10 +159,10 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 1024, 14)
         extent = (1024, 512, 18)
-        expected = {
-            'corner': (corner[0], corner[1], 32),
-            'extent': (1024, 512, 0)
-        }
+        expected = Region.Bounds(
+            corner=(corner[0], corner[1], 32),
+            extent=(1024, 512, 0)
+        )
         actual = Region.get_sub_region_x_y_block_far_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -172,10 +172,10 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 1024, 18)
         extent = (1024, 512, 15)
-        expected = {
-            'corner': (corner[0], corner[1], 32),
-            'extent': (1024, 512, 1)
-        }
+        expected = Region.Bounds(
+            corner=(corner[0], corner[1], 32),
+            extent=(1024, 512, 1)
+        )
         actual = Region.get_sub_region_x_y_block_far_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -190,10 +190,10 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 1024, 17)
         extent = (1024, 512, 10)
-        expected = {
-            'corner': (corner[0], corner[1], 16),
-            'extent': (1024, 512, 0)
-        }
+        expected = Region.Bounds(
+            corner=(corner[0], corner[1], 16),
+            extent=(1024, 512, 0)
+        )
         actual = Region.get_sub_region_x_y_block_far_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -203,10 +203,10 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 1024, 16)
         extent = (1024, 512, 16)
-        expected = {
-            'corner': corner,
-            'extent': (1024, 0, 16)
-        }
+        expected = Region.Bounds(
+            corner=corner,
+            extent=(1024, 0, 16)
+        )
         actual = Region.get_sub_region_x_z_block_near_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -216,10 +216,10 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 1022, 16)
         extent = (1024, 514, 16)
-        expected = {
-            'corner': corner,
-            'extent': (1024, 2, 16)
-        }
+        expected = Region.Bounds(
+            corner=corner,
+            extent=(1024, 2, 16)
+        )
         actual = Region.get_sub_region_x_z_block_near_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -232,10 +232,10 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 490, 14)
         extent = (100, 100, 16)
-        expected = {
-            'corner': corner,
-            'extent': extent
-        }
+        expected = Region.Bounds(
+            corner=corner,
+            extent=extent
+        )
         actual = Region.get_sub_region_x_z_block_near_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -245,10 +245,10 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 100, 0)
         extent = (1024, 128, 32)
-        expected = {
-            'corner': corner,
-            'extent': extent
-        }
+        expected = Region.Bounds(
+            corner=corner,
+            extent=extent
+        )
         actual = Region.get_sub_region_x_z_block_near_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -262,10 +262,11 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 1024, 17)
         extent = (1024, 12, 50)
-        expected = {
-            'corner': corner,
-            'extent': extent
-        }
+        expected = Region.Bounds(
+            corner=corner,
+            extent=extent
+        )
+
         actual = Region.get_sub_region_x_z_block_near_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -275,10 +276,10 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 1023, 16)
         extent = (1024, 513, 20)
-        expected = {
-            'corner': (corner[0], 1536, corner[2]),
-            'extent': (1024, 0, 20)
-        }
+        expected = Region.Bounds(
+            corner=(corner[0], 1536, corner[2]),
+            extent=(1024, 0, 20)
+        )
         actual = Region.get_sub_region_x_z_block_far_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -288,10 +289,10 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 1024, 18)
         extent = (1024, 514, 16)
-        expected = {
-            'corner': (corner[0], 1536, corner[2]),
-            'extent': (1024, 2, 16)
-        }
+        expected = Region.Bounds(
+            corner=(corner[0], 1536, corner[2]),
+            extent=(1024, 2, 16)
+        )
         actual = Region.get_sub_region_x_z_block_far_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -308,10 +309,10 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 1024, 17)
         extent = (1024, 12, 50)
-        expected = {
-            'corner': (corner[0], 1024, corner[2]),
-            'extent': (1024, 0, 50)
-        }
+        expected = Region.Bounds(
+            corner=(corner[0], 1024, corner[2]),
+            extent=(1024, 0, 50)
+        )
         actual = Region.get_sub_region_x_z_block_far_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -321,10 +322,10 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 1024, 16)
         extent = (1024, 512, 16)
-        expected = {
-            'corner': corner,
-            'extent': (0, 512, 16)
-        }
+        expected = Region.Bounds(
+            corner=corner,
+            extent=(0, 512, 16)
+        )
         actual = Region.get_sub_region_y_z_block_near_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -334,10 +335,10 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (509, 1024, 14)
         extent = (1027, 512, 16)
-        expected = {
-            'corner': corner,
-            'extent': (3, 512, 16)
-        }
+        expected = Region.Bounds(
+            corner=corner,
+            extent=(3, 512, 16)
+        )
         actual = Region.get_sub_region_y_z_block_near_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -350,10 +351,10 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (509, 1024, 14)
         extent = (100, 512, 16)
-        expected = {
-            'corner': corner,
-            'extent': extent
-        }
+        expected = Region.Bounds(
+            corner=corner,
+            extent=extent
+        )
         actual = Region.get_sub_region_y_z_block_near_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -363,10 +364,10 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (400, 1024, 4)
         extent = (80, 512, 10)
-        expected = {
-            'corner': corner,
-            'extent': extent
-        }
+        expected = Region.Bounds(
+            corner=corner,
+            extent=extent
+        )
         actual = Region.get_sub_region_y_z_block_near_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -376,10 +377,10 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 1024, 16)
         extent = (200, 512, 10)
-        expected = {
-            'corner': corner,
-            'extent': extent
-        }
+        expected = Region.Bounds(
+            corner=corner,
+            extent=extent
+        )
         actual = Region.get_sub_region_y_z_block_near_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -389,10 +390,10 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 1023, 16)
         extent = (1024, 513, 20)
-        expected = {
-            'corner': (1536, corner[1], corner[2]),
-            'extent': (0, extent[1], extent[2])
-        }
+        expected = Region.Bounds(
+            corner=(1536, corner[1], corner[2]),
+            extent=(0, extent[1], extent[2])
+        )
         actual = Region.get_sub_region_y_z_block_far_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -402,10 +403,10 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 1024, 18)
         extent = (1026, 514, 16)
-        expected = {
-            'corner': (1536, corner[1], corner[2]),
-            'extent': (2, extent[1], extent[2])
-        }
+        expected = Region.Bounds(
+            corner=(1536, corner[1], corner[2]),
+            extent=(2, extent[1], extent[2])
+        )
         actual = Region.get_sub_region_y_z_block_far_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
@@ -422,10 +423,10 @@ class TestRegion(unittest.TestCase):
         resolution = 0
         corner = (512, 1024, 17)
         extent = (104, 12, 50)
-        expected = {
-            'corner': corner,
-            'extent': (0, extent[1], extent[2])
-        }
+        expected = Region.Bounds(
+            corner=corner,
+            extent=(0, extent[1], extent[2])
+        )
         actual = Region.get_sub_region_y_z_block_far_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)

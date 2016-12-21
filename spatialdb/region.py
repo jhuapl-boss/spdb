@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections import namedtuple
 from spdb.c_lib import ndlib
 from spdb.c_lib.ndtype import CUBOIDSIZE
 
@@ -22,6 +23,26 @@ class Region:
     Class that helps calculate cuboid aligned and non-cuboid aligned
     sub-regions.
     """
+
+
+    """
+    Return type from get_cuboid_aligned_sub_region().
+
+    Attributes:
+        x_cuboids (range): Indices of x cuboids in sub-region.
+        y_cuboids (range): Indices of y cuboids in sub-region.
+        z_cuboids (range): Indices of z cuboids in sub-region.
+    """
+    Cuboids = namedtuple('Cuboids', 'x_cuboids, y_cuboids, z_cuboids')
+
+    """
+    Return type from get_sub_region_*() methods.
+
+    Attributes:
+        corner (tuple): x, y, z coords of corner.
+        extents (tuple): Number of elements in the x, y, z directions.
+    """
+    Bounds = namedtuple('Bounds', 'corner, extent')
 
     @classmethod
     def get_cuboid_aligned_sub_region(cls, resolution, corner, extent):
@@ -38,7 +59,7 @@ class Region:
             extent ((int, int, int)): xyz extents of the region (equivalent to size).
 
         Returns:
-            (dict): { 'x_cuboids': range(), 'y_cuboids': range(), 'z_cuboids': range() }
+            (namedtuple): [ 'x_cuboids': range(), 'y_cuboids': range(), 'z_cuboids': range() ]
         """
         [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
 
@@ -50,11 +71,11 @@ class Region:
         y_end_cube = Region._get_last_cuboid(corner[1], extent[1], y_cube_dim)
         z_end_cube = Region._get_last_cuboid(corner[2], extent[2], z_cube_dim)
 
-        return {
-            'x_cuboids': range(x_start_cube, x_end_cube),
-            'y_cuboids': range(y_start_cube, y_end_cube),
-            'z_cuboids': range(z_start_cube, z_end_cube)
-        }
+        return Region.Cuboids(
+            x_cuboids=range(x_start_cube, x_end_cube),
+            y_cuboids=range(y_start_cube, y_end_cube),
+            z_cuboids=range(z_start_cube, z_end_cube)
+        )
 
     @classmethod
     def _get_first_cuboid(cls, start, extent, cube_dim):
@@ -103,6 +124,61 @@ class Region:
         return end_cube
 
     @classmethod
+    def get_all_partial_sub_regions(cls, resolution, corner, extent):
+        """
+
+        Args:
+            resolution (int): Resolution level.
+            corner ((int, int, int)): xyz location of the corner of the region.
+            extent ((int, int, int)): xyz extents of the region (equivalent to size).
+
+        Returns:
+            (list[dict]): List of dicts with keys 'corner' and 'extent' in this order:
+                x_y near side,
+                x_y far side,
+                x_z near side,
+                x_z far side,
+                y_z near side,
+                y_z far side
+        """
+
+        # Identify non-cuboid aligned sub-region in x-y plane closest to origin.
+        near_x_y_region = Region.get_sub_region_x_y_block_near_side(
+            resolution, corner, extent)
+
+        # Identify non-cuboid aligned sub-region in x-y plane farthest from
+        # origin.
+        far_x_y_region = Region.get_sub_region_x_y_block_far_side(
+            resolution, corner, extent)
+
+        # Identify non-cuboid aligned sub-region in x-z plane closest to origin
+        # (but cuboid aligned in the x-y plane).
+        near_x_z_region = Region.get_sub_region_x_z_block_near_side(
+            resolution, corner, extent)
+
+        # Identify non-cuboid aligned sub-region in x-z plane farthest from
+        # origin (but cuboid aligned in the x-y plane).
+        far_x_z_region = Region.get_sub_region_x_z_block_far_side(
+            resolution, corner, extent)
+
+        # Identify non-cuboid aligned sub-region in y-z plane closest to origin
+        # (but cuboid aligned in the x-y and x-z planes).
+        near_y_z_region = Region.get_sub_region_y_z_block_near_side(
+            resolution, corner, extent)
+
+        # Identify non-cuboid aligned sub-region in y-z plane farthest from
+        # origin (but cuboid aligned in the x-y and x-z planes).
+        far_y_z_region = Region.get_sub_region_y_z_block_far_side(
+            resolution, corner, extent)
+
+        return [
+            near_x_y_region, far_x_y_region,
+            near_x_z_region, far_x_z_region,
+            near_y_z_region, far_y_z_region
+        ]
+
+
+    @classmethod
     def get_sub_region_x_y_block_near_side(cls, resolution, corner, extent):
         """
         Get the non-cuboid aligned sub-region in the x-y plane closest to the origin.
@@ -117,7 +193,8 @@ class Region:
 
         if corner[2] % z_cube_dim == 0 and extent[2] >= z_cube_dim:
             # No sub-region, already cuboid aligned on the near side.
-            return { 'corner': corner, 'extent': (extent[0], extent[1], 0) }
+            return Region.Bounds(
+                corner=corner, extent=(extent[0], extent[1], 0))
 
         # Set at boundary of next cuboid along the z axis.
         z_end = (1+(corner[2] // z_cube_dim)) * z_cube_dim
@@ -130,10 +207,10 @@ class Region:
             # extents of region.
             z_end = min(z_end, corner[2] + extent[2])
 
-        return {
-            'corner': corner,
-            'extent': (extent[0], extent[1], z_end - corner[2])
-        }
+        return Region.Bounds(
+            corner=corner,
+            extent=(extent[0], extent[1], z_end - corner[2])
+        )
 
     @classmethod
     def get_sub_region_x_y_block_far_side(cls, resolution, corner, extent):
@@ -157,10 +234,10 @@ class Region:
             if z_start > corner[2]:
                 z_extent = corner[2] + extent[2] - z_start
 
-        return {
-            'corner': (corner[0], corner[1], z_start),
-            'extent': (extent[0], extent[1], z_extent)
-        }
+        return Region.Bounds(
+            corner=(corner[0], corner[1], z_start),
+            extent=(extent[0], extent[1], z_extent)
+        )
 
     @classmethod
     def get_sub_region_x_z_block_near_side(cls, resolution, corner, extent):
@@ -177,7 +254,8 @@ class Region:
 
         if corner[1] % y_cube_dim == 0 and extent[1] >= y_cube_dim:
             # No sub-region, already cuboid aligned on the near side.
-            return { 'corner': corner, 'extent': (extent[0], 0, extent[2]) }
+            return Region.Bounds(
+                corner=corner, extent=(extent[0], 0, extent[2]))
 
         # Set at boundary of next cuboid along the y axis.
         y_end = (1+(corner[1] // y_cube_dim)) * y_cube_dim
@@ -190,10 +268,10 @@ class Region:
             # extents of region.
             y_end = min(y_end, corner[1] + extent[1])
 
-        return {
-            'corner': corner,
-            'extent': (extent[0], y_end - corner[1], extent[2])
-        }
+        return Region.Bounds(
+            corner=corner,
+            extent=(extent[0], y_end - corner[1], extent[2])
+        )
 
     @classmethod
     def get_sub_region_x_z_block_far_side(cls, resolution, corner, extent):
@@ -217,10 +295,10 @@ class Region:
             if y_start > corner[1]:
                 y_extent = corner[1] + extent[1] - y_start
 
-        return {
-            'corner': (corner[0], y_start, corner[2]),
-            'extent': (extent[0], y_extent, extent[2])
-        }
+        return Region.Bounds(
+            corner=(corner[0], y_start, corner[2]),
+            extent=(extent[0], y_extent, extent[2])
+        )
 
     @classmethod
     def get_sub_region_y_z_block_near_side(cls, resolution, corner, extent):
@@ -237,7 +315,8 @@ class Region:
 
         if corner[0] % x_cube_dim == 0 and extent[0] >= x_cube_dim:
             # No sub-region, already cuboid aligned on the near side.
-            return { 'corner': corner, 'extent': (0, extent[1], extent[2]) }
+            return Region.Bounds(
+                corner=corner, extent=(0, extent[1], extent[2]))
 
         # Set at boundary of next cuboid along the x axis.
         x_end = (1+(corner[0] // x_cube_dim)) * x_cube_dim
@@ -250,10 +329,10 @@ class Region:
             # extents of region.
             x_end = min(x_end, corner[0] + extent[0])
 
-        return {
-            'corner': corner,
-            'extent': (x_end - corner[0], extent[1], extent[2])
-        }
+        return Region.Bounds(
+            corner=corner,
+            extent=(x_end - corner[0], extent[1], extent[2])
+        )
 
     @classmethod
     def get_sub_region_y_z_block_far_side(cls, resolution, corner, extent):
@@ -277,7 +356,7 @@ class Region:
             if x_start > corner[0]:
                 x_extent = corner[0] + extent[0] - x_start
 
-        return {
-            'corner': (x_start, corner[1], corner[2]),
-            'extent': (x_extent, extent[1], extent[2])
-        }
+        return Region.Bounds(
+            corner=(x_start, corner[1], corner[2]),
+            extent=(x_extent, extent[1], extent[2])
+        )
