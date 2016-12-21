@@ -59,7 +59,7 @@ class Region:
             extent ((int, int, int)): xyz extents of the region (equivalent to size).
 
         Returns:
-            (namedtuple): [ 'x_cuboids': range(), 'y_cuboids': range(), 'z_cuboids': range() ]
+            (Region.Cuboids): ranges of cuboid indices in the x, y, z dimensions.
         """
         [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
 
@@ -188,6 +188,8 @@ class Region:
             corner ((int, int, int)): xyz location of the corner of the region.
             extent ((int, int, int)): xyz extents of the region (equivalent to size).
 
+        Returns:
+            (Region.Bounds): Corner and extent of sub region.
         """
         [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
 
@@ -222,6 +224,8 @@ class Region:
             corner ((int, int, int)): xyz location of the corner of the region.
             extent ((int, int, int)): xyz extents of the region.
 
+        Returns:
+            (Region.Bounds): Corner and extent of sub region.
         """
         [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
 
@@ -249,6 +253,8 @@ class Region:
             corner ((int, int, int)): xyz location of the corner of the region.
             extent ((int, int, int)): xyz extents of the region (equivalent to size).
 
+        Returns:
+            (Region.Bounds): Corner and extent of sub region.
         """
         [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
 
@@ -283,6 +289,8 @@ class Region:
             corner ((int, int, int)): xyz location of the corner of the region.
             extent ((int, int, int)): xyz extents of the region.
 
+        Returns:
+            (Region.Bounds): Corner and extent of sub region.
         """
         [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
 
@@ -310,6 +318,8 @@ class Region:
             corner ((int, int, int)): xyz location of the corner of the region.
             extent ((int, int, int)): xyz extents of the region (equivalent to size).
 
+        Returns:
+            (Region.Bounds): Corner and extent of sub region.
         """
         [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
 
@@ -344,6 +354,8 @@ class Region:
             corner ((int, int, int)): xyz location of the corner of the region.
             extent ((int, int, int)): xyz extents of the region.
 
+        Returns:
+            (Region.Bounds): Corner and extent of sub region.
         """
         [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
 
