@@ -158,7 +158,7 @@ class TestRegion(unittest.TestCase):
         """Far side cuboid aligned along z axis, so z extent is 0."""
         resolution = 0
         corner = (512, 1024, 14)
-        extent = (1024, 512, 19)
+        extent = (1024, 512, 18)
         expected = {
             'corner': (corner[0], corner[1], 32),
             'extent': (1024, 512, 0)
@@ -171,7 +171,7 @@ class TestRegion(unittest.TestCase):
         """Far side non-cuboid aligned along z axis."""
         resolution = 0
         corner = (512, 1024, 18)
-        extent = (1024, 512, 16)
+        extent = (1024, 512, 15)
         expected = {
             'corner': (corner[0], corner[1], 32),
             'extent': (1024, 512, 1)
@@ -290,7 +290,7 @@ class TestRegion(unittest.TestCase):
         extent = (1024, 514, 16)
         expected = {
             'corner': (corner[0], 1536, corner[2]),
-            'extent': (1024, 1, 16)
+            'extent': (1024, 2, 16)
         }
         actual = Region.get_sub_region_x_z_block_far_side(resolution, corner, extent)
 
@@ -301,7 +301,7 @@ class TestRegion(unittest.TestCase):
         Far side non-cuboid aligned along z axis - extents less than a cuboid.
 
         Expect a 0 width slice in the z dimension.  This case should be covered
-        by Region.get_sub_region_x_y_block_near_side().
+        by Region.get_sub_region_x_z_block_near_side().
 
         See test_get_sub_region_x_z_block_near_side_less_than_cuboid2().
         """
@@ -381,6 +381,52 @@ class TestRegion(unittest.TestCase):
             'extent': extent
         }
         actual = Region.get_sub_region_y_z_block_near_side(resolution, corner, extent)
+
+        self.assertEqual(expected, actual)
+
+    def test_get_sub_region_y_z_block_far_side_none(self):
+        """Far side cuboid aligned along x axis, so x extent is 0."""
+        resolution = 0
+        corner = (512, 1023, 16)
+        extent = (1024, 513, 20)
+        expected = {
+            'corner': (1536, corner[1], corner[2]),
+            'extent': (0, extent[1], extent[2])
+        }
+        actual = Region.get_sub_region_y_z_block_far_side(resolution, corner, extent)
+
+        self.assertEqual(expected, actual)
+
+    def test_get_sub_region_y_z_block_far_side(self):
+        """Far side non-cuboid aligned along x axis."""
+        resolution = 0
+        corner = (512, 1024, 18)
+        extent = (1026, 514, 16)
+        expected = {
+            'corner': (1536, corner[1], corner[2]),
+            'extent': (2, extent[1], extent[2])
+        }
+        actual = Region.get_sub_region_y_z_block_far_side(resolution, corner, extent)
+
+        self.assertEqual(expected, actual)
+
+    def test_get_sub_region_y_z_block_far_side_less_than_cuboid(self):
+        """
+        Far side non-cuboid aligned along x axis - extents less than a cuboid.
+
+        Expect a 0 width slice in the x dimension.  This case should be covered
+        by Region.get_sub_region_y_z_block_near_side().
+
+        See test_get_sub_region_y_z_block_near_side_less_than_cuboid2().
+        """
+        resolution = 0
+        corner = (512, 1024, 17)
+        extent = (104, 12, 50)
+        expected = {
+            'corner': corner,
+            'extent': (0, extent[1], extent[2])
+        }
+        actual = Region.get_sub_region_y_z_block_far_side(resolution, corner, extent)
 
         self.assertEqual(expected, actual)
 

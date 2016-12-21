@@ -29,7 +29,8 @@ class Region:
         Given a region, return the sub-region that spans entire cuboids.
 
         The sub-region returned fills entire cuboids.  The edges of the
-        original region may not fill entire cuboids.
+        original region may not fill entire cuboids.  The sub-region returned
+        is represented by ranges of cuboid indices in x, y, and z.
 
         Args:
             resolution (int): Resolution level.
@@ -154,7 +155,7 @@ class Region:
             # End not on cuboid boundary so start at previous cuboid boundary.
             z_start = (z_start // z_cube_dim) * z_cube_dim
             if z_start > corner[2]:
-                z_extent = corner[2] + extent[2] - z_start - 1
+                z_extent = corner[2] + extent[2] - z_start
 
         return {
             'corner': (corner[0], corner[1], z_start),
@@ -214,7 +215,7 @@ class Region:
             # End not on cuboid boundary so start at previous cuboid boundary.
             y_start = (y_start // y_cube_dim) * y_cube_dim
             if y_start > corner[1]:
-                y_extent = corner[1] + extent[1] - y_start - 1
+                y_extent = corner[1] + extent[1] - y_start
 
         return {
             'corner': (corner[0], y_start, corner[2]),
@@ -254,3 +255,29 @@ class Region:
             'extent': (x_end - corner[0], extent[1], extent[2])
         }
 
+    @classmethod
+    def get_sub_region_y_z_block_far_side(cls, resolution, corner, extent):
+        """
+        Get the non-cuboid aligned sub-region in the y-z plane farthest to the origin.
+
+        Args:
+            resolution (int): Resolution level.
+            corner ((int, int, int)): xyz location of the corner of the region.
+            extent ((int, int, int)): xyz extents of the region.
+
+        """
+        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
+
+        # Set to the boundary of last full cuboid along the x axis.
+        x_start = corner[0] + extent[0]
+        x_extent = 0
+        if x_start % x_cube_dim != 0:
+            # End not on cuboid boundary so start at previous cuboid boundary.
+            x_start = (x_start // x_cube_dim) * x_cube_dim
+            if x_start > corner[0]:
+                x_extent = corner[0] + extent[0] - x_start
+
+        return {
+            'corner': (x_start, corner[1], corner[2]),
+            'extent': (x_extent, extent[1], extent[2])
+        }
