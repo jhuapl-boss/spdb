@@ -369,7 +369,7 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         self.assertIn('ids', actual)
         self.assertCountEqual(expected, actual['ids'])
 
-    def skip_test_get_ids_in_region_multiple_cubes(self):
+    def test_get_ids_in_region_multiple_cubes(self):
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
         cube1.zeros()
         cube1.data[0][0][40][0] = 55555
@@ -400,6 +400,11 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         self.assertIn('ids', actual)
         self.assertCountEqual(expected, actual['ids'])
 
+    def skip_test_get_ids_in_region(self):
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        # Method under test.
+        actual = sp.get_ids_in_region()
 
     @classmethod
     def setUpClass(cls):

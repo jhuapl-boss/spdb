@@ -166,7 +166,6 @@ class ObjectIndices:
 
         channel_id_key = self.generate_channel_id_key(resource, resolution, id)
 
-        #TODO: consider using batch_get_items() in the future.
         response = self.dynamodb.get_item(
             TableName=self.id_index_table,
             Key={'channel-id-key': {'S': channel_id_key}, 'version': {'N': '{}'.format(version)}},
@@ -264,15 +263,16 @@ class ObjectIndices:
             version (optional[int]): Defaults to zero, reserved for future use.
 
         Returns:
-            (dict): { 'ids': ['1', '4', '8'] }
+            (list[string]): { ['1', '4', '8'] }
 
         Raises:
             (SpdbError): Can't talk to id index database or database corrupt.
         """
         id_set = set()
         for key in obj_keys:
+            #TODO: consider using batch_get_items() in the future.
             response = self.dynamodb.get_item(
-                TableName=self.s3_index,
+                TableName=self.s3_index_table,
                 Key={'object-key': {'S': key}, 'version-node': {'N': "{}".format(version)}},
                 ConsistentRead=True,
                 ReturnConsumedCapacity='NONE')
@@ -286,12 +286,12 @@ class ObjectIndices:
                 continue
             if 'id-set' not in response['Item']:
                 continue
-            if 'SS' not in response['Item']['id-set']:
+            if 'NS' not in response['Item']['id-set']:
                 raise SpdbError(
-                    "Error id-set attribute is not string set in cuboid index table of DynamoDB.",
+                    "Error id-set attribute is not number set in cuboid index table of DynamoDB.",
                     ErrorCodes.OBJECT_STORE_ERROR)
 
-            for id in response['Item']['id-set']:
+            for id in response['Item']['id-set']['NS']:
                 id_set.add(id)
 
         return list(id_set)

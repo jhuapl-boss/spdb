@@ -804,6 +804,7 @@ class SpatialDB:
             if id != 0:
                 # 0 is not a valid id.
                 ids.append('{}'.format(id))
+
         return {'ids': ids}
 
     def get_ids_in_region(
@@ -829,42 +830,13 @@ class SpatialDB:
             (SpdbError): Can't talk to id index database or database corrupt.
         """
 
-        return self._get_ids_in_region_naive(
-            resource, resolution, corner, extent, t_range, version)
+        # return self._get_ids_in_region_naive(
+        #     resource, resolution, corner, extent, t_range, version)
 
-        ##################### Beginnings of faster implementation.
+        ##################### Faster implementation using DynamoDB.
 
-        # Identify sub-region entirely contained by cuboids.
-        cuboids = Region.get_cuboid_aligned_sub_region(
-            resolution, corner, extent)
-
-        # Identify non-cuboid aligned sub-region in x-y plane closest to origin.
-        near_x_y_region = Region.get_sub_region_x_y_block_near_side(
-            resolution, corner, extent)
-
-        # Identify non-cuboid aligned sub-region in x-y plane farthest from
-        # origin.
-        far_x_y_region = Region.get_sub_region_x_y_block_far_side(
-            resolution, corner, extent)
-
-        # Identify non-cuboid aligned sub-region in x-z plane closest to origin
-        # (but cuboid aligned in the x-y plane).
-
-        # Identify non-cuboid aligned sub-region in x-z plane farthest from
-        # origin (but cuboid aligned in the x-y plane).
-
-        # Identify non-cuboid aligned sub-region in y-z plane closest to origin
-        # (but cuboid aligned in the x-y and x-z planes).
-
-        # Identify non-cuboid aligned sub-region in y-z plane farthest from
-        # origin (but cuboid aligned in the x-y and x-z planes).
-
-        # Do cutouts on each partial region.
-
-        # Get ids from dynamo for sub-region that's 100% cuboid aligned.
-
-        # Union all ids.
-
+        return self.objectio.get_ids_in_region(
+            self.cutout, resource, resolution, corner, extent, t_range, version)
 
     def reserve_ids(self, resource, num_ids, version=0):
         """Method to reserve a block of ids for a given channel at a version.

@@ -16,6 +16,7 @@ import unittest
 
 from spdb.project import BossResourceBasic
 from spdb.spatialdb import AWSObjectStore
+from spdb.spatialdb import Region
 
 from bossutils import configuration
 
@@ -43,6 +44,18 @@ class AWSObjectStoreTestMixin(object):
         object_keys = os.generate_object_key(self.resource, 0, 2, 56)
 
         assert object_keys == '631424bf68302b683a0be521101c192b&4&3&2&0&2&56'
+
+    def test_get_object_keys(self):
+        os = AWSObjectStore(self.object_store_config)
+        cuboid_bounds = Region.Cuboids(range(2, 3), range(2, 3), range(2, 3))
+        resolution = 0
+
+        expected = ['631424bf68302b683a0be521101c192b&4&3&2&0&2&56']
+        actual = os._get_object_keys(
+            self.resource, resolution, cuboid_bounds, t_range=[2, 3])
+
+        assert expected == actual
+
 
     def test_cached_cuboid_to_object_keys(self):
         """Test to check key conversion from cached cuboid to object"""

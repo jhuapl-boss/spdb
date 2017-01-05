@@ -7,3 +7,4 @@ from .rediskvio import RedisKVIO
 from .spatialdb import SpatialDB
 from .state import CacheStateDB
 from .object import AWSObjectStore
+from .region import Region

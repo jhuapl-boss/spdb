@@ -13,10 +13,14 @@
 # limitations under the License.
 
 from abc import ABCMeta, abstractmethod
+import boto3
 import json
 import hashlib
+import numpy as np
 from .error import SpdbError, ErrorCodes
 from .object_indices import ObjectIndices
+from .region import Region
+from spdb.c_lib.ndlib import XYZMorton
 
 from bossutils.aws import get_region
 
@@ -131,6 +135,28 @@ class ObjectStore(metaclass=ABCMeta):
             None
         """
 
+    @abstractmethod
+    def get_ids_in_region(
+            self, cutout_fcn, resource, resolution, corner, extent,
+            t_range=[0, 1], version=0):
+        """
+        Method to get all the ids within a defined region.
+
+        Args:
+            cutout_fcn (function): SpatialDB's cutout method.  Provided for naive search of ids in sub-regions
+            resource (project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            corner ((int, int, int)): xyz location of the corner of the region
+            extent ((int, int, int)): xyz extents of the region
+            t_range (optional[list[int]]): time range, defaults to [0, 1]
+            version (optional[int]): Reserved for future use.  Defaults to 0
+
+        Returns:
+            (dict): { 'ids': ['1', '4', '8'] }
+
+        """
+        raise NotImplemented
+
 
 class AWSObjectStore(ObjectStore):
     def __init__(self, conf):
@@ -153,7 +179,7 @@ class AWSObjectStore(ObjectStore):
         # call the base class constructor
         ObjectStore.__init__(self, conf)
         self.obj_ind = ObjectIndices(
-            conf['s3_index_table'], conf['id_index_table'],  conf['id_count_table'], get_region())
+            conf['s3_index_table'], conf['id_index_table'], conf['id_count_table'], get_region())
 
 
     @staticmethod
@@ -572,3 +598,108 @@ class AWSObjectStore(ObjectStore):
             (np.array): starting ID for the block of ID successfully reserved as a numpy array to insure uint64
         """
         return self.obj_ind.reserve_ids(resource, num_ids, version)
+
+    def get_ids_in_region(
+            self, cutout_fcn, resource, resolution, corner, extent,
+            t_range=[0, 1], version=0):
+        """
+        Method to get all the ids within a defined region.
+
+        Args:
+            cutout_fcn (function): SpatialDB's cutout method.  Provided for naive search of ids in sub-regions
+            resource (project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            corner ((int, int, int)): xyz location of the corner of the region
+            extent ((int, int, int)): xyz extents of the region
+            t_range (optional[list[int]]): time range, defaults to [0, 1]
+            version (optional[int]): Reserved for future use.  Defaults to 0
+
+        Returns:
+            (dict): { 'ids': ['1', '4', '8'] }
+
+        """
+
+        # Identify sub-region entirely contained by cuboids.
+        cuboids = Region.get_cuboid_aligned_sub_region(
+            resolution, corner, extent)
+
+        # Get all non-cuboid aligned sub-regions.
+        non_cuboid_list = Region.get_all_partial_sub_regions(
+            resolution, corner, extent)
+
+        # Do cutouts on each partial region and build id set.
+        id_set = np.array([], dtype='uint64')
+        for partial_region in non_cuboid_list:
+            id_arr = self._get_ids_from_cutout(
+                cutout_fcn, resource, resolution,
+                partial_region['corner'], partial_region['extent'],
+                t_range, version)
+            id_set = np.union1d(id_set, id_arr)
+
+        # Get ids from dynamo for sub-region that's 100% cuboid aligned.
+        obj_key_list = self._get_object_keys(
+            resource, resolution, cuboids, t_range)
+        cuboid_ids = self.obj_ind.get_ids_in_cuboids(obj_key_list, version)
+        cuboid_int_ids = []
+        for id in cuboid_ids:
+            cuboid_int_ids.append(int(id))
+        cuboid_ids_arr = np.asarray(cuboid_int_ids, dtype='uint64')
+
+        # Union ids from cuboid aligned sub-region.
+        id_set = np.union1d(id_set, cuboid_ids_arr)
+
+        # Convert ids back to strings for transmission via HTTP.
+        ids_as_str = ['%d' % n for n in id_set]
+
+        return { 'ids': ids_as_str }
+
+
+    def _get_ids_from_cutout(
+            self, cutout_fcn, resource, resolution, corner, extent,
+            t_range=[0, 1], version=0):
+        """
+        Do a cutout and return the unique ids within the specified region.
+
+        0 is never returned as an id.
+
+        Args:
+            cutout_fcn (function): SpatialDB's cutout method.  Provided for naive search of ids in sub-regions
+            resource (project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            corner ((int, int, int)): xyz location of the corner of the region
+            extent ((int, int, int)): xyz extents of the region
+            t_range (optional[list[int]]): time range, defaults to [0, 1]
+            version (optional[int]): Reserved for future use.  Defaults to 0
+
+        Returns:
+            (numpy.array): unique ids in a numpy array.
+        """
+        cube = cutout_fcn(resource, corner, extent, resolution, t_range)
+        id_arr = np.unique(cube.data)
+        # 0 is not a valid id.
+        id_arr_no_zero = np.trim_zeros(id_arr, trim='f')
+        return id_arr_no_zero
+
+    def _get_object_keys(self, resource, resolution, cuboid_bounds, t_range=[0, 1]):
+        """
+        Retrieves objects keys for cuboids specified in cuboid_bounds.
+
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            cuboid_bounds (Region.Cuboids): ranges of cuboids to get keys for
+            t_range (optional[list[int]]): time range, defaults to [0, 1]
+
+        Returns:
+
+        """
+        key_list = []
+        for x in cuboid_bounds.x_cuboids:
+            for y in cuboid_bounds.y_cuboids:
+                for z in cuboid_bounds.z_cuboids:
+                    morton = XYZMorton([x, y, z])
+                    for t in range(t_range[0], t_range[1]):
+                        key_list.append(self.generate_object_key(
+                            resource, resolution, t, morton))
+
+        return key_list
