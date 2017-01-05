@@ -630,9 +630,12 @@ class AWSObjectStore(ObjectStore):
         # Do cutouts on each partial region and build id set.
         id_set = np.array([], dtype='uint64')
         for partial_region in non_cuboid_list:
+            extent = partial_region.extent
+            if extent[0] == 0 or extent[1] == 0 or extent[2] == 0:
+                continue
             id_arr = self._get_ids_from_cutout(
                 cutout_fcn, resource, resolution,
-                partial_region['corner'], partial_region['extent'],
+                partial_region.corner, partial_region.extent,
                 t_range, version)
             id_set = np.union1d(id_set, id_arr)
 
