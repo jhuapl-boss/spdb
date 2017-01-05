@@ -346,6 +346,7 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
                 filter_ids=['foo', 55555])
 
     def test_get_ids_in_region_single_cube(self):
+        """Test single cuboid using DynamoDB index."""
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
         cube1.zeros()
         cube1.data[0][0][40][0] = 55555
@@ -363,13 +364,19 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         t_range = [0, 1]
         version = 0
         expected = ['55555', '66666']
+
+        # Method under test.
         actual = sp.get_ids_in_region(
             self.resource, resolution, corner, extent, t_range, version)
 
         self.assertIn('ids', actual)
         self.assertCountEqual(expected, actual['ids'])
 
-    def test_get_ids_in_region_multiple_cubes(self):
+    def test_get_ids_in_region_multiple_partial_cubes(self):
+        """
+        Region cuboid aligned in x, but doesn't span full cuboids in the y 
+        and z.
+        """
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
         cube1.zeros()
         cube1.data[0][0][40][0] = 55555
@@ -388,23 +395,63 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
 
         resolution = 0
         sp.write_cuboid(self.resource, pos1, resolution, cube1.data, time_sample_start=0)
+        sp.write_cuboid(self.resource, pos2, resolution, cube2.data, time_sample_start=0)
 
-        corner = (5*self.x_dim, 4*self.y_dim, 2*self.z_dim)
+        corner = (4*self.x_dim, 4*self.y_dim, 2*self.z_dim)
         extent = (2*self.x_dim, 60, 10)
         t_range = [0, 1]
         version = 0
         expected = ['55555', '66666', '77777']
+
+        # Method under test.
         actual = sp.get_ids_in_region(
             self.resource, resolution, corner, extent, t_range, version)
 
         self.assertIn('ids', actual)
         self.assertCountEqual(expected, actual['ids'])
 
-    def skip_test_get_ids_in_region(self):
+    def test_get_ids_in_region_multiple_cubes_and_partials(self):
+        """Region has some full cuboids and some partial."""
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube1.zeros()
+        cube1.data[0][0][40][105] = 55555
+        cube1.data[0][0][50][105] = 66666
+        pos1 = [7*self.x_dim, 5*self.y_dim, 2*self.z_dim]
+        cube1.morton_id = XYZMorton(pos1)
+
+        cube2 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube2.zeros()
+        cube2.data[0][0][40][105] = 55555
+        cube2.data[0][0][50][105] = 77777
+        pos2 = [8*self.x_dim, 5*self.y_dim, 2*self.z_dim]
+        cube2.morton_id = XYZMorton(pos2)
+
+        cube3 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube3.zeros()
+        cube3.data[0][0][0][105] = 88888
+        pos3 = [9*self.x_dim, 5*self.y_dim, 2*self.z_dim]
+        cube3.morton_id = XYZMorton(pos3)
+
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
+        resolution = 0
+        sp.write_cuboid(self.resource, pos1, resolution, cube1.data, time_sample_start=0)
+        sp.write_cuboid(self.resource, pos2, resolution, cube2.data, time_sample_start=0)
+        sp.write_cuboid(self.resource, pos3, resolution, cube3.data, time_sample_start=0)
+
+        corner = (7*self.x_dim+100, 5*self.y_dim, 2*self.z_dim)
+        extent = (2*self.x_dim+self.x_dim//2, 60, 10)
+        t_range = [0, 1]
+        version = 0
+        expected = ['55555', '66666', '77777', '88888']
+
         # Method under test.
-        actual = sp.get_ids_in_region()
+        actual = sp.get_ids_in_region(
+            self.resource, resolution, corner, extent, t_range, version)
+
+        self.assertIn('ids', actual)
+        self.assertCountEqual(expected, actual['ids'])
+
 
     @classmethod
     def setUpClass(cls):
