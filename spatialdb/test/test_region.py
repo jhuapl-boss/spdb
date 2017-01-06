@@ -22,9 +22,9 @@ class TestRegion(unittest.TestCase):
         corner = (512, 1024, 32)
         extent = (1024, 512, 32)
         expected = Region.Cuboids(
-            x_cuboids=range(1, 4),
-            y_cuboids=range(2, 4),
-            z_cuboids=range(2, 5)
+            x_cuboids=range(1, 3),
+            y_cuboids=range(2, 3),
+            z_cuboids=range(2, 4)
         )
         actual = Region.get_cuboid_aligned_sub_region(resolution, corner, extent)
 
@@ -36,9 +36,9 @@ class TestRegion(unittest.TestCase):
         corner = (511, 1024, 32)
         extent = (1026, 512, 32)
         expected = Region.Cuboids(
-            x_cuboids=range(1, 4),
-            y_cuboids=range(2, 4),
-            z_cuboids=range(2, 5)
+            x_cuboids=range(1, 3),
+            y_cuboids=range(2, 3),
+            z_cuboids=range(2, 4)
         )
         actual = Region.get_cuboid_aligned_sub_region(resolution, corner, extent)
 
@@ -50,9 +50,9 @@ class TestRegion(unittest.TestCase):
         corner = (512, 1023, 32)
         extent = (1024, 514, 32)
         expected = Region.Cuboids(
-            x_cuboids=range(1, 4),
-            y_cuboids=range(2, 4),
-            z_cuboids=range(2, 5)
+            x_cuboids=range(1, 3),
+            y_cuboids=range(2, 3),
+            z_cuboids=range(2, 4)
         )
         actual = Region.get_cuboid_aligned_sub_region(resolution, corner, extent)
 
@@ -64,9 +64,9 @@ class TestRegion(unittest.TestCase):
         corner = (512, 1024, 15)
         extent = (1024, 512, 18)
         expected = Region.Cuboids(
-            x_cuboids=range(1, 4),
-            y_cuboids=range(2, 4),
-            z_cuboids=range(1, 3)
+            x_cuboids=range(1, 3),
+            y_cuboids=range(2, 3),
+            z_cuboids=range(1, 2)
         )
         actual = Region.get_cuboid_aligned_sub_region(resolution, corner, extent)
 

@@ -112,7 +112,7 @@ class Region:
             (int): Index of cuboid such that it can be used as the 2nd argument to range().
         """
         end = start + extent
-        end_cube = end // cube_dim + 1
+        end_cube = end // cube_dim
         if end % cube_dim != 0:
             # End not on cuboid boundary so start at previous cuboid boundary.
             end = (end // cube_dim) * cube_dim
