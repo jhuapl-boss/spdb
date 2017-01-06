@@ -269,6 +269,41 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
                                           unittest.TestCase):
     layer = AWSSetupLayer
 
+    @classmethod
+    def setUpClass(cls):
+        """Clean kv store in between tests"""
+        client = redis.StrictRedis(host=cls.kvio_config['cache_host'],
+                                   port=6379, db=1, decode_responses=False)
+        client.flushdb()
+        client = redis.StrictRedis(host=cls.state_config['cache_state_host'],
+                                   port=6379, db=1, decode_responses=False)
+        client.flushdb()
+
+    def setUp(self):
+        """ Copy params from the Layer setUpClass
+        """
+        # Setup Data
+        self.data = self.layer.setup_helper.get_anno64_dict()
+        # Make the coord frame extra large for this test suite.
+        self.data['coord_frame']['x_stop'] = 10000
+        self.data['coord_frame']['y_stop'] = 10000
+        self.data['coord_frame']['z_stop'] = 10000
+        self.resource = BossResourceBasic(self.data)
+
+        # Setup config
+        self.kvio_config = self.layer.kvio_config
+        self.state_config = self.layer.state_config
+        self.object_store_config = self.layer.object_store_config
+
+    def tearDown(self):
+        """Clean kv store in between tests"""
+        client = redis.StrictRedis(host=self.kvio_config['cache_host'],
+                                   port=6379, db=1, decode_responses=False)
+        client.flushdb()
+        client = redis.StrictRedis(host=self.state_config['cache_state_host'],
+                                   port=6379, db=1, decode_responses=False)
+        client.flushdb()
+
     def test_reserve_id_init(self):
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
@@ -347,6 +382,7 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
 
     def test_get_ids_in_region_single_cube(self):
         """Test single cuboid using DynamoDB index."""
+        cube_dim_tuple = (self.x_dim, self.y_dim, self.z_dim)
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
         cube1.zeros()
         cube1.data[0][0][40][0] = 55555
@@ -359,8 +395,12 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         resolution = 0
         sp.write_cuboid(self.resource, pos1, resolution, cube1.data, time_sample_start=0)
 
+        # Make sure cube write complete and correct.
+        actual_cube = sp.cutout(self.resource, pos1, cube_dim_tuple, resolution)
+        np.testing.assert_array_equal(cube1.data, actual_cube.data)
+
         corner = (2*self.x_dim, 3*self.y_dim, 2*self.z_dim)
-        extent = (5, 60, 10)
+        extent = (self.x_dim, self.y_dim, self.z_dim)
         t_range = [0, 1]
         version = 0
         expected = ['55555', '66666']
@@ -397,6 +437,9 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         sp.write_cuboid(self.resource, pos1, resolution, cube1.data, time_sample_start=0)
         sp.write_cuboid(self.resource, pos2, resolution, cube2.data, time_sample_start=0)
 
+        # Not verifying writes here because get_ids_in_region() should be doing
+        # cutouts due to the region not containing full cuboids.
+
         corner = (4*self.x_dim, 4*self.y_dim, 2*self.z_dim)
         extent = (2*self.x_dim, 60, 10)
         t_range = [0, 1]
@@ -410,8 +453,11 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         self.assertIn('ids', actual)
         self.assertCountEqual(expected, actual['ids'])
 
-    def test_get_ids_in_region_multiple_cubes_and_partials(self):
-        """Region has some full cuboids and some partial."""
+    def test_get_ids_in_region_multiple_cubes_and_x_partials(self):
+        """
+        Region has some full cuboids and some partial cuboids along the x axis.
+        """
+        cube_dim_tuple = (self.x_dim, self.y_dim, self.z_dim)
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
         cube1.zeros()
         cube1.data[0][0][40][105] = 55555
@@ -439,8 +485,16 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         sp.write_cuboid(self.resource, pos2, resolution, cube2.data, time_sample_start=0)
         sp.write_cuboid(self.resource, pos3, resolution, cube3.data, time_sample_start=0)
 
+        # Make sure cube write complete and correct.
+        actual_cube = sp.cutout(self.resource, pos1, cube_dim_tuple, resolution)
+        np.testing.assert_array_equal(cube1.data, actual_cube.data)
+        actual_cube = sp.cutout(self.resource, pos2, cube_dim_tuple, resolution)
+        np.testing.assert_array_equal(cube2.data, actual_cube.data)
+        actual_cube = sp.cutout(self.resource, pos3, cube_dim_tuple, resolution)
+        np.testing.assert_array_equal(cube3.data, actual_cube.data)
+
         corner = (7*self.x_dim+100, 5*self.y_dim, 2*self.z_dim)
-        extent = (2*self.x_dim+self.x_dim//2, 60, 10)
+        extent = (2*self.x_dim+self.x_dim//2, self.y_dim, self.z_dim)
         t_range = [0, 1]
         version = 0
         expected = ['55555', '66666', '77777', '88888']
@@ -452,34 +506,55 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         self.assertIn('ids', actual)
         self.assertCountEqual(expected, actual['ids'])
 
-
-    @classmethod
-    def setUpClass(cls):
-        """Clean kv store in between tests"""
-        client = redis.StrictRedis(host=cls.kvio_config['cache_host'],
-                                   port=6379, db=1, decode_responses=False)
-        client.flushdb()
-        client = redis.StrictRedis(host=cls.state_config['cache_state_host'],
-                                   port=6379, db=1, decode_responses=False)
-        client.flushdb()
-
-    def setUp(self):
-        """ Copy params from the Layer setUpClass
+    def test_get_ids_in_region_multiple_cubes_and_y_partials(self):
         """
-        # Setup Data
-        self.data = self.layer.setup_helper.get_anno64_dict()
-        self.resource = BossResourceBasic(self.data)
+        Region has some full cuboids and some partial cuboids along the y axis.
+        """
+        cube_dim_tuple = (self.x_dim, self.y_dim, self.z_dim)
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube1.zeros()
+        cube1.data[0][0][500][105] = 43434
+        pos1 = [8*self.x_dim, 4*self.y_dim, 2*self.z_dim]
+        cube1.morton_id = XYZMorton(pos1)
 
-        # Setup config
-        self.kvio_config = self.layer.kvio_config
-        self.state_config = self.layer.state_config
-        self.object_store_config = self.layer.object_store_config
+        cube2 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube2.zeros()
+        cube2.data[0][0][40][105] = 55555
+        cube2.data[0][0][50][105] = 77777
+        pos2 = [8*self.x_dim, 5*self.y_dim, 2*self.z_dim]
+        cube2.morton_id = XYZMorton(pos2)
 
-    def tearDown(self):
-        """Clean kv store in between tests"""
-        client = redis.StrictRedis(host=self.kvio_config['cache_host'],
-                                   port=6379, db=1, decode_responses=False)
-        client.flushdb()
-        client = redis.StrictRedis(host=self.state_config['cache_state_host'],
-                                  port=6379, db=1, decode_responses=False)
-        client.flushdb()
+        cube3 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube3.zeros()
+        cube3.data[0][0][0][105] = 99999
+        pos3 = [8*self.x_dim, 6*self.y_dim, 2*self.z_dim]
+        cube3.morton_id = XYZMorton(pos3)
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        resolution = 0
+        sp.write_cuboid(self.resource, pos1, resolution, cube1.data, time_sample_start=0)
+        sp.write_cuboid(self.resource, pos2, resolution, cube2.data, time_sample_start=0)
+        sp.write_cuboid(self.resource, pos3, resolution, cube3.data, time_sample_start=0)
+
+        # Make sure cube write complete and correct.
+        actual_cube = sp.cutout(self.resource, pos1, cube_dim_tuple, resolution)
+        np.testing.assert_array_equal(cube1.data, actual_cube.data)
+        actual_cube = sp.cutout(self.resource, pos2, cube_dim_tuple, resolution)
+        np.testing.assert_array_equal(cube2.data, actual_cube.data)
+        actual_cube = sp.cutout(self.resource, pos3, cube_dim_tuple, resolution)
+        np.testing.assert_array_equal(cube3.data, actual_cube.data)
+
+        corner = (8*self.x_dim, 4*self.y_dim+self.y_dim//2, 2*self.z_dim)
+        extent = (self.x_dim, 2*self.y_dim, self.z_dim)
+        t_range = [0, 1]
+        version = 0
+        expected = ['43434', '55555', '77777', '99999']
+
+        # Method under test.
+        actual = sp.get_ids_in_region(
+            self.resource, resolution, corner, extent, t_range, version)
+
+        self.assertIn('ids', actual)
+        self.assertCountEqual(expected, actual['ids'])
+
