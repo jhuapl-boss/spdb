@@ -558,3 +558,54 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         self.assertIn('ids', actual)
         self.assertCountEqual(expected, actual['ids'])
 
+    def test_get_ids_in_region_multiple_cubes_and_z_partials(self):
+        """
+        Region has some full cuboids and some partial cuboids along the z axis.
+        """
+        cube_dim_tuple = (self.x_dim, self.y_dim, self.z_dim)
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube1.zeros()
+        cube1.data[0][15][500][105] = 35353
+        pos1 = [8*self.x_dim, 5*self.y_dim, 1*self.z_dim]
+        cube1.morton_id = XYZMorton(pos1)
+
+        cube2 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube2.zeros()
+        cube2.data[0][0][40][105] = 55555
+        cube2.data[0][0][50][105] = 77777
+        pos2 = [8*self.x_dim, 5*self.y_dim, 2*self.z_dim]
+        cube2.morton_id = XYZMorton(pos2)
+
+        cube3 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube3.zeros()
+        cube3.data[0][0][0][105] = 98989
+        pos3 = [8*self.x_dim, 5*self.y_dim, 3*self.z_dim]
+        cube3.morton_id = XYZMorton(pos3)
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        resolution = 0
+        sp.write_cuboid(self.resource, pos1, resolution, cube1.data, time_sample_start=0)
+        sp.write_cuboid(self.resource, pos2, resolution, cube2.data, time_sample_start=0)
+        sp.write_cuboid(self.resource, pos3, resolution, cube3.data, time_sample_start=0)
+
+        # Make sure cube write complete and correct.
+        actual_cube = sp.cutout(self.resource, pos1, cube_dim_tuple, resolution)
+        np.testing.assert_array_equal(cube1.data, actual_cube.data)
+        actual_cube = sp.cutout(self.resource, pos2, cube_dim_tuple, resolution)
+        np.testing.assert_array_equal(cube2.data, actual_cube.data)
+        actual_cube = sp.cutout(self.resource, pos3, cube_dim_tuple, resolution)
+        np.testing.assert_array_equal(cube3.data, actual_cube.data)
+
+        corner = (8*self.x_dim, 5*self.y_dim, 2*self.z_dim-1)
+        extent = (self.x_dim, self.y_dim, self.z_dim+3)
+        t_range = [0, 1]
+        version = 0
+        expected = ['35353', '55555', '77777', '98989']
+
+        # Method under test.
+        actual = sp.get_ids_in_region(
+            self.resource, resolution, corner, extent, t_range, version)
+
+        self.assertIn('ids', actual)
+        self.assertCountEqual(expected, actual['ids'])
