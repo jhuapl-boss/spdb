@@ -193,9 +193,11 @@ class ObjectIndices:
 
         return response['Item']['cuboid-set']['SS']
 
-    def get_bounding_box(self, resource, resolution, id, bb_type='loose'):
+    def get_loose_bounding_box(self, resource, resolution, id):
         """
-        Get the bounding box that contains the object labeled with id.
+        Get the loose bounding box that contains the object labeled with id.
+
+        A loose bounding box is always cuboid aligned.
 
         Bounding box ranges follow the Python range convention.  For example,
         if x_range = [0, 10], then x >= 0 and x < 10.
@@ -204,19 +206,13 @@ class ObjectIndices:
             resource (project.BossResource): Data model info based on the request or target resource
             resolution (int): the resolution level
             id (uint64|string): object's id
-            bb_type (optional[string]): 'loose' | 'tight'. Defaults to 'loose'
 
         Returns:
-            (dict): {'x_range': [0, 10], 'y_range': [0, 10], 'z_range': [0, 10], 't_range': [0, 10]}
+            (dict|None): {'x_range': [0, 10], 'y_range': [0, 10], 'z_range': [0, 10], 't_range': [0, 10]} or None if the id is not found.
 
         Raises:
             (SpdbError): Can't talk to id index database or database corrupt.
         """
-        if not bb_type == 'loose':
-            raise SpdbError(
-                "Only loose bounding box currently supported",
-                ErrorCodes.SPDB_ERROR )
-
         cf = resource.get_coord_frame()
         x_min = cf.x_stop
         x_max = cf.x_start
@@ -227,6 +223,10 @@ class ObjectIndices:
 
         [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
         obj_keys = self.get_cuboids(resource, resolution, id)
+
+        if len(obj_keys) == 0:
+            return None
+
         for key in obj_keys:
             morton = int(key.split('&')[6])
             xyz = MortonXYZ(morton)
@@ -253,6 +253,39 @@ class ObjectIndices:
             'z_range': [z_min, z_max+z_cube_dim],
             't_range': [0, 1]
         }
+
+    def get_tight_bounding_box(self, cutout_fcn, resource, resolution, id, x_rng, y_rng, z_rng, t_rng):
+        """Computes the exact bounding box for an id.
+
+        Use ranges from the cuboid aligned "loose" bounding box as input.
+
+        Args:
+            cutout_fcn (function): SpatialDB's cutout method.  Provided for naive search of cuboids on the edges of the loose bounding box.
+            resource (project.BossResource): Data model info based on the request or target resource.
+            resolution (int): the resolution level.
+            id (int): id to find bounding box of.
+            x_rng (list[int]): 2 element list representing range.
+            y_rng (list[int]): 2 element list representing range.
+            z_rng (list[int]): 2 element list representing range.
+            t_rng (list[int]): 2 element list representing range.
+
+        Returns:
+            (dict): {'x_range': [0, 10], 'y_range': [0, 10], 'z_range': [0, 10], 't_range': [0, 10]}
+        """
+
+        ##########
+        ####### In progress - NOT ready.
+        ##########
+        
+
+        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
+
+        near_x_corner = (x_rng[0], y_rng[0], z_rng[0])
+        near_x_extent = (x_rng[0]+x_cube_dim, y_rng[1]-y_rng[0], z_rng[1]-z_rng[0])
+        near_x_region = cutout_fcn(resource, near_x_corner, near_x_extent, resolution, t_rng)
+        near_x_ind = np.where(near_x_region == id)
+
+
 
     def get_ids_in_cuboids(self, obj_keys, version=0):
         """

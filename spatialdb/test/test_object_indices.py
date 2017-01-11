@@ -52,7 +52,7 @@ class ObjectIndicesTestMixin(object):
         actual = self.obj_ind._make_ids_strings(arr)
         self.assertEqual(expected, actual)
 
-    def test_get_bounding_box_loose(self):
+    def test_get_loose_bounding_box(self):
 
         # Only need for the AWSObjectStore's generate_object_key() method, so
         # can provide dummy values to initialize it.
@@ -83,13 +83,25 @@ class ObjectIndicesTestMixin(object):
 
         with patch.object(self.obj_ind, 'get_cuboids') as fake_get_cuboids:
             fake_get_cuboids.return_value = [key0, key1, key2]
-            actual = self.obj_ind.get_bounding_box(self.resource, resolution, id, 'loose')
+            actual = self.obj_ind.get_loose_bounding_box(self.resource, resolution, id)
             expected = {
                 'x_range': [2*x_cube_dim, (6+1)*x_cube_dim],
                 'y_range': [1*y_cube_dim, (7+1)*y_cube_dim],
                 'z_range': [3*z_cube_dim, (5+1)*z_cube_dim],
                 't_range': [0, 1]
             }
+            self.assertEqual(expected, actual)
+
+    def test_get_loose_bounding_box_not_found(self):
+        """Make sure None returned if id is not in channel."""
+        resolution = 0
+        time_sample = 0
+        id = 2234
+
+        with patch.object(self.obj_ind, 'get_cuboids') as fake_get_cuboids:
+            fake_get_cuboids.return_value = []
+            actual = self.obj_ind.get_loose_bounding_box(self.resource, resolution, id)
+            expected = None
             self.assertEqual(expected, actual)
 
     def test_create_id_counter_key(self):

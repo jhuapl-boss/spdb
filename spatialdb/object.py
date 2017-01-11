@@ -506,9 +506,11 @@ class AWSObjectStore(ObjectStore):
         self.obj_ind.update_id_indices(
             resource, resolution, key_list, cube_list, version)
 
-    def get_bounding_box(self, resource, resolution, id, bb_type='loose'):
+    def get_loose_bounding_box(self, resource, resolution, id):
         """
-        Get the bounding box that contains the object labeled with id.
+        Get the loose bounding box that contains the object labeled with id.
+
+        A loose bounding box is always cuboid aligned.
 
         Bounding box ranges follow the Python range convention.  For example,
         if x_range = [0, 10], then x >= 0 and x < 10.
@@ -517,7 +519,6 @@ class AWSObjectStore(ObjectStore):
             resource (project.BossResource): Data model info based on the request or target resource
             resolution (int): the resolution level
             id (uint64|string): object's id
-            bb_type (optional[string]): 'loose' | 'tight'. Defaults to 'loose'
 
         Returns:
             (dict): {'x_range': [0, 10], 'y_range': [0, 10], 'z_range': [0, 10], 't_range': [0, 10]}
@@ -525,7 +526,28 @@ class AWSObjectStore(ObjectStore):
         Raises:
             (SpdbError): Can't talk to id index database or database corrupt.
         """
-        return self.obj_ind.get_bounding_box(resource, resolution, id, bb_type)
+        return self.obj_ind.get_loose_bounding_box(resource, resolution, id)
+
+    def get_tight_bounding_box(self, cutout_fcn, resource, resolution, id, x_rng, y_rng, z_rng, t_rng):
+        """Computes the exact bounding box for an id.
+
+        Use ranges from the cuboid aligned "loose" bounding box as input.
+
+        Args:
+            cutout_fcn (function): SpatialDB's cutout method.  Provided for naive search of cuboids on the edges of the loose bounding box.
+            resource (project.BossResource): Data model info based on the request or target resource.
+            resolution (int): the resolution level.
+            id (int): id to find bounding box of.
+            x_rng (list[int]): 2 element list representing range.
+            y_rng (list[int]): 2 element list representing range.
+            z_rng (list[int]): 2 element list representing range.
+            t_rng (list[int]): 2 element list representing range.
+
+        Returns:
+            (dict): {'x_range': [0, 10], 'y_range': [0, 10], 'z_range': [0, 10], 't_range': [0, 10]}
+        """
+        return self.obj_ind.get_tight_bounding_box(
+            cutout_fcn, resource, resolution, id, x_rng, y_rng, z_rng, t_rng)
 
     def trigger_page_out(self, config_data, write_cuboid_key, resource):
         """

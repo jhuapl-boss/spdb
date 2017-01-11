@@ -762,18 +762,24 @@ class SpatialDB:
         Get the bounding box that contains the object labeled with id.
 
         Args:
-            resource (project.BossResource): Data model info based on the request or target resource
+            resource (project.BossResource): an annotation channel
             resolution (int): the resolution level
             id (uint64|string): object's id
             bb_type (optional[string]): 'loose' | 'tight'. Defaults to 'loose'
 
         Returns:
-            (dict): {'x_range': [0, 10], 'y_range': [0, 10], 'z_range': [0, 10], 't_range': [0, 10]}
+            (dict|None): {'x_range': [0, 10], 'y_range': [0, 10], 'z_range': [0, 10], 't_range': [0, 10]} or None if id is nt found in the resource.
 
         Raises:
             (SpdbError): Can't talk to id index database or database corrupt.
         """
-        return self.objectio.get_bounding_box(resource, resolution, id, bb_type)
+        loose = self.objectio.get_loose_bounding_box(resource, resolution, id)
+        if bb_type == 'loose' or loose is None:
+            return loose
+
+        return self.objectio.get_tight_bounding_box(
+            self.cutout, resource, resolution, id,
+            loose['x_range'], loose['y_range'], loose['z_range'], loose['t_range'])
 
     def _get_ids_in_region_naive(
             self, resource, resolution, corner, extent, t_range=[0, 1], version=0):

@@ -273,7 +273,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         self.obj_ind.update_id_indices(
             resource, resolution, [key0, key1], [bytes0, bytes1], version)
 
-        actual = self.obj_ind.get_bounding_box(resource, resolution, id, 'loose')
+        actual = self.obj_ind.get_loose_bounding_box(resource, resolution, id)
         expected = {
             'x_range': [pos0[0], pos1[0]+x_cube_dim],
             'y_range': [pos0[1], pos1[1]+y_cube_dim],
