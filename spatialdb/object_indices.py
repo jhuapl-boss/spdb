@@ -208,7 +208,7 @@ class ObjectIndices:
             id (uint64|string): object's id
 
         Returns:
-            (dict|None): {'x_range': [0, 10], 'y_range': [0, 10], 'z_range': [0, 10], 't_range': [0, 10]} or None if the id is not found.
+            (dict|None): {'x_range': [0, 512], 'y_range': [0, 512], 'z_range': [0, 16], 't_range': [0, 1]} or None if the id is not found.
 
         Raises:
             (SpdbError): Can't talk to id index database or database corrupt.
@@ -259,6 +259,8 @@ class ObjectIndices:
 
         Use ranges from the cuboid aligned "loose" bounding box as input.
 
+        Note: assumes that VALID ranges are provided for the loose bounding box.
+
         Args:
             cutout_fcn (function): SpatialDB's cutout method.  Provided for naive search of cuboids on the edges of the loose bounding box.
             resource (project.BossResource): Data model info based on the request or target resource.
@@ -276,14 +278,60 @@ class ObjectIndices:
         ##########
         ####### In progress - NOT ready.
         ##########
-        
 
-        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
+        x_min_max = self._get_tight_bounding_box_x_axis(
+            cutout_fcn, resource, resolution, id, x_rng, y_rng, z_rng, t_rng)
 
+    def _get_tight_bounding_box_x_axis(self, cutout_fcn, resource, resolution, id, x_rng, y_rng, z_rng, t_rng):
+        """Computes the min and max indices of the  an id.
+
+        Use ranges from the cuboid aligned "loose" bounding box as input.
+
+        Note: assumes that VALID ranges are provided for the loose bounding box.
+
+        Args:
+            cutout_fcn (function): SpatialDB's cutout method.  Provided for naive search of cuboids on the edges of the loose bounding box.
+            resource (project.BossResource): Data model info based on the request or target resource.
+            resolution (int): the resolution level.
+            id (int): id to find bounding box of.
+            x_rng (list[int]): 2 element list representing range.
+            y_rng (list[int]): 2 element list representing range.
+            z_rng (list[int]): 2 element list representing range.
+            t_rng (list[int]): 2 element list representing range.
+
+        Returns:
+            (tuple): (x_min_index, x_max_index)
+        """
+        x_cube_dim = CUBOIDSIZE[resolution][0]
+
+        # Cutout the side closest to the origin along the x axis.
         near_x_corner = (x_rng[0], y_rng[0], z_rng[0])
         near_x_extent = (x_rng[0]+x_cube_dim, y_rng[1]-y_rng[0], z_rng[1]-z_rng[0])
-        near_x_region = cutout_fcn(resource, near_x_corner, near_x_extent, resolution, t_rng)
-        near_x_ind = np.where(near_x_region == id)
+        near_x_cube = cutout_fcn(
+            resource, near_x_corner, near_x_extent, resolution, t_rng)
+        near_x_ind = np.where(near_x_cube.data == id)
+
+        min_x = x_rng[0] + min(near_x_ind[3])
+        max_x = x_rng[0] + max(near_x_ind[3])
+
+        # Cutout the side farthest from the origin along the x axis.
+        far_x_corner = x_rng[1] - x_cube_dim
+        if far_x_corner <= x_rng[0]:
+            # Only 1 cuboid in the x direction, so the far side is included by
+            # the near side.
+            return (min_x, max_x)
+
+        far_x_extent = (x_rng[1] - far_x_corner, near_x_extent[1], near_x_extent[2])
+        far_x_cube = cutout_fcn(
+            resource, far_x_corner, far_x_extent, resolution, t_rng)
+        far_x_ind = np.where(far_x_cube.data == id)
+
+        if len(far_x_ind[3]) == 0:
+            # This shouldn't happen if loose cuboid computed correctly.
+            return (min_x, max_x)
+
+        max_x = far_x_corner + max(far_x_ind[3])
+        return (min_x, max_x)
 
 
 

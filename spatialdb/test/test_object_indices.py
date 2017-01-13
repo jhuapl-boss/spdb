@@ -21,6 +21,8 @@ from spdb.c_lib.ndtype import CUBOIDSIZE
 from spdb.project import BossResourceBasic
 from spdb.project.test.resource_setup import get_anno_dict
 from spdb.spatialdb.object import AWSObjectStore
+from spdb.spatialdb import SpatialDB
+from spdb.spatialdb.cube import Cube
 import unittest
 from unittest.mock import patch
 import random
@@ -53,7 +55,6 @@ class ObjectIndicesTestMixin(object):
         self.assertEqual(expected, actual)
 
     def test_get_loose_bounding_box(self):
-
         # Only need for the AWSObjectStore's generate_object_key() method, so
         # can provide dummy values to initialize it.
         with patch('spdb.spatialdb.object.get_region') as fake_get_region:
@@ -100,9 +101,76 @@ class ObjectIndicesTestMixin(object):
 
         with patch.object(self.obj_ind, 'get_cuboids') as fake_get_cuboids:
             fake_get_cuboids.return_value = []
-            actual = self.obj_ind.get_loose_bounding_box(self.resource, resolution, id)
+            actual = self.obj_ind.get_loose_bounding_box(
+                self.resource, resolution, id)
             expected = None
             self.assertEqual(expected, actual)
+
+    @patch('spdb.spatialdb.SpatialDB', autospec=True)
+    def test_tight_bounding_box_x_axis_single_cuboid(self, mock_spdb):
+        """Loose bounding box only spans a single cuboid."""
+        resolution = 0
+        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
+        id = 12345
+        x_rng = [0, x_cube_dim]
+        y_rng = [0, y_cube_dim]
+        z_rng = [0, z_cube_dim]
+        t_rng = [0, 1]
+
+        cube = Cube.create_cube(
+            self.resource, (x_cube_dim, y_cube_dim, z_cube_dim))
+        cube.data = np.zeros((1, z_cube_dim, y_cube_dim, x_cube_dim))
+        cube.data[0][7][128][10] = id
+        cube.data[0][7][128][11] = id
+        cube.data[0][7][128][12] = id
+        mock_spdb.cutout.return_value = cube
+
+        expected = (10, 12)
+
+        # Method under test.
+        actual = self.obj_ind._get_tight_bounding_box_x_axis(
+            mock_spdb.cutout, self.resource, resolution, id,
+            x_rng, y_rng, z_rng, t_rng)
+
+        self.assertEqual(expected, actual)
+        self.assertEqual(1, mock_spdb.cutout.call_count)
+
+    @patch('spdb.spatialdb.SpatialDB', autospec=True)
+    def test_tight_bounding_box_x_axis_multiple_cuboids(self, mock_spdb):
+        """Loose bounding box spans multiple cuboids."""
+        resolution = 0
+        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
+        id = 12345
+        x_rng = [0, 2*x_cube_dim]
+        y_rng = [0, y_cube_dim]
+        z_rng = [0, z_cube_dim]
+        t_rng = [0, 1]
+
+        cube = Cube.create_cube(
+            self.resource, (x_cube_dim, y_cube_dim, z_cube_dim))
+        cube.data = np.zeros((1, z_cube_dim, y_cube_dim, x_cube_dim))
+        cube.data[0][7][128][10] = id
+        cube.data[0][7][128][11] = id
+        cube.data[0][7][128][12] = id
+
+        cube2 = Cube.create_cube(
+            self.resource, (x_cube_dim, y_cube_dim, z_cube_dim))
+        cube2.data = np.zeros((1, z_cube_dim, y_cube_dim, x_cube_dim))
+        cube2.data[0][7][128][3] = id
+        cube2.data[0][7][128][4] = id
+
+        # Return cube on the 1st call to cutout and cube2 on the 2nd call.
+        mock_spdb.cutout.side_effect = [cube, cube2]
+
+        expected = (10, 516)
+
+        # Method under test.
+        actual = self.obj_ind._get_tight_bounding_box_x_axis(
+            mock_spdb.cutout, self.resource, resolution, id,
+            x_rng, y_rng, z_rng, t_rng)
+
+        self.assertEqual(expected, actual)
+        self.assertEqual(2, mock_spdb.cutout.call_count)
 
     def test_create_id_counter_key(self):
         self.resource._lookup_key = "1&2&3"

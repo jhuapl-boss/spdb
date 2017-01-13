@@ -768,7 +768,7 @@ class SpatialDB:
             bb_type (optional[string]): 'loose' | 'tight'. Defaults to 'loose'
 
         Returns:
-            (dict|None): {'x_range': [0, 10], 'y_range': [0, 10], 'z_range': [0, 10], 't_range': [0, 10]} or None if id is nt found in the resource.
+            (dict|None): {'x_range': [0, 512], 'y_range': [0, 512], 'z_range': [0, 16], 't_range': [0, 1]} or None if the id is not found.
 
         Raises:
             (SpdbError): Can't talk to id index database or database corrupt.
