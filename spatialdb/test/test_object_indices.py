@@ -172,6 +172,101 @@ class ObjectIndicesTestMixin(object):
         self.assertEqual(expected, actual)
         self.assertEqual(2, mock_spdb.cutout.call_count)
 
+    @patch('spdb.spatialdb.SpatialDB', autospec=True)
+    def test_tight_bounding_box_y_axis_single_cuboid(self, mock_spdb):
+        """Loose bounding box only spans a single cuboid."""
+        resolution = 0
+        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
+        id = 12345
+        x_rng = [0, x_cube_dim]
+        y_rng = [0, y_cube_dim]
+        z_rng = [0, z_cube_dim]
+        t_rng = [0, 1]
+
+        cube = Cube.create_cube(
+            self.resource, (x_cube_dim, y_cube_dim, z_cube_dim))
+        cube.data = np.zeros((1, z_cube_dim, y_cube_dim, x_cube_dim))
+        cube.data[0][7][200][10] = id
+        cube.data[0][7][201][10] = id
+        cube.data[0][7][202][10] = id
+        mock_spdb.cutout.return_value = cube
+
+        expected = (200, 202)
+
+        # Method under test.
+        actual = self.obj_ind._get_tight_bounding_box_y_axis(
+            mock_spdb.cutout, self.resource, resolution, id,
+            x_rng, y_rng, z_rng, t_rng)
+
+        self.assertEqual(expected, actual)
+        self.assertEqual(1, mock_spdb.cutout.call_count)
+
+    @patch('spdb.spatialdb.SpatialDB', autospec=True)
+    def test_tight_bounding_box_y_axis_multiple_cuboids(self, mock_spdb):
+        """Loose bounding box spans multiple cuboids."""
+        resolution = 0
+        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
+        id = 12345
+        x_rng = [0, x_cube_dim]
+        y_rng = [0, 2*y_cube_dim]
+        z_rng = [0, z_cube_dim]
+        t_rng = [0, 1]
+
+        cube = Cube.create_cube(
+            self.resource, (x_cube_dim, y_cube_dim, z_cube_dim))
+        cube.data = np.zeros((1, z_cube_dim, y_cube_dim, x_cube_dim))
+        cube.data[0][7][509][11] = id
+        cube.data[0][7][510][11] = id
+        cube.data[0][7][511][11] = id
+
+        cube2 = Cube.create_cube(
+            self.resource, (x_cube_dim, y_cube_dim, z_cube_dim))
+        cube2.data = np.zeros((1, z_cube_dim, y_cube_dim, x_cube_dim))
+        cube2.data[0][7][0][11] = id
+        cube2.data[0][7][1][11] = id
+
+        # Return cube on the 1st call to cutout and cube2 on the 2nd call.
+        mock_spdb.cutout.side_effect = [cube, cube2]
+
+        expected = (509, 513)
+
+        # Method under test.
+        actual = self.obj_ind._get_tight_bounding_box_y_axis(
+            mock_spdb.cutout, self.resource, resolution, id,
+            x_rng, y_rng, z_rng, t_rng)
+
+        self.assertEqual(expected, actual)
+        self.assertEqual(2, mock_spdb.cutout.call_count)
+
+    @patch('spdb.spatialdb.SpatialDB', autospec=True)
+    def test_tight_bounding_box_z_axis_single_cuboid(self, mock_spdb):
+        """Loose bounding box only spans a single cuboid."""
+        resolution = 0
+        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
+        id = 12345
+        x_rng = [0, x_cube_dim]
+        y_rng = [0, y_cube_dim]
+        z_rng = [0, z_cube_dim]
+        t_rng = [0, 1]
+
+        cube = Cube.create_cube(
+            self.resource, (x_cube_dim, y_cube_dim, z_cube_dim))
+        cube.data = np.zeros((1, z_cube_dim, y_cube_dim, x_cube_dim))
+        cube.data[0][12][200][10] = id
+        cube.data[0][13][200][10] = id
+        cube.data[0][14][200][10] = id
+        mock_spdb.cutout.return_value = cube
+
+        expected = (12, 14)
+
+        # Method under test.
+        actual = self.obj_ind._get_tight_bounding_box_z_axis(
+            mock_spdb.cutout, self.resource, resolution, id,
+            x_rng, y_rng, z_rng, t_rng)
+
+        self.assertEqual(expected, actual)
+        self.assertEqual(1, mock_spdb.cutout.call_count)
+
     def test_create_id_counter_key(self):
         self.resource._lookup_key = "1&2&3"
         key = self.obj_ind.generate_reserve_id_key(self.resource)
@@ -184,6 +279,84 @@ class ObjectIndicesTestMixin(object):
         with self.assertRaises(SpdbError):
             start_id = self.obj_ind.reserve_ids(img_resource, 10)
 
+    @patch('spdb.spatialdb.SpatialDB', autospec=True)
+    def test_tight_bounding_box_z_axis_multiple_cuboids(self, mock_spdb):
+        """Loose bounding box spans multiple cuboids."""
+        resolution = 0
+        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
+        id = 12345
+        x_rng = [0, x_cube_dim]
+        y_rng = [0, y_cube_dim]
+        z_rng = [0, 2*z_cube_dim]
+        t_rng = [0, 1]
+
+        cube = Cube.create_cube(
+            self.resource, (x_cube_dim, y_cube_dim, z_cube_dim))
+        cube.data = np.zeros((1, z_cube_dim, y_cube_dim, x_cube_dim))
+        cube.data[0][13][509][11] = id
+        cube.data[0][14][509][11] = id
+        cube.data[0][15][509][11] = id
+
+        cube2 = Cube.create_cube(
+            self.resource, (x_cube_dim, y_cube_dim, z_cube_dim))
+        cube2.data = np.zeros((1, z_cube_dim, y_cube_dim, x_cube_dim))
+        cube2.data[0][0][509][11] = id
+        cube2.data[0][1][509][11] = id
+
+        # Return cube on the 1st call to cutout and cube2 on the 2nd call.
+        mock_spdb.cutout.side_effect = [cube, cube2]
+
+        expected = (13, 17)
+
+        # Method under test.
+        actual = self.obj_ind._get_tight_bounding_box_z_axis(
+            mock_spdb.cutout, self.resource, resolution, id,
+            x_rng, y_rng, z_rng, t_rng)
+
+        self.assertEqual(expected, actual)
+        self.assertEqual(2, mock_spdb.cutout.call_count)
+
+    def test_get_tight_bounding_box_ranges(self):
+        """Ensure that ranges are Python style ranges: [x, y).
+
+        In other words, make sure the max indices are incremented by 1.
+        """
+        resolution = 0
+        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
+        id = 12345
+        x_rng = [0, x_cube_dim]
+        y_rng = [0, y_cube_dim]
+        z_rng = [0, 2*z_cube_dim]
+        t_rng = [0, 1]
+
+        # Don't need real one because will provide fake
+        # _get_tight_bounding_box_*_axis().
+        cutout_fcn = None
+
+        with patch.object(self.obj_ind, '_get_tight_bounding_box_x_axis') as fake_get_x_axis:
+            with patch.object(self.obj_ind, '_get_tight_bounding_box_y_axis') as fake_get_y_axis:
+                with patch.object(self.obj_ind, '_get_tight_bounding_box_z_axis') as fake_get_z_axis:
+                    x_min_max = (35, 40)
+                    y_min_max = (100, 105)
+                    z_min_max = (22, 26)
+
+                    fake_get_x_axis.return_value = x_min_max
+                    fake_get_y_axis.return_value = y_min_max
+                    fake_get_z_axis.return_value = z_min_max
+
+                    actual = self.obj_ind.get_tight_bounding_box(
+                        cutout_fcn, self.resource, resolution, id,
+                        x_rng, y_rng, z_rng, t_rng)
+
+                    self.assertIn('x_range', actual)
+                    self.assertIn('y_range', actual)
+                    self.assertIn('z_range', actual)
+                    self.assertEqual(x_min_max[0], actual['x_range'][0])
+                    self.assertEqual(1+x_min_max[1], actual['x_range'][1])
+                    self.assertEqual(y_min_max[0], actual['y_range'][0])
+                    self.assertEqual(1+y_min_max[1], actual['y_range'][1])
+                    self.assertEqual(z_min_max[0], actual['z_range'][0])
+                    self.assertEqual(1+z_min_max[1], actual['z_range'][1])
 
 class TestObjectIndices(ObjectIndicesTestMixin, unittest.TestCase):
     @classmethod
