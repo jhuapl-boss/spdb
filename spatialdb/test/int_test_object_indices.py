@@ -247,7 +247,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         expected = [key, new_key]
         self.assertCountEqual(expected, actual)
 
-    def test_get_bounding_box_loose(self):
+    def test_get_loose_bounding_box(self):
         id = 33333
         resource = BossResourceBasic(data=get_anno_dict())
         resolution = 1

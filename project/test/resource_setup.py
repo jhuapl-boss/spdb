@@ -53,11 +53,15 @@ def get_image_dict():
     return data
 
 
-def get_anno_dict():
+def get_anno_dict(boss_key='col1&exp1&ch2', lookup_key='4&3&345'):
     """Method to generate an initial set of parameters to use to instantiate a basic resource for an ANNOTATION dataset
+
+    Args:
+        boss_key (optional[string]): Optionally override default value.  Defaults to 'col1&exp1&ch2'.
+        lookup_key (optional[string]): Optionally override default value.  Defaults to '4&3&345'.
+
     Returns:
         dict - a dictionary of data to initialize a basic resource
-
     """
     data = get_image_dict()
     data['channel']['name'] = "anno1"
@@ -67,7 +71,7 @@ def get_anno_dict():
     data['channel']['base_resolution'] = 0
     data['channel']['sources'] = ["ch1"]
     data['channel']['default_time_sample'] = 0
-    data['boss_key'] = 'col1&exp1&ch2'
-    data['lookup_key'] = '4&3&345'
+    data['boss_key'] = boss_key
+    data['lookup_key'] = lookup_key
 
     return data

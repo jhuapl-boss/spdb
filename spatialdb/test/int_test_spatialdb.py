@@ -283,7 +283,9 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         """ Copy params from the Layer setUpClass
         """
         # Setup Data
-        self.data = self.layer.setup_helper.get_anno64_dict()
+        #self.data = self.layer.setup_helper.get_anno64_dict()
+        self.data = get_anno_dict()
+
         # Make the coord frame extra large for this test suite.
         self.data['coord_frame']['x_stop'] = 10000
         self.data['coord_frame']['y_stop'] = 10000
@@ -609,3 +611,247 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
 
         self.assertIn('ids', actual)
         self.assertCountEqual(expected, actual['ids'])
+
+    def test_get_tight_bounding_box_single_cuboid(self):
+        """
+        Get the tight bounding box for an object that exists within a single cuboid.
+        """
+        resolution = 0
+        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
+
+        id = 33333
+        data = get_anno_dict(boss_key='col1&exp1&ch50', lookup_key='1&1&50')
+        data['coord_frame']['x_stop'] = 10000
+        data['coord_frame']['y_stop'] = 10000
+        data['coord_frame']['z_stop'] = 10000
+        resource = BossResourceBasic(data)
+        time_sample = 0
+        version = 0
+        x_rng = [0, x_cube_dim]
+        y_rng = [0, y_cube_dim]
+        z_rng = [0, z_cube_dim]
+        t_rng = [0, 1]
+
+        cube_dim_tuple = (self.x_dim, self.y_dim, self.z_dim)
+        cube1 = Cube.create_cube(resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube1.zeros()
+        cube1.data[0][14][500][104] = id
+        cube1.data[0][15][501][105] = id
+        cube1.data[0][15][502][104] = id
+        cube1.data[0][14][503][105] = id
+
+        pos1 = [10*self.x_dim, 15*self.y_dim, 2*self.z_dim]
+        cube1.morton_id = XYZMorton(pos1)
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+        sp.write_cuboid(resource, pos1, resolution, cube1.data, time_sample_start=0)
+
+        # Make sure cube write complete and correct.
+        actual_cube = sp.cutout(resource, pos1, cube_dim_tuple, resolution)
+        np.testing.assert_array_equal(cube1.data, actual_cube.data)
+
+        # Method under test.
+        actual = sp.get_bounding_box(resource, resolution, id, bb_type='tight')
+
+        expected = {
+            'x_range': [pos1[0]+104, pos1[0]+106],
+            'y_range': [pos1[1]+500, pos1[1]+504],
+            'z_range': [pos1[2]+14, pos1[2]+16],
+            't_range': t_rng
+        }
+
+        self.assertEqual(expected, actual)
+
+    def test_get_tight_bounding_box_multi_cuboids_x_axis(self):
+        """
+        Get the tight bounding box for an object that exists in two cuboids on the x axis.
+        """
+        resolution = 0
+        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
+
+        id = 33333
+        data = get_anno_dict(boss_key='col1&exp1&ch30', lookup_key='1&1&30')
+        data['coord_frame']['x_stop'] = 10000
+        data['coord_frame']['y_stop'] = 10000
+        data['coord_frame']['z_stop'] = 10000
+        resource = BossResourceBasic(data)
+        time_sample = 0
+        version = 0
+        x_rng = [0, x_cube_dim]
+        y_rng = [0, y_cube_dim]
+        z_rng = [0, z_cube_dim]
+        t_rng = [0, 1]
+
+        cube_dim_tuple = (self.x_dim, self.y_dim, self.z_dim)
+        cube1 = Cube.create_cube(resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube1.zeros()
+        cube1.data[0][14][500][508] = id
+        cube1.data[0][15][501][509] = id
+        cube1.data[0][15][502][510] = id
+        cube1.data[0][14][503][511] = id
+
+        pos1 = [10*self.x_dim, 15*self.y_dim, 2*self.z_dim]
+        cube1.morton_id = XYZMorton(pos1)
+
+        cube2 = Cube.create_cube(resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube2.zeros()
+        cube2.data[0][14][500][0] = id
+        cube2.data[0][15][501][1] = id
+        cube2.data[0][15][502][1] = id
+        cube2.data[0][14][503][2] = id
+
+        pos2 = [11*self.x_dim, 15*self.y_dim, 2*self.z_dim]
+        cube2.morton_id = XYZMorton(pos2)
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+        sp.write_cuboid(resource, pos1, resolution, cube1.data, time_sample_start=0)
+        sp.write_cuboid(resource, pos2, resolution, cube2.data, time_sample_start=0)
+
+        # Make sure cube write complete and correct.
+        actual_cube = sp.cutout(resource, pos1, cube_dim_tuple, resolution)
+        np.testing.assert_array_equal(cube1.data, actual_cube.data)
+        actual_cube2 = sp.cutout(resource, pos2, cube_dim_tuple, resolution)
+        np.testing.assert_array_equal(cube2.data, actual_cube2.data)
+
+        # Method under test.
+        actual = sp.get_bounding_box(resource, resolution, id, bb_type='tight')
+
+        expected = {
+            'x_range': [pos1[0]+508, pos2[0]+3],
+            'y_range': [pos1[1]+500, pos2[1]+504],
+            'z_range': [pos1[2]+14, pos2[2]+16],
+            't_range': t_rng
+        }
+
+        self.assertEqual(expected, actual)
+
+    def test_get_tight_bounding_box_multi_cuboids_y_axis(self):
+        """
+        Get the tight bounding box for an object that exists in two cuboids on the y axis.
+        """
+        resolution = 0
+        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
+
+        id = 33333
+        data = get_anno_dict(boss_key='col1&exp1&ch80', lookup_key='1&1&80')
+        data['coord_frame']['x_stop'] = 10000
+        data['coord_frame']['y_stop'] = 10000
+        data['coord_frame']['z_stop'] = 10000
+        resource = BossResourceBasic(data)
+        time_sample = 0
+        version = 0
+        x_rng = [0, x_cube_dim]
+        y_rng = [0, y_cube_dim]
+        z_rng = [0, z_cube_dim]
+        t_rng = [0, 1]
+
+        cube_dim_tuple = (self.x_dim, self.y_dim, self.z_dim)
+        cube1 = Cube.create_cube(resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube1.zeros()
+        cube1.data[0][14][509][508] = id
+        cube1.data[0][15][510][509] = id
+        cube1.data[0][15][510][510] = id
+        cube1.data[0][14][511][511] = id
+
+        pos1 = [10*self.x_dim, 15*self.y_dim, 2*self.z_dim]
+        cube1.morton_id = XYZMorton(pos1)
+
+        cube2 = Cube.create_cube(resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube2.zeros()
+        cube2.data[0][14][0][508] = id
+        cube2.data[0][15][1][509] = id
+        cube2.data[0][15][2][510] = id
+        cube2.data[0][14][3][511] = id
+
+        pos2 = [10*self.x_dim, 16*self.y_dim, 2*self.z_dim]
+        cube2.morton_id = XYZMorton(pos2)
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+        sp.write_cuboid(resource, pos1, resolution, cube1.data, time_sample_start=0)
+        sp.write_cuboid(resource, pos2, resolution, cube2.data, time_sample_start=0)
+
+        # Make sure cube write complete and correct.
+        actual_cube = sp.cutout(resource, pos1, cube_dim_tuple, resolution)
+        np.testing.assert_array_equal(cube1.data, actual_cube.data)
+        actual_cube2 = sp.cutout(resource, pos2, cube_dim_tuple, resolution)
+        np.testing.assert_array_equal(cube2.data, actual_cube2.data)
+
+        # Method under test.
+        actual = sp.get_bounding_box(resource, resolution, id, bb_type='tight')
+
+        expected = {
+            'x_range': [pos1[0]+508, pos2[0]+512],
+            'y_range': [pos1[1]+509, pos2[1]+4],
+            'z_range': [pos1[2]+14, pos2[2]+16],
+            't_range': t_rng
+        }
+
+        self.assertEqual(expected, actual)
+
+    def test_get_tight_bounding_box_multi_cuboids_z_axis(self):
+        """
+        Get the tight bounding box for an object that exists in two cuboids on the y axis.
+        """
+        resolution = 0
+        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
+
+        id = 33333
+        data = get_anno_dict(boss_key='col1&exp1&ch100', lookup_key='1&1&100')
+        data['coord_frame']['x_stop'] = 10000
+        data['coord_frame']['y_stop'] = 10000
+        data['coord_frame']['z_stop'] = 10000
+        resource = BossResourceBasic(data)
+        time_sample = 0
+        version = 0
+        x_rng = [0, x_cube_dim]
+        y_rng = [0, y_cube_dim]
+        z_rng = [0, z_cube_dim]
+        t_rng = [0, 1]
+
+        cube_dim_tuple = (self.x_dim, self.y_dim, self.z_dim)
+        cube1 = Cube.create_cube(resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube1.zeros()
+        cube1.data[0][14][509][508] = id
+        cube1.data[0][15][510][509] = id
+        cube1.data[0][15][510][510] = id
+        cube1.data[0][14][511][511] = id
+
+        pos1 = [10*self.x_dim, 15*self.y_dim, 2*self.z_dim]
+        cube1.morton_id = XYZMorton(pos1)
+
+        cube2 = Cube.create_cube(resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube2.zeros()
+        cube2.data[0][0][509][508] = id
+        cube2.data[0][0][510][509] = id
+        cube2.data[0][1][510][510] = id
+        cube2.data[0][2][511][511] = id
+
+        pos2 = [10*self.x_dim, 15*self.y_dim, 3*self.z_dim]
+        cube2.morton_id = XYZMorton(pos2)
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+        sp.write_cuboid(resource, pos1, resolution, cube1.data, time_sample_start=0)
+        sp.write_cuboid(resource, pos2, resolution, cube2.data, time_sample_start=0)
+
+        # Make sure cube write complete and correct.
+        actual_cube = sp.cutout(resource, pos1, cube_dim_tuple, resolution)
+        np.testing.assert_array_equal(cube1.data, actual_cube.data)
+        actual_cube2 = sp.cutout(resource, pos2, cube_dim_tuple, resolution)
+        np.testing.assert_array_equal(cube2.data, actual_cube2.data)
+        del cube1
+        del actual_cube
+        del cube2
+        del actual_cube2
+
+
+        # Method under test.
+        actual = sp.get_bounding_box(resource, resolution, id, bb_type='tight')
+
+        expected = {
+            'x_range': [pos1[0]+508, pos2[0]+512],
+            'y_range': [pos1[1]+509, pos2[1]+512],
+            'z_range': [pos1[2]+14, pos2[2]+3],
+            't_range': t_rng
+        }
+
+        self.assertEqual(expected, actual)

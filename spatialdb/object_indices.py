@@ -274,11 +274,6 @@ class ObjectIndices:
         Returns:
             (dict): {'x_range': [0, 10], 'y_range': [0, 10], 'z_range': [0, 10], 't_range': [0, 10]}
         """
-
-        ##########
-        ####### In progress - NOT ready.
-        ##########
-
         x_min_max = self._get_tight_bounding_box_x_axis(
             cutout_fcn, resource, resolution, id, x_rng, y_rng, z_rng, t_rng)
         y_min_max = self._get_tight_bounding_box_y_axis(
@@ -289,7 +284,8 @@ class ObjectIndices:
         return {
             'x_range': [x_min_max[0], x_min_max[1]+1],
             'y_range': [y_min_max[0], y_min_max[1]+1],
-            'z_range': [z_min_max[0], z_min_max[1]+1]
+            'z_range': [z_min_max[0], z_min_max[1]+1],
+            't_range': t_rng
         }
 
     def _get_tight_bounding_box_x_axis(self, cutout_fcn, resource, resolution, id, x_rng, y_rng, z_rng, t_rng):
@@ -316,7 +312,7 @@ class ObjectIndices:
 
         # Cutout the side closest to the origin along the x axis.
         near_x_corner = (x_rng[0], y_rng[0], z_rng[0])
-        near_x_extent = (x_rng[0]+x_cube_dim, y_rng[1]-y_rng[0], z_rng[1]-z_rng[0])
+        near_x_extent = (x_cube_dim, y_rng[1]-y_rng[0], z_rng[1]-z_rng[0])
         near_x_cube = cutout_fcn(
             resource, near_x_corner, near_x_extent, resolution, t_rng)
         near_x_ind = np.where(near_x_cube.data == id)
@@ -325,13 +321,13 @@ class ObjectIndices:
         max_x = x_rng[0] + max(near_x_ind[3])
 
         # Cutout the side farthest from the origin along the x axis.
-        far_x_corner = x_rng[1] - x_cube_dim
-        if far_x_corner <= x_rng[0]:
+        far_x_corner = (x_rng[1] - x_cube_dim, y_rng[0], z_rng[0])
+        if far_x_corner[0] <= x_rng[0]:
             # Only 1 cuboid in the x direction, so the far side is included by
             # the near side.
             return (min_x, max_x)
 
-        far_x_extent = (x_rng[1] - far_x_corner, near_x_extent[1], near_x_extent[2])
+        far_x_extent = (x_rng[1] - far_x_corner[0], near_x_extent[1], near_x_extent[2])
         far_x_cube = cutout_fcn(
             resource, far_x_corner, far_x_extent, resolution, t_rng)
         far_x_ind = np.where(far_x_cube.data == id)
@@ -340,7 +336,7 @@ class ObjectIndices:
             # This shouldn't happen if loose cuboid computed correctly.
             return (min_x, max_x)
 
-        max_x = far_x_corner + max(far_x_ind[3])
+        max_x = far_x_corner[0] + max(far_x_ind[3])
         return (min_x, max_x)
 
     def _get_tight_bounding_box_y_axis(self, cutout_fcn, resource, resolution, id, x_rng, y_rng, z_rng, t_rng):
@@ -367,7 +363,7 @@ class ObjectIndices:
 
         # Cutout the side closest to the origin along the x axis.
         near_y_corner = (x_rng[0], y_rng[0], z_rng[0])
-        near_y_extent = (x_rng[1]-x_rng[0], y_rng[0]+y_cube_dim, z_rng[1]-z_rng[0])
+        near_y_extent = (x_rng[1]-x_rng[0], y_cube_dim, z_rng[1]-z_rng[0])
         near_y_cube = cutout_fcn(
             resource, near_y_corner, near_y_extent, resolution, t_rng)
         near_y_ind = np.where(near_y_cube.data == id)
@@ -376,13 +372,13 @@ class ObjectIndices:
         max_y = y_rng[0] + max(near_y_ind[2])
 
         # Cutout the side farthest from the origin along the y axis.
-        far_y_corner = y_rng[1] - y_cube_dim
-        if far_y_corner <= y_rng[0]:
+        far_y_corner = (x_rng[0], y_rng[1] - y_cube_dim, z_rng[0])
+        if far_y_corner[1] <= y_rng[0]:
             # Only 1 cuboid in the x direction, so the far side is included by
             # the near side.
             return (min_y, max_y)
 
-        far_y_extent = (near_y_extent[0], y_rng[1] - far_y_corner, near_y_extent[2])
+        far_y_extent = (near_y_extent[0], y_rng[1] - far_y_corner[1], near_y_extent[2])
         far_y_cube = cutout_fcn(
             resource, far_y_corner, far_y_extent, resolution, t_rng)
         far_y_ind = np.where(far_y_cube.data == id)
@@ -391,7 +387,7 @@ class ObjectIndices:
             # This shouldn't happen if loose cuboid computed correctly.
             return (min_y, max_y)
 
-        max_y = far_y_corner + max(far_y_ind[2])
+        max_y = far_y_corner[1] + max(far_y_ind[2])
         return (min_y, max_y)
 
     def _get_tight_bounding_box_z_axis(self, cutout_fcn, resource, resolution, id, x_rng, y_rng, z_rng, t_rng):
@@ -418,7 +414,7 @@ class ObjectIndices:
 
         # Cutout the side closest to the origin along the x axis.
         near_z_corner = (x_rng[0], y_rng[0], z_rng[0])
-        near_z_extent = (x_rng[1]-x_rng[0], y_rng[1]-y_rng[0], z_rng[0]+z_cube_dim)
+        near_z_extent = (x_rng[1]-x_rng[0], y_rng[1]-y_rng[0], z_cube_dim)
         near_z_cube = cutout_fcn(
             resource, near_z_corner, near_z_extent, resolution, t_rng)
         near_z_ind = np.where(near_z_cube.data == id)
@@ -427,13 +423,13 @@ class ObjectIndices:
         max_z = z_rng[0] + max(near_z_ind[1])
 
         # Cutout the side farthest from the origin along the z axis.
-        far_z_corner = z_rng[1] - z_cube_dim
-        if far_z_corner <= z_rng[0]:
+        far_z_corner = (x_rng[0], y_rng[0], z_rng[1] - z_cube_dim)
+        if far_z_corner[2] <= z_rng[0]:
             # Only 1 cuboid in the z direction, so the far side is included by
             # the near side.
             return (min_z, max_z)
 
-        far_z_extent = (near_z_extent[0], near_z_extent[1], z_rng[1] - far_z_corner)
+        far_z_extent = (near_z_extent[0], near_z_extent[1], z_rng[1] - far_z_corner[2])
         far_z_cube = cutout_fcn(
             resource, far_z_corner, far_z_extent, resolution, t_rng)
         far_z_ind = np.where(far_z_cube.data == id)
@@ -442,7 +438,7 @@ class ObjectIndices:
             # This shouldn't happen if loose cuboid computed correctly.
             return (min_z, max_z)
 
-        max_z = far_z_corner + max(far_z_ind[1])
+        max_z = far_z_corner[2] + max(far_z_ind[1])
         return (min_z, max_z)
 
     def get_ids_in_cuboids(self, obj_keys, version=0):

@@ -351,12 +351,14 @@ class ObjectIndicesTestMixin(object):
                     self.assertIn('x_range', actual)
                     self.assertIn('y_range', actual)
                     self.assertIn('z_range', actual)
+                    self.assertIn('t_range', actual)
                     self.assertEqual(x_min_max[0], actual['x_range'][0])
                     self.assertEqual(1+x_min_max[1], actual['x_range'][1])
                     self.assertEqual(y_min_max[0], actual['y_range'][0])
                     self.assertEqual(1+y_min_max[1], actual['y_range'][1])
                     self.assertEqual(z_min_max[0], actual['z_range'][0])
                     self.assertEqual(1+z_min_max[1], actual['z_range'][1])
+                    self.assertEqual(t_rng, actual['t_range'])
 
 class TestObjectIndices(ObjectIndicesTestMixin, unittest.TestCase):
     @classmethod
