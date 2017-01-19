@@ -620,6 +620,9 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
 
         id = 33333
+        # Customize resource with so it writes to its own channel and uses a
+        # coord frame large enough to encompass the data written.  This is
+        # important for proper loose bounding box calculations.
         data = get_anno_dict(boss_key='col1&exp1&ch50', lookup_key='1&1&50')
         data['coord_frame']['x_stop'] = 10000
         data['coord_frame']['y_stop'] = 10000
@@ -670,6 +673,9 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
 
         id = 33333
+        # Customize resource with so it writes to its own channel and uses a
+        # coord frame large enough to encompass the data written.  This is
+        # important for proper loose bounding box calculations.
         data = get_anno_dict(boss_key='col1&exp1&ch30', lookup_key='1&1&30')
         data['coord_frame']['x_stop'] = 10000
         data['coord_frame']['y_stop'] = 10000
@@ -733,6 +739,9 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
 
         id = 33333
+        # Customize resource with so it writes to its own channel and uses a
+        # coord frame large enough to encompass the data written.  This is
+        # important for proper loose bounding box calculations.
         data = get_anno_dict(boss_key='col1&exp1&ch80', lookup_key='1&1&80')
         data['coord_frame']['x_stop'] = 10000
         data['coord_frame']['y_stop'] = 10000
@@ -796,6 +805,9 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
 
         id = 33333
+        # Customize resource with so it writes to its own channel and uses a
+        # coord frame large enough to encompass the data written.  This is
+        # important for proper loose bounding box calculations.
         data = get_anno_dict(boss_key='col1&exp1&ch100', lookup_key='1&1&100')
         data['coord_frame']['x_stop'] = 10000
         data['coord_frame']['y_stop'] = 10000

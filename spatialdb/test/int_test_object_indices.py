@@ -34,8 +34,16 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         """ Copy params from the Layer setUpClass
         """
         self.data = self.layer.setup_helper.get_anno64_dict()
+        # Ensure that a random channel id used so tests don't stomp on each
+        # other.
         self.data['lookup_key'] = "1&2&{}".format(random.randint(3, 999))
+        # Expand coord frame to fit test data.  This must be sized properly or
+        # loose bounding box calculation will fail.
+        self.data['coord_frame']['x_stop'] = 10000
+        self.data['coord_frame']['y_stop'] = 10000
+        self.data['coord_frame']['z_stop'] = 10000
         self.resource = BossResourceBasic(self.data)
+
         self.kvio_config = self.layer.kvio_config
         self.state_config = self.layer.state_config
         self.object_store_config = self.layer.object_store_config
@@ -249,8 +257,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
 
     def test_get_loose_bounding_box(self):
         id = 33333
-        resource = BossResourceBasic(data=get_anno_dict())
-        resolution = 1
+        resolution = 0
         time_sample = 0
         version = 0
 
@@ -259,21 +266,23 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         bytes0 = np.zeros(10, dtype='uint64')
         bytes0[1] = id
         pos0 = [x_cube_dim, 2*y_cube_dim, 3*z_cube_dim]
-        morton_id0 = XYZMorton(pos0)
+        pos_ind0 = [pos0[0]/x_cube_dim, pos0[1]/y_cube_dim, pos0[2]/z_cube_dim]
+        morton_id0 = XYZMorton(pos_ind0)
         key0 = self.obj_store.generate_object_key(
-            resource, resolution, time_sample, morton_id0)
+            self.resource, resolution, time_sample, morton_id0)
 
         bytes1 = np.zeros(4, dtype='uint64')
         bytes1[0] = id     # Pre-existing id.
         pos1 = [3*x_cube_dim, 5*y_cube_dim, 6*z_cube_dim]
-        morton_id1 = XYZMorton(pos1)
+        pos_ind1 = [pos1[0]/x_cube_dim, pos1[1]/y_cube_dim, pos1[2]/z_cube_dim]
+        morton_id1 = XYZMorton(pos_ind1)
         key1 = self.obj_store.generate_object_key(
-            resource, resolution, time_sample, morton_id1)
+            self.resource, resolution, time_sample, morton_id1)
 
         self.obj_ind.update_id_indices(
-            resource, resolution, [key0, key1], [bytes0, bytes1], version)
+            self.resource, resolution, [key0, key1], [bytes0, bytes1], version)
 
-        actual = self.obj_ind.get_loose_bounding_box(resource, resolution, id)
+        actual = self.obj_ind.get_loose_bounding_box(self.resource, resolution, id)
         expected = {
             'x_range': [pos0[0], pos1[0]+x_cube_dim],
             'y_range': [pos0[1], pos1[1]+y_cube_dim],
