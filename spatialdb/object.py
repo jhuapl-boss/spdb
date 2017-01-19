@@ -136,6 +136,50 @@ class ObjectStore(metaclass=ABCMeta):
         """
 
     @abstractmethod
+    def get_loose_bounding_box(self, resource, resolution, id):
+        """
+        Get the loose bounding box that contains the object labeled with id.
+
+        A loose bounding box is always cuboid aligned.
+
+        Bounding box ranges follow the Python range convention.  For example,
+        if x_range = [0, 10], then x >= 0 and x < 10.
+
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            id (uint64|string): object's id
+
+        Returns:
+            (dict): {'x_range': [0, 10], 'y_range': [0, 10], 'z_range': [0, 10], 't_range': [0, 10]}
+
+        Raises:
+            (SpdbError): Can't talk to id index database or database corrupt.
+        """
+        raise NotImplemented
+
+    @abstractmethod
+    def get_tight_bounding_box(self, cutout_fcn, resource, resolution, id, x_rng, y_rng, z_rng, t_rng):
+        """Computes the exact bounding box for an id.
+
+        Use ranges from the cuboid aligned "loose" bounding box as input.
+
+        Args:
+            cutout_fcn (function): SpatialDB's cutout method.  Provided for naive search of cuboids on the edges of the loose bounding box.
+            resource (project.BossResource): Data model info based on the request or target resource.
+            resolution (int): the resolution level.
+            id (int): id to find bounding box of.
+            x_rng (list[int]): 2 element list representing range.
+            y_rng (list[int]): 2 element list representing range.
+            z_rng (list[int]): 2 element list representing range.
+            t_rng (list[int]): 2 element list representing range.
+
+        Returns:
+            (dict): {'x_range': [0, 10], 'y_range': [0, 10], 'z_range': [0, 10], 't_range': [0, 10]}
+        """
+        raise NotImplemented
+
+    @abstractmethod
     def get_ids_in_region(
             self, cutout_fcn, resource, resolution, corner, extent,
             t_range=[0, 1], version=0):
