@@ -778,7 +778,7 @@ class SpatialDB:
             return loose
 
         return self.objectio.get_tight_bounding_box(
-            self.cutout, resource, resolution, id,
+            self.cutout, resource, resolution, int(id),
             loose['x_range'], loose['y_range'], loose['z_range'], loose['t_range'])
 
     def _get_ids_in_region_naive(
