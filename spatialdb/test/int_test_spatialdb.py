@@ -388,7 +388,7 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
         cube1.zeros()
         cube1.data[0][0][40][0] = 55555
-        cube1.data[0][0][50][0] = 66666
+        cube1.data[0][0][50][0] = 66666000000000
         pos1 = [2*self.x_dim, 3*self.y_dim, 2*self.z_dim]
         cube1.morton_id = XYZMorton(pos1)
 
@@ -405,7 +405,7 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         extent = (self.x_dim, self.y_dim, self.z_dim)
         t_range = [0, 1]
         version = 0
-        expected = ['55555', '66666']
+        expected = ['55555', '66666000000000']
 
         # Method under test.
         actual = sp.get_ids_in_region(
@@ -672,7 +672,7 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         resolution = 0
         [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
 
-        id = 33333
+        id = 40000000000
         # Customize resource with so it writes to its own channel and uses a
         # coord frame large enough to encompass the data written.  This is
         # important for proper loose bounding box calculations.
