@@ -679,16 +679,14 @@ class AWSObjectStore(ObjectStore):
                 cutout_fcn, resource, resolution,
                 partial_region.corner, partial_region.extent,
                 t_range, version)
+            # TODO: do a unique first?  perf test
             id_set = np.union1d(id_set, id_arr)
 
         # Get ids from dynamo for sub-region that's 100% cuboid aligned.
         obj_key_list = self._get_object_keys(
             resource, resolution, cuboids, t_range)
         cuboid_ids = self.obj_ind.get_ids_in_cuboids(obj_key_list, version)
-        cuboid_int_ids = []
-        for id in cuboid_ids:
-            cuboid_int_ids.append(int(id))
-        cuboid_ids_arr = np.asarray(cuboid_int_ids, dtype='uint64')
+        cuboid_ids_arr = np.asarray([int(id) for id in cuboid_ids], dtype='uint64')
 
         # Union ids from cuboid aligned sub-region.
         id_set = np.union1d(id_set, cuboid_ids_arr)
@@ -697,7 +695,6 @@ class AWSObjectStore(ObjectStore):
         ids_as_str = ['%d' % n for n in id_set]
 
         return { 'ids': ids_as_str }
-
 
     def _get_ids_from_cutout(
             self, cutout_fcn, resource, resolution, corner, extent,
