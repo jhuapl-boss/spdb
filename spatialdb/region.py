@@ -101,7 +101,9 @@ class Region:
     @classmethod
     def _get_last_cuboid(cls, start, extent, cube_dim):
         """
-        Get the index of the last cuboid fully contained by start and extent.
+        Get the index+1 of the last cuboid fully contained by start and extent.
+
+        Returns index + 1 because this is used as part of a range().
 
         Args:
             start (int): Starting coordinate along the single axis.
@@ -116,7 +118,6 @@ class Region:
         if end % cube_dim != 0:
             # End not on cuboid boundary so start at previous cuboid boundary.
             end = (end // cube_dim) * cube_dim
-            _end_cube = end // cube_dim + 1
             if end < start + cube_dim:
                 # Less than a cuboid's worth of data on this axis.
                 end_cube -= 1

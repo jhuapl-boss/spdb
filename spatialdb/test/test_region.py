@@ -86,6 +86,20 @@ class TestRegion(unittest.TestCase):
 
         self.assertEqual(expected, actual)
 
+    def test_get_cuboid_aligned_sub_region_smaller_than_cuboid_within_first_cuboid(self):
+        """Request region within the bounds of the first cuboid."""
+        resolution = 0
+        corner = (100, 50, 4)
+        extent = (20, 20, 4)
+        expected = Region.Cuboids(
+            x_cuboids=range(0, -1),
+            y_cuboids=range(0, -1),
+            z_cuboids=range(0, -1)
+        )
+        actual = Region.get_cuboid_aligned_sub_region(resolution, corner, extent)
+
+        self.assertEqual(expected, actual)
+
     def test_get_sub_region_x_y_block_near_side_none(self):
         """Near side cuboid aligned along z axis, so z extent is 0."""
         resolution = 0
