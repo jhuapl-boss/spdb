@@ -177,7 +177,7 @@ class ObjectIndices:
                 "Error reading id index table from DynamoDB.",
                 ErrorCodes.OBJECT_STORE_ERROR)
 
-        # Id not in table.  Should we raise instead?
+        # Id not in table.
         if 'Item' not in response:
             return []
 
