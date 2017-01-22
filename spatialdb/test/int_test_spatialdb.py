@@ -620,6 +620,7 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
 
         id = 33333
+        id_as_str = '33333'
         # Customize resource with so it writes to its own channel and uses a
         # coord frame large enough to encompass the data written.  This is
         # important for proper loose bounding box calculations.
@@ -654,7 +655,7 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         np.testing.assert_array_equal(cube1.data, actual_cube.data)
 
         # Method under test.
-        actual = sp.get_bounding_box(resource, resolution, id, bb_type='tight')
+        actual = sp.get_bounding_box(resource, resolution, id_as_str, bb_type='tight')
 
         expected = {
             'x_range': [pos1[0]+104, pos1[0]+106],
