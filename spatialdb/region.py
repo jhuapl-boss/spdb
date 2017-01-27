@@ -22,6 +22,9 @@ class Region:
     """
     Class that helps calculate cuboid aligned and non-cuboid aligned
     sub-regions.
+
+    See ./diagrams/ids_in_region.png for an illustration of what is calculated.
+    Note that the diagram only shows what happens in the x and y dimensions.
     """
 
 

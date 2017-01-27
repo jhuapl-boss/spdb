@@ -261,6 +261,10 @@ class ObjectIndices:
 
         Note: assumes that VALID ranges are provided for the loose bounding box.
 
+        See ./diagrams/tight_bounding_boxes.png for illustration of cutouts
+        made to calculate the bounds.  Note that the diagram only shows the
+        cutouts made in the x and y dimensions.
+
         Args:
             cutout_fcn (function): SpatialDB's cutout method.  Provided for naive search of cuboids on the edges of the loose bounding box.
             resource (project.BossResource): Data model info based on the request or target resource.
