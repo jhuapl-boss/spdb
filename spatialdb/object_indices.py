@@ -96,6 +96,10 @@ class ObjectIndices:
 
         Any ids that are zeros will not be added to the indices.
 
+        While processing cuboid data in the cube_list, ids found will replace
+        any existing ids previously associated with the same cuboid in the
+        index.
+
         Args:
             resource (BossResource): Data model info based on the request or target resource.
             resolution (int): Resolution level.
@@ -118,11 +122,11 @@ class ObjectIndices:
                 print('Object key: {} has no ids'.format(obj_key))
                 continue
 
-            # Add these ids to the s3 cuboid index table.
+            # Associate these ids with their cuboid inthe s3 cuboid index table.
             response = self.dynamodb.update_item(
                 TableName=self.s3_index_table,
                 Key={'object-key': {'S': obj_key}, 'version-node': {'N': "{}".format(version)}},
-                UpdateExpression='ADD #idset :ids',
+                UpdateExpression='SET #idset = :ids',
                 ExpressionAttributeNames={'#idset': 'id-set'},
                 ExpressionAttributeValues={':ids': {'NS': ids_str_list}},
                 ReturnConsumedCapacity='NONE')

@@ -94,9 +94,13 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         self.assertIn('NS', response['Item']['id-set'])
         self.assertCountEqual(expected, response['Item']['id-set']['NS'])
 
-    def test_update_id_indices_update_existing_entry_in_cuboid_index(self):
+    def test_update_id_indices_replaces_existing_entry_in_cuboid_index(self):
         """
-        Test adding additional ids to existing cuboids in the s3 cuboid index.
+        Test calling update_id_indices() replaces existing id set in the s3 cuboid index.
+
+        Id set should be replaced because the entire cuboid is rewritten to s3
+        before this method is called.  Thus, the ids in the cuboid data are the
+        only ids that should exist in the index for that cuboid.
         """
         bytes = np.zeros(10, dtype='uint64')
         bytes[1] = 20
@@ -130,7 +134,8 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         self.assertIn('id-set', response['Item'])
         self.assertIn('NS', response['Item']['id-set'])
 
-        expected = ['20', '55', '1000', '4444']
+        # Id 20 should no longer be present.
+        expected = ['55', '1000', '4444']
         self.assertCountEqual(expected, response['Item']['id-set']['NS'])
 
     def test_update_id_indices_new_entry_for_id_index(self):
