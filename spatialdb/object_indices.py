@@ -122,33 +122,45 @@ class ObjectIndices:
                 print('Object key: {} has no ids'.format(obj_key))
                 continue
 
-            # Associate these ids with their cuboid inthe s3 cuboid index table.
-            response = self.dynamodb.update_item(
-                TableName=self.s3_index_table,
-                Key={'object-key': {'S': obj_key}, 'version-node': {'N': "{}".format(version)}},
-                UpdateExpression='SET #idset = :ids',
-                ExpressionAttributeNames={'#idset': 'id-set'},
-                ExpressionAttributeValues={':ids': {'NS': ids_str_list}},
-                ReturnConsumedCapacity='NONE')
-            if response['ResponseMetadata']['HTTPStatusCode'] != 200:
+            # Associate these ids with their cuboid in the s3 cuboid index table.
+            try:
+                response = self.dynamodb.update_item(
+                    TableName=self.s3_index_table,
+                    Key={'object-key': {'S': obj_key}, 'version-node': {'N': "{}".format(version)}},
+                    UpdateExpression='SET #idset = :ids',
+                    ExpressionAttributeNames={'#idset': 'id-set'},
+                    ExpressionAttributeValues={':ids': {'NS': ids_str_list}},
+                    ReturnConsumedCapacity='NONE')
+                if response['ResponseMetadata']['HTTPStatusCode'] != 200:
+                    raise SpdbError(
+                        "Error updating {} in cuboid index table in DynamoDB.".format(obj_key),
+                        ErrorCodes.OBJECT_STORE_ERROR)
+            except botocore.exceptions.ClientError as ex:
+                print("Caught exception: {}".format(ex))
                 raise SpdbError(
-                    "Error updating {} in cuboid index table in DynamoDB.".format(obj_key),
+                    "Error updating {} in cuboid index table in DynamoDB.  Too many ids present in cuboid.".format(obj_key),
                     ErrorCodes.OBJECT_STORE_ERROR)
 
             # Add object key to this id's cuboid set.
             for id in ids:
                 channel_id_key = self.generate_channel_id_key(resource, resolution, id)
-                response = self.dynamodb.update_item(
-                    TableName=self.id_index_table,
-                    Key={'channel-id-key': {'S': channel_id_key}, 'version': {'N': "{}".format(version)}},
-                    UpdateExpression='ADD #cuboidset :objkey',
-                    ExpressionAttributeNames={'#cuboidset': 'cuboid-set'},
-                    ExpressionAttributeValues={':objkey': {'SS': [obj_key]}},
-                    ReturnConsumedCapacity='NONE')
+                try:
+                    response = self.dynamodb.update_item(
+                        TableName=self.id_index_table,
+                        Key={'channel-id-key': {'S': channel_id_key}, 'version': {'N': "{}".format(version)}},
+                        UpdateExpression='ADD #cuboidset :objkey',
+                        ExpressionAttributeNames={'#cuboidset': 'cuboid-set'},
+                        ExpressionAttributeValues={':objkey': {'SS': [obj_key]}},
+                        ReturnConsumedCapacity='NONE')
 
-                if response['ResponseMetadata']['HTTPStatusCode'] != 200:
+                    if response['ResponseMetadata']['HTTPStatusCode'] != 200:
+                        raise SpdbError(
+                            "Error updating {} in id index table in DynamoDB.".format(channel_id_key),
+                            ErrorCodes.OBJECT_STORE_ERROR)
+                except botocore.exceptions.ClientError as ex:
+                    print("Caught exception: {}".format(ex))
                     raise SpdbError(
-                        "Error updating {} in id index table in DynamoDB.".format(channel_id_key),
+                        "Error updating {} in id index table in DynamoDB.  Id present in too many cuboids.".format(channel_id_key),
                         ErrorCodes.OBJECT_STORE_ERROR)
 
     def get_cuboids(self, resource, resolution, id, version=0):

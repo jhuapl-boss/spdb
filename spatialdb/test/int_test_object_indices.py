@@ -15,6 +15,7 @@
 from spdb.spatialdb.object_indices import ObjectIndices
 from spdb.c_lib.ndlib import XYZMorton
 from spdb.c_lib.ndtype import CUBOIDSIZE
+from spdb.spatialdb.error import SpdbError, ErrorCodes
 from spdb.project import BossResourceBasic
 from spdb.project.test.resource_setup import get_anno_dict
 
@@ -237,6 +238,48 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         self.assertIn('SS', response2['Item']['cuboid-set'])
         self.assertIn(object_key, response2['Item']['cuboid-set']['SS'])
         self.assertIn(new_object_key, response2['Item']['cuboid-set']['SS'])
+
+    def test_too_many_ids_in_cuboid(self):
+        """
+        Test error handling when a cuboid has more unique ids than DynamoDB
+        can support.
+        """
+        version = 0
+        resolution = 0
+        time_sample = 0
+        resource = BossResourceBasic(data=get_anno_dict())
+        mortonid = XYZMorton([0, 0, 0])
+        obj_keys = [self.obj_store.generate_object_key(resource, resolution, time_sample, mortonid)]
+        cubes = [np.random.randint(2000000, size=(16, 512, 512), dtype='uint64')]
+        with self.assertRaises(SpdbError) as ex:
+            self.obj_ind.update_id_indices(
+                resource, resolution, obj_keys, cubes, version)
+
+
+    def test_too_many_cuboids_for_id_index(self):
+        """
+        Test error handling when number of cuboids that contain an id exceeds
+        the limits allowed by DynamoDB.
+        """
+        version = 0
+        resolution = 0
+        time_sample = 0
+        resource = BossResourceBasic(data=get_anno_dict())
+        y = 0
+        z = 0
+        obj_keys = []
+        cubes = []
+
+        for x in range(0, 7651):
+            mortonid = XYZMorton([x, y, z])
+            obj_keys.append(self.obj_store.generate_object_key(
+                resource, resolution, time_sample, mortonid))
+            # Just need one non-zero number to represent each cuboid.
+            cubes.append(np.ones(1, dtype='uint64'))
+
+        with self.assertRaises(SpdbError) as ex:
+            self.obj_ind.update_id_indices(
+                resource, resolution, obj_keys, cubes, version)
 
     def test_get_cuboids(self):
         id = 22222
