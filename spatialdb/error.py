@@ -41,10 +41,33 @@ class SpdbError(Exception):
 
         raise SpdbError("The key already exists.  When trying to create key it must not exist", ErrorCodes.SPDB_ERROR)
 
+    Attributes:
+        message (string): Error message.
+        error_code (ErrorCodes): spdb error code.
     """
 
     def __init__(self, *args):
+        """
+        Constructor.
+
+        Args:
+            *args: arg[0] should be message and arg[1] should be SpdbError.
+        """
+
         # Log
         # TODO: Look into removing boss logger dependency
-        blog = BossLogger().logger
-        blog.error("SpdbError - Message: {0} - Code: {1}".format(args[0], args[1]))
+        if len(args) > 1:
+            blog = BossLogger().logger
+            blog.error("SpdbError - Message: {0} - Code: {1}".format(args[0], args[1]))
+            self.message = args[0]
+            self.error_code = args[1]
+            return
+
+        if len(args) == 1:
+            self.message = args[0]
+            self.error_code = ErrorCodes.SPDB_ERROR
+            return
+
+        self.message = 'No error message given.'
+        self.error_code = ErrorCodes.SPDB_ERROR
+
