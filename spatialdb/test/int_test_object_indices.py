@@ -254,6 +254,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         with self.assertRaises(SpdbError) as ex:
             self.obj_ind.update_id_indices(
                 resource, resolution, obj_keys, cubes, version)
+        self.assertEqual(ErrorCodes.OBJECT_STORE_ERROR, ex.exception.error_code)
 
 
     def test_too_many_cuboids_for_id_index(self):
@@ -280,6 +281,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         with self.assertRaises(SpdbError) as ex:
             self.obj_ind.update_id_indices(
                 resource, resolution, obj_keys, cubes, version)
+        self.assertEqual(ErrorCodes.OBJECT_STORE_ERROR, ex.exception.error_code)
 
     def test_get_cuboids(self):
         id = 22222
