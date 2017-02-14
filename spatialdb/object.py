@@ -617,7 +617,7 @@ class AWSObjectStore(ObjectStore):
                                     MessageBody=json.dumps(msg_data))
 
         if response['ResponseMetadata']['HTTPStatusCode'] != 200:
-            raise SpdbError("Error sending SNS message to trigger page out operation.",
+            raise SpdbError("Error sending SQS message to trigger page out operation.",
                             ErrorCodes.SPDB_ERROR)
 
         # Trigger lambda to handle it
