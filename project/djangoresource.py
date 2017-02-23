@@ -80,9 +80,7 @@ class BossResourceDjango(BossResource):
                                             self.boss_request.coord_frame.x_voxel_size,
                                             self.boss_request.coord_frame.y_voxel_size,
                                             self.boss_request.coord_frame.z_voxel_size,
-                                            self.boss_request.coord_frame.voxel_unit,
-                                            self.boss_request.coord_frame.time_step,
-                                            self.boss_request.coord_frame.time_step_unit)
+                                            self.boss_request.coord_frame.voxel_unit)
 
     def populate_experiment(self):
         """
@@ -92,7 +90,9 @@ class BossResourceDjango(BossResource):
                                       self.boss_request.experiment.description,
                                       self.boss_request.experiment.num_hierarchy_levels,
                                       self.boss_request.experiment.hierarchy_method,
-                                      self.boss_request.experiment.num_time_samples)
+                                      self.boss_request.experiment.num_time_samples,
+                                      self.boss_request.experiment.time_step,
+                                      self.boss_request.experiment.time_step_unit)
 
     def populate_channel(self):
         """

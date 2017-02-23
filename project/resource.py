@@ -53,13 +53,19 @@ class Experiment:
       hierarchy_method (str): The style of down-sampling used to build the resolution hierarchy.
       Valid values are 'near_iso', 'iso', and 'slice'.
       max_time_step (int): The maximum supported time sample
+      time_step (int): The increment in time between two time samples (assumes constant rate)
+      time_step_unit (str): The unit to use for the time step. Valid values are "nanosecond", "microsecond",
+        "millisecond", "second"
     """
-    def __init__(self, name, description, num_hierarchy_levels, hierarchy_method, num_time_samples):
+    def __init__(self, name, description, num_hierarchy_levels, hierarchy_method, num_time_samples,
+                 time_step, time_step_unit):
         self.name = name
         self.description = description
         self.num_hierarchy_levels = num_hierarchy_levels
         self.hierarchy_method = hierarchy_method
         self.num_time_samples = num_time_samples
+        self.time_step = time_step
+        self.time_step_unit = time_step_unit
 
 
 class CoordinateFrame:
@@ -80,9 +86,7 @@ class CoordinateFrame:
       z_voxel_size (int): The physical size of a voxel in the z-dimension
       voxel_unit (str): The unit to use for x/y/z voxel size. Valid values are "nanometer", "micrometer", "millimeter",
         "centimeter"
-      time_step (int): The increment in time between two time samples (assumes constant rate)
-      time_step_unit (str): The unit to use for the time step. Valid values are "nanosecond", "microsecond",
-        "millisecond", "second"
+
 
     Attributes:
       name (str): Unique string to identify the coordinate frame
@@ -98,12 +102,10 @@ class CoordinateFrame:
       z_voxel_size (int): The physical size of a voxel in the z-dimension
       voxel_unit (str): The unit to use for x/y/z voxel size. Valid values are "nanometer", "micrometer", "millimeter",
         "centimeter"
-      time_step (int): The increment in time between two time samples (assumes constant rate)
-      time_step_unit (str): The unit to use for the time step. Valid values are "nanosecond", "microsecond",
-        "millisecond", "second"
+
     """
     def __init__(self, name, description, x_start, x_stop, y_start, y_stop, z_start, z_stop,
-                 x_voxel_size, y_voxel_size, z_voxel_size, voxel_unit, time_step, time_step_unit):
+                 x_voxel_size, y_voxel_size, z_voxel_size, voxel_unit):
 
         self.name = name
         self.description = description
@@ -117,8 +119,6 @@ class CoordinateFrame:
         self.y_voxel_size = y_voxel_size
         self.z_voxel_size = z_voxel_size
         self.voxel_unit = voxel_unit
-        self.time_step = time_step
-        self.time_step_unit = time_step_unit
 
 
 class Channel:

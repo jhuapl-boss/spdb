@@ -85,9 +85,7 @@ class BossResourceBasic(BossResource):
                                             self.data['coord_frame']['x_voxel_size'],
                                             self.data['coord_frame']['y_voxel_size'],
                                             self.data['coord_frame']['z_voxel_size'],
-                                            self.data['coord_frame']['voxel_unit'],
-                                            self.data['coord_frame']['time_step'],
-                                            self.data['coord_frame']['time_step_unit'])
+                                            self.data['coord_frame']['voxel_unit'])
 
     def populate_experiment(self):
         """
@@ -98,6 +96,8 @@ class BossResourceBasic(BossResource):
                                       self.data['experiment']['num_hierarchy_levels'],
                                       self.data['experiment']['hierarchy_method'],
                                       self.data['experiment']['num_time_samples'],
+                                      self.data['experiment']['time_step'],
+                                      self.data['experiment']['time_step_unit']
                                       )
 
     def populate_channel(self):
