@@ -61,8 +61,6 @@ class TestBasicResource(unittest.TestCase):
         assert coord.y_voxel_size == setup_data['coord_frame']['y_voxel_size']
         assert coord.z_voxel_size == setup_data['coord_frame']['z_voxel_size']
         assert coord.voxel_unit == setup_data['coord_frame']['voxel_unit']
-        assert coord.time_step == setup_data['coord_frame']['time_step']
-        assert coord.time_step_unit == setup_data['coord_frame']['time_step_unit']
 
     def test_basic_resource_experiment(self):
         """Test basic get experiment interface
@@ -81,6 +79,8 @@ class TestBasicResource(unittest.TestCase):
         assert exp.num_hierarchy_levels == setup_data['experiment']['num_hierarchy_levels']
         assert exp.hierarchy_method == setup_data['experiment']['hierarchy_method']
         assert exp.num_time_samples == setup_data['experiment']['num_time_samples']
+        assert exp.time_step == setup_data['experiment']['time_step']
+        assert exp.time_step_unit == setup_data['experiment']['time_step_unit']
 
     def test_basic_resource_channel_no_time(self):
         """Test basic get channel interface
@@ -215,8 +215,7 @@ class TestBasicResource(unittest.TestCase):
         assert coord.y_voxel_size == setup_data['coord_frame']['y_voxel_size']
         assert coord.z_voxel_size == setup_data['coord_frame']['z_voxel_size']
         assert coord.voxel_unit == setup_data['coord_frame']['voxel_unit']
-        assert coord.time_step == setup_data['coord_frame']['time_step']
-        assert coord.time_step_unit == setup_data['coord_frame']['time_step_unit']
+
 
         # Check exp
         exp = resource2.get_experiment()
@@ -225,6 +224,8 @@ class TestBasicResource(unittest.TestCase):
         assert exp.num_hierarchy_levels == setup_data['experiment']['num_hierarchy_levels']
         assert exp.hierarchy_method == setup_data['experiment']['hierarchy_method']
         assert exp.num_time_samples == setup_data['experiment']['num_time_samples']
+        assert exp.time_step == setup_data['experiment']['time_step']
+        assert exp.time_step_unit == setup_data['experiment']['time_step_unit']
 
         # Check channel
         channel = resource2.get_channel()
@@ -295,8 +296,6 @@ class TestBasicResource(unittest.TestCase):
         assert coord.y_voxel_size == setup_data['coord_frame']['y_voxel_size']
         assert coord.z_voxel_size == setup_data['coord_frame']['z_voxel_size']
         assert coord.voxel_unit == setup_data['coord_frame']['voxel_unit']
-        assert coord.time_step == setup_data['coord_frame']['time_step']
-        assert coord.time_step_unit == setup_data['coord_frame']['time_step_unit']
 
         # Check exp
         exp = resource2.get_experiment()
@@ -305,6 +304,8 @@ class TestBasicResource(unittest.TestCase):
         assert exp.num_hierarchy_levels == setup_data['experiment']['num_hierarchy_levels']
         assert exp.hierarchy_method == setup_data['experiment']['hierarchy_method']
         assert exp.num_time_samples == setup_data['experiment']['num_time_samples']
+        assert exp.time_step == setup_data['experiment']['time_step']
+        assert exp.time_step_unit == setup_data['experiment']['time_step_unit']
 
         # Check channel
         channel = resource2.get_channel()
@@ -436,8 +437,6 @@ class TestBasicResource(unittest.TestCase):
         assert coord.y_voxel_size == setup_data['coord_frame']['y_voxel_size']
         assert coord.z_voxel_size == setup_data['coord_frame']['z_voxel_size']
         assert coord.voxel_unit == setup_data['coord_frame']['voxel_unit']
-        assert coord.time_step == setup_data['coord_frame']['time_step']
-        assert coord.time_step_unit == setup_data['coord_frame']['time_step_unit']
 
         # Check exp
         exp = resource2.get_experiment()
@@ -446,6 +445,8 @@ class TestBasicResource(unittest.TestCase):
         assert exp.num_hierarchy_levels == setup_data['experiment']['num_hierarchy_levels']
         assert exp.hierarchy_method == setup_data['experiment']['hierarchy_method']
         assert exp.num_time_samples == setup_data['experiment']['num_time_samples']
+        assert exp.time_step == setup_data['experiment']['time_step']
+        assert exp.time_step_unit == setup_data['experiment']['time_step_unit']
 
         # Check channel
         channel = resource2.get_channel()

@@ -24,8 +24,6 @@ def get_image_dict():
     data['coord_frame']['y_voxel_size'] = 4
     data['coord_frame']['z_voxel_size'] = 35
     data['coord_frame']['voxel_unit'] = "nanometers"
-    data['coord_frame']['time_step'] = 0
-    data['coord_frame']['time_step_unit'] = "na"
 
     data['experiment'] = {}
     data['experiment']['name'] = "exp1"
@@ -33,6 +31,8 @@ def get_image_dict():
     data['experiment']['num_hierarchy_levels'] = 7
     data['experiment']['hierarchy_method'] = 'slice'
     data['experiment']['num_time_samples'] = 0
+    data['experiment']['time_step'] = 0
+    data['experiment']['time_step_unit'] = "na"
 
     data['channel_layer'] = {}
     data['channel_layer']['name'] = "ch1"
