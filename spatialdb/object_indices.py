@@ -138,8 +138,9 @@ class ObjectIndices:
             except botocore.exceptions.ClientError as ex:
                 print("Caught exception: {}".format(ex))
                 raise SpdbError(
-                    "Error updating {} in cuboid index table in DynamoDB.  Too many ids present in cuboid.".format(obj_key),
+                    "Error updating {} in cuboid index table in DynamoDB: {} ".format(obj_key, ex),
                     ErrorCodes.OBJECT_STORE_ERROR)
+
 
             # Add object key to this id's cuboid set.
             for id in ids:
