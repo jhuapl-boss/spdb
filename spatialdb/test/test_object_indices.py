@@ -54,6 +54,43 @@ class ObjectIndicesTestMixin(object):
         actual = self.obj_ind._make_ids_strings(arr)
         self.assertEqual(expected, actual)
 
+    def test_update_id_indices_ignores_zeros(self):
+        """
+        Never send id 0 to the DynamoDB id index or cuboid index!  Since
+        0 is the default value before an id is assigned to a voxel, this
+        would blow way past DynamoDB limits.
+        """
+
+        resolution = 0
+        version = 0
+        _id = 300
+        id_str_list = ['{}'.format(_id)]
+        cube_data = np.zeros(5, dtype='uint64')
+        cube_data[2] = _id
+        key = 'some_obj_key'
+
+        exp_channel_key = self.obj_ind.generate_channel_id_key(self.resource, resolution, _id)
+
+        with patch.object(self.obj_ind.dynamodb, 'update_item') as mock_update_item:
+            mock_update_item.return_value = {
+                'ResponseMetadata': { 'HTTPStatusCode': 200 }
+            }
+            self.obj_ind.update_id_indices(self.resource, resolution, [key], [cube_data], version)
+
+            # Expect only 2 calls because there's only 1 non-zero id.
+            self.assertEqual(2, mock_update_item.call_count)
+
+            # First call should update s3 cuboid index.
+            kall0 = mock_update_item.mock_calls[0]
+            _, _, kwargs0 = kall0
+            self.assertEqual(id_str_list, kwargs0['ExpressionAttributeValues'][':ids']['NS'])
+
+            # Second call should update id index.
+            kall1 = mock_update_item.mock_calls[1]
+            _, _, kwargs1 = kall1
+            self.assertEqual(exp_channel_key, kwargs1['Key']['channel-id-key']['S'])
+
+            
     def test_get_loose_bounding_box(self):
         # Only need for the AWSObjectStore's generate_object_key() method, so
         # can provide dummy values to initialize it.
