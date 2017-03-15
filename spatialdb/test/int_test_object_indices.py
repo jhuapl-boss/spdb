@@ -257,10 +257,14 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         self.assertEqual(ErrorCodes.OBJECT_STORE_ERROR, ex.exception.error_code)
 
 
+    @unittest.skip('test takes too long for normal integration tests')
     def test_too_many_cuboids_for_id_index(self):
         """
         Test error handling when number of cuboids that contain an id exceeds
-        the limits allowed by DynamoDB.
+        the limits allowed by DynamoDB.  
+        
+        This test writes 7651 cuboids which causes DynamoDB throttling, so we 
+        normally skip this test.  
         """
         version = 0
         resolution = 0
