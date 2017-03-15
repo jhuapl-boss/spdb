@@ -112,7 +112,7 @@ class ObjectIndices:
         """
         for obj_key, cube in zip(key_list, cube_list):
             # Find unique ids in this cube.
-            ids = unique(cube)
+            ids = np.unique(cube)
 
             # Convert ids to a string.
             ids_str_list = self._make_ids_strings(ids)
@@ -144,6 +144,10 @@ class ObjectIndices:
 
             # Add object key to this id's cuboid set.
             for id in ids:
+                if id == 0:
+                    # 0 is not a valid id (unclassified pixel).
+                    continue
+
                 channel_id_key = self.generate_channel_id_key(resource, resolution, id)
                 try:
                     response = self.dynamodb.update_item(
