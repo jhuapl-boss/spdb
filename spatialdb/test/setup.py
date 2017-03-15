@@ -28,9 +28,53 @@ from spdb.project.test.resource_setup import get_image_dict, get_anno_dict
 from spdb.project import BossResourceBasic
 
 from bossutils import configuration
+from bossutils.aws import get_region
 
 import random
 import os
+
+
+def get_account_id():
+    """Method to get the AWS account ID
+    Returns:
+        (str)
+    """
+    return boto3.client('sts').get_caller_identity()['Account']
+
+
+def get_test_configuration():
+    """Method to get the integration test configuration info for spdb
+
+    Returns:
+        (dict, dict, dict): A tuple of dictionaries (kvio_config, state_config, object_store_config, s3_flush_queue_name)
+    """
+    config = configuration.BossConfig()
+
+    # Get domain info
+    parts = config['aws']['cache'].split('.')
+    domain = "{}.{}".format(parts[1], parts[2])
+
+    # kvio settings
+    kvio_config = {"cache_host": config['aws']['cache'],
+                   "cache_db": 1,
+                   "read_timeout": 86400}
+
+    # state settings
+    state_config = {"cache_state_host": config['aws']['cache-state'], "cache_state_db": 1}
+
+    _, domain = config['aws']['cuboid_bucket'].split('.', 1)
+    s3_flush_queue_name = "intTest.S3FlushQueue.{}".format(domain).replace('.', '-')
+
+    object_store_config = {"s3_flush_queue": "https://queue.amazonaws.com/{}/{}".format(get_account_id(),
+                                                                                        s3_flush_queue_name),
+                           "cuboid_bucket": "intTest.{}".format(config['aws']['cuboid_bucket']),
+                           "page_in_lambda_function": config['lambda']['page_in_function'],
+                           "page_out_lambda_function": config['lambda']['flush_function'],
+                           "s3_index_table": "intTest.{}".format(config['aws']['s3-index-table']),
+                           "id_index_table": "intTest.{}".format(config['aws']['id-index-table']),
+                           "id_count_table": "intTest.{}".format(config['aws']['id-count-table'])}
+
+    return kvio_config, state_config, object_store_config, s3_flush_queue_name
 
 
 class SetupTests(object):
@@ -154,7 +198,6 @@ class SetupTests(object):
                 resp = client.describe_table(TableName=table_name)
             except:
                 # Exception thrown when table doesn't exist.
-                print('')
                 return
 
     # ***** END Cuboid Index Table END *****
@@ -258,32 +301,11 @@ class AWSSetupLayer(object):
 
     @classmethod
     def setUp(cls):
+        # Turn of mocking (since this is used only during integration tests)
         cls.setup_helper.mock = False
 
-        config = configuration.BossConfig()
-
-        # Get domain info
-        parts = config['aws']['cache'].split('.')
-        domain = "{}.{}".format(parts[1], parts[2])
-
-        # kvio settings
-        cls.kvio_config = {"cache_host": config['aws']['cache'],
-                           "cache_db": 1,
-                           "read_timeout": 86400}
-
-        # state settings
-        cls.state_config = {"cache_state_host": config['aws']['cache-state'], "cache_state_db": 1}
-
-        _, domain = config['aws']['cuboid_bucket'].split('.', 1)
-        cls.s3_flush_queue_name = "intTest.S3FlushQueue.{}".format(domain).replace('.', '-')
-        cls.object_store_config = {"s3_flush_queue": "",
-                                   "cuboid_bucket": "intTest{}.{}".format(random.randint(0, 9999),
-                                                                          config['aws']['cuboid_bucket']),
-                                   "page_in_lambda_function": config['lambda']['page_in_function'],
-                                   "page_out_lambda_function": config['lambda']['flush_function'],
-                                   "s3_index_table": "intTest.{}".format(config['aws']['s3-index-table']),
-                                   "id_index_table": "intTest.{}".format(config['aws']['id-index-table']),
-                                   "id_count_table": "intTest.{}".format(config['aws']['id-count-table'])}
+        # Get SPDB config
+        cls.kvio_config, cls.state_config, cls.object_store_config, cls.s3_flush_queue_name = get_test_configuration()
 
         # Setup AWS
         print('Creating Temporary AWS Resources', end='', flush=True)
@@ -330,7 +352,7 @@ class AWSSetupLayer(object):
 
     @classmethod
     def tearDown(cls):
-        print('Deleting Temporary AWS Resources', end='', flush=True)
+        print('\nDeleting Temporary AWS Resources', end='', flush=True)
         try:
             cls.setup_helper.delete_index_table(cls.object_store_config["s3_index_table"])
         except:
