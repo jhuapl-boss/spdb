@@ -65,10 +65,12 @@ def get_test_configuration():
     _, domain = config['aws']['cuboid_bucket'].split('.', 1)
     s3_flush_queue_name = "intTest.S3FlushQueue.{}".format(domain).replace('.', '-')
 
+    account_id = "{}".format(get_account_id())
+    account_id = account_id[:5]
+
     object_store_config = {"s3_flush_queue": "https://queue.amazonaws.com/{}/{}".format(get_account_id(),
                                                                                         s3_flush_queue_name),
-                           "cuboid_bucket": "intTest-{}.{}".format(random.randint(1000, 9999),
-                                                                   config['aws']['cuboid_bucket']),
+                           "cuboid_bucket": "intTest.{}.{}".format(account_id, config['aws']['cuboid_bucket']),
                            "page_in_lambda_function": config['lambda']['page_in_function'],
                            "page_out_lambda_function": config['lambda']['flush_function'],
                            "s3_index_table": "intTest.{}".format(config['aws']['s3-index-table']),
