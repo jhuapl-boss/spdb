@@ -265,14 +265,40 @@ class CacheStateDB(object):
         Returns:
             list(str): List of delayed write-cuboid keys
         """
-        output = []
-        write_cuboid_key = self.status_client.lpop(delayed_write_key)
-        while write_cuboid_key:
-            if write_cuboid_key:
-                output.append(write_cuboid_key)
-            write_cuboid_key = self.status_client.lpop(delayed_write_key)
+        write_cuboid_key_list = []
+        with self.status_client.pipeline() as pipe:
+            try:
+                # Get all items in the list and cleanup, in a transaction so other procs can't add anything
+                pipe.watch(delayed_write_key)
+                pipe.multi()
 
-        return [x.decode() for x in output]
+                # Get all items in the list
+                pipe.lrange(delayed_write_key, 0, -1)
+
+                # Delete the delayed-write-key as it should be empty now
+                pipe.delete(delayed_write_key)
+
+                # Delete its associated resource-delayed-write key that stores the resource string
+                pipe.delete("RESOURCE-{}".format(delayed_write_key))
+
+                # Execute.
+                write_cuboid_key_list = pipe.execute()
+
+                # If you got here things worked OK. Clean up the result. First entry in list is the LRANGE result
+                write_cuboid_key_list = write_cuboid_key_list[0]
+
+                # Keys are encoded
+                write_cuboid_key_list = [x.decode() for x in write_cuboid_key_list]
+
+            except redis.WatchError as _:
+                # Watch error occurred. Just bail out and let the daemon pick this up later.
+                return []
+
+            except Exception as e:
+                raise SpdbError("An error occurred while attempting to retrieve delay-write keys: \n {}".format(e),
+                                ErrorCodes.REDIS_ERROR)
+
+        return write_cuboid_key_list
 
     def check_single_delayed_write(self, delayed_write_key):
         """
