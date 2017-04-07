@@ -29,16 +29,10 @@ def get_image_dict():
     data['experiment']['name'] = "exp1"
     data['experiment']['description'] = "Test experiment 1"
     data['experiment']['num_hierarchy_levels'] = 7
-    data['experiment']['hierarchy_method'] = 'slice'
+    data['experiment']['hierarchy_method'] = 'anisotropic'
     data['experiment']['num_time_samples'] = 0
     data['experiment']['time_step'] = 0
     data['experiment']['time_step_unit'] = "na"
-
-    data['channel_layer'] = {}
-    data['channel_layer']['name'] = "ch1"
-    data['channel_layer']['description'] = "Test channel 1"
-    data['channel_layer']['is_channel'] = True
-    data['channel_layer']['datatype'] = 'uint8'
 
     data['channel'] = {}
     data['channel']['name'] = "ch1"
@@ -49,6 +43,7 @@ def get_image_dict():
     data['channel']['sources'] = []
     data['channel']['related'] = []
     data['channel']['default_time_sample'] = 0
+    data['channel']['downsample_status'] = "NOT_DOWNSAMPLED"
 
     return data
 

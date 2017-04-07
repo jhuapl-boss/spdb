@@ -101,6 +101,24 @@ class TestBasicResource(unittest.TestCase):
         assert channel.sources == setup_data['channel']['sources']
         assert channel.related == setup_data['channel']['related']
         assert channel.default_time_sample == setup_data['channel']['default_time_sample']
+        assert channel.downsample_status == setup_data['channel']['downsample_status']
+
+    def test_is_downsampled(self):
+        """Test is downsampled method
+
+        Returns:
+            None
+
+        """
+        setup_data = get_image_dict()
+        resource = BossResourceBasic(setup_data)
+
+        self.assertFalse(resource.is_downsampled())
+
+        setup_data['channel']['downsample_status'] = "DOWNSAMPLED"
+        resource = BossResourceBasic(setup_data)
+
+        self.assertTrue(resource.is_downsampled())
 
     def test_basic_resource_get_boss_key(self):
         """Test basic get boss key interface

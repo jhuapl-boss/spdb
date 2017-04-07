@@ -139,9 +139,11 @@ class Channel:
       source (list(str)): A list of channels from which this channel is derived
       related (list(str)): A list of channels that are related to this channel
       default_time_sample(int): The time step to use if time is omitted from a request
+      downsample_status (str): String indicating the status of a channel's downsampling process
 
     """
-    def __init__(self, name, description, ch_type, datatype, base_resolution, sources, related, default_time_sample):
+    def __init__(self, name, description, ch_type, datatype, base_resolution, sources, related,
+                 default_time_sample, downsample_status):
         self.name = name
         self.description = description
         self.type = ch_type
@@ -150,6 +152,7 @@ class Channel:
         self.sources = sources
         self.related = related
         self.default_time_sample = default_time_sample
+        self.downsample_status = downsample_status
 
     def is_image(self):
         """
@@ -335,15 +338,20 @@ class BossResource(metaclass=ABCMeta):
         """
         return "redis"
 
-    # TODO: Need to implement propagation in data model to support propagation status tracking
-    def is_propagated(self):
-        """Check if a layer/channel has been propagated, building out the res hierarchy
+    def is_downsampled(self):
+        """Check if a channel has been downsampled, building out the res hierarchy
 
         Returns:
-            bool: True if the resource has been propagated, False if not.
+            bool: True if the resource has been downsampled, False if not.
 
         """
-        return False
+        if not self._channel:
+            self.populate_channel()
+
+        if self._channel.downsample_status.lower() == "downsampled":
+            return True
+        else:
+            return False
 
     def get_data_type(self):
         """Method to get data type.  Lazily populated. None if current resource is not a channel or layer

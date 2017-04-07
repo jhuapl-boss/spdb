@@ -111,7 +111,8 @@ class BossResourceBasic(BossResource):
                                 self.data['channel']['base_resolution'],
                                 self.data['channel']['sources'],
                                 self.data['channel']['related'],
-                                self.data['channel']['default_time_sample'])
+                                self.data['channel']['default_time_sample'],
+                                self.data['channel']['downsample_status'])
 
     def populate_boss_key(self):
         """

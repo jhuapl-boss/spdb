@@ -111,7 +111,8 @@ class BossResourceDjango(BossResource):
                                 self.boss_request.channel.base_resolution,
                                 sources,
                                 related,
-                                self.boss_request.channel.default_time_sample)
+                                self.boss_request.channel.default_time_sample,
+                                self.boss_request.channel.downsample_status)
 
     def populate_boss_key(self):
         """
