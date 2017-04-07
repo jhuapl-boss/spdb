@@ -480,3 +480,137 @@ class TestBasicResource(unittest.TestCase):
         # check keys
         assert resource2.get_lookup_key() == setup_data['lookup_key']
         assert resource2.get_boss_key() == setup_data['boss_key']
+
+    def test_basic_resource_get_iso_level_anisotropic(self):
+        """Test get iso level anisotropic
+
+        Returns:
+            None
+
+        """
+        setup_data = get_anno_dict()
+        resource = BossResourceBasic(setup_data)
+
+        self.assertEqual(resource.get_isotropic_level(), 3)
+
+    def test_basic_resource_get_iso_level_isotropic(self):
+        """Test get iso level isotropic
+
+        Returns:
+            None
+
+        """
+        setup_data = get_anno_dict()
+        setup_data["experiment"]['hierarchy_method'] = "isotropic"
+        resource = BossResourceBasic(setup_data)
+
+        self.assertEqual(resource.get_isotropic_level(), 0)
+
+    def test_basic_resource_get_downsampled_voxel_dims_anisotropic(self):
+        """Test downsample voxel dims anisotropic
+
+        Returns:
+            None
+
+        """
+        setup_data = get_anno_dict()
+        resource = BossResourceBasic(setup_data)
+
+        voxel_dims = resource.get_downsampled_voxel_dims()
+        self.assertEqual(len(voxel_dims), setup_data["experiment"]['num_hierarchy_levels'])
+        self.assertEqual(voxel_dims[0], [4, 4, 35])
+        self.assertEqual(voxel_dims[4], [64, 64, 35])
+
+    def test_basic_resource_get_downsampled_voxel_dims_anisotropic_iso(self):
+        """Test downsample voxel dims anisotropic with iso flag
+
+        Returns:
+            None
+
+        """
+        setup_data = get_anno_dict()
+        resource = BossResourceBasic(setup_data)
+
+        voxel_dims = resource.get_downsampled_voxel_dims(iso=True)
+        self.assertEqual(len(voxel_dims), setup_data["experiment"]['num_hierarchy_levels'])
+        self.assertEqual(voxel_dims[0], [4, 4, 35])
+        self.assertEqual(voxel_dims[1], [8, 8, 35])
+        self.assertEqual(voxel_dims[2], [16, 16, 35])
+        self.assertEqual(voxel_dims[3], [32, 32, 35])
+        self.assertEqual(voxel_dims[4], [64, 64, 70])
+        self.assertEqual(voxel_dims[5], [128, 128, 140])
+
+    def test_basic_resource_get_downsampled_voxel_dims_isotropic(self):
+        """Test downsample voxel dims isotropic
+
+        Returns:
+            None
+
+        """
+        setup_data = get_anno_dict()
+        setup_data['coord_frame']['x_voxel_size'] = 6
+        setup_data['coord_frame']['y_voxel_size'] = 6
+        setup_data['coord_frame']['z_voxel_size'] = 6
+        setup_data['experiment']['hierarchy_method'] = "isotropic"
+        resource = BossResourceBasic(setup_data)
+
+        voxel_dims = resource.get_downsampled_voxel_dims()
+        self.assertEqual(len(voxel_dims), setup_data["experiment"]['num_hierarchy_levels'])
+        self.assertEqual(voxel_dims[0], [6, 6, 6])
+        self.assertEqual(voxel_dims[3], [48, 48, 48])
+
+    def test_basic_resource_get_downsampled_extent_dims_anisotropic(self):
+        """Test downsample extent anisotropic
+
+        Returns:
+            None
+
+        """
+        setup_data = get_anno_dict()
+        resource = BossResourceBasic(setup_data)
+
+        extent_dims = resource.get_downsampled_extent_dims()
+        self.assertEqual(len(extent_dims), setup_data["experiment"]['num_hierarchy_levels'])
+        self.assertEqual(extent_dims[0], [2000, 5000, 200])
+        self.assertEqual(extent_dims[4], [125, 313, 200])
+
+
+    def test_basic_resource_get_downsampled_extent_dims_anisotropic_iso(self):
+        """Test downsample extent anisotropic with isotropic flag
+
+        Returns:
+            None
+
+        """
+        setup_data = get_anno_dict()
+        resource = BossResourceBasic(setup_data)
+
+        extent_dims = resource.get_downsampled_extent_dims(iso=True)
+        self.assertEqual(len(extent_dims), setup_data["experiment"]['num_hierarchy_levels'])
+        self.assertEqual(extent_dims[0], [2000, 5000, 200])
+        self.assertEqual(extent_dims[3], [250, 625, 200])
+        self.assertEqual(extent_dims[4], [125, 313, 100])
+
+    def test_basic_resource_get_downsampled_extent_dims_isotropic(self):
+        """Test downsample extent isotropic
+
+        Returns:
+            None
+
+        """
+        setup_data = get_anno_dict()
+        setup_data['coord_frame']['x_voxel_size'] = 6
+        setup_data['coord_frame']['y_voxel_size'] = 6
+        setup_data['coord_frame']['z_voxel_size'] = 6
+        setup_data['experiment']['hierarchy_method'] = "isotropic"
+        resource = BossResourceBasic(setup_data)
+
+        extent_dims = resource.get_downsampled_extent_dims()
+        self.assertEqual(len(extent_dims), setup_data["experiment"]['num_hierarchy_levels'])
+        self.assertEqual(extent_dims[0], [2000, 5000, 200])
+        self.assertEqual(extent_dims[1], [1000, 2500, 100])
+        self.assertEqual(extent_dims[3], [250, 625, 25])
+
+
+
+

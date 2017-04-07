@@ -15,6 +15,107 @@
 from abc import ABCMeta, abstractmethod
 import numpy as np
 import json
+import math
+
+
+def get_isotropic_level(hierarchy_method, x_voxel_size, y_voxel_size, z_voxel_size):
+        """Method to get the resolution level where the data is closest to isotropic
+
+        Args:
+            hierarchy_method(str): isotropic or anisotropic
+            x_voxel_size(int): voxel size in x dimension
+            y_voxel_size(int): voxel size in y dimension
+            z_voxel_size(int): voxel size in z dimension
+
+        Returns:
+            int
+        """
+        if hierarchy_method == "isotropic":
+            return 0
+        else:
+            if x_voxel_size != y_voxel_size:
+                raise Exception("X voxel size != Y voxel size. Currently unable to determine isotropic level")
+
+            aspect_ratios = [float(z_voxel_size) / (x_voxel_size * 2 ** r) for r in range(0, 30)]
+            resolution = (np.abs(np.array(aspect_ratios)-1)).argmin()
+
+            return resolution
+
+
+def get_downsampled_voxel_dims(num_hierarchy_levels, isotropic_level, hierarchy_method,
+                               x_voxel_size, y_voxel_size, z_voxel_size,
+                               iso=False):
+    """Method to return a list, mapping resolution levels to voxel dimensions
+
+    Args:
+        num_hierarchy_levels(int): Number of levels to compute
+        isotropic_level(iso): Resolution level closest to isotropic
+        hierarchy_method(str): Downsampling method (anisotropic | isotropic)
+        x_voxel_size(int): voxel size in x dimension
+        y_voxel_size(int): voxel size in y dimension
+        z_voxel_size(int): voxel size in z dimension
+        iso(bool): If requesting isotropic dimensions (for anisotropic channels)
+
+    Returns:
+        (list): List where each element is the voxel coords in [x,y,z]. Array index = resolution level
+    """
+    voxel_dims = [[x_voxel_size, y_voxel_size, z_voxel_size]]
+    for res in range(1, num_hierarchy_levels):
+        if hierarchy_method == "isotropic":
+            voxel_dims.append([voxel_dims[res-1][0] * 2,
+                               voxel_dims[res-1][1] * 2,
+                               voxel_dims[res-1][2] * 2])
+        else:
+            # Anisotropic channel
+            if res > isotropic_level and iso is True:
+                # You want the isotropic version
+                voxel_dims.append([voxel_dims[res-1][0] * 2,
+                                   voxel_dims[res-1][1] * 2,
+                                   voxel_dims[res-1][2] * 2])
+            else:
+                # You want the anisotropic version
+                voxel_dims.append([voxel_dims[res-1][0] * 2,
+                                   voxel_dims[res-1][1] * 2,
+                                   voxel_dims[res-1][2]])
+    return voxel_dims
+
+
+def get_downsampled_extent_dims(num_hierarchy_levels, isotropic_level, hierarchy_method,
+                                x_extent, y_extent, z_extent,
+                                iso=False):
+    """Method to return a list, mapping resolution levels to coord frame extent dimensions
+
+    Args:
+        num_hierarchy_levels(int): Number of levels to compute
+        isotropic_level(iso): Resolution level closest to isotropic
+        hierarchy_method(str): Downsampling method (anisotropic | isotropic)
+        x_extent(int): extent in x dimension
+        y_extent(int): extent in y dimension
+        z_extent(int): extent in z dimension
+        iso(bool): If requesting isotropic dimensions (for anisotropic channels)
+
+    Returns:
+        (list): List where each element is the voxel coords in [x,y,z]. Array index = resolution level
+    """
+    extent_dims = [[x_extent, y_extent, z_extent]]
+    for res in range(1, num_hierarchy_levels):
+        if hierarchy_method == "isotropic":
+            extent_dims.append([math.ceil(extent_dims[res-1][0] / 2.0),
+                                math.ceil(extent_dims[res-1][1] / 2.0),
+                                math.ceil(extent_dims[res-1][2] / 2.0)])
+        else:
+            # Anisotropic channel
+            if res > isotropic_level and iso is True:
+                # You want the isotropic version
+                extent_dims.append([math.ceil(extent_dims[res-1][0] / 2.0),
+                                    math.ceil(extent_dims[res-1][1] / 2.0),
+                                    math.ceil(extent_dims[res-1][2] / 2.0)])
+            else:
+                # You want the anisotropic version
+                extent_dims.append([math.ceil(extent_dims[res-1][0] / 2.0),
+                                    math.ceil(extent_dims[res-1][1] / 2.0),
+                                    math.ceil(extent_dims[res-1][2])])
+    return extent_dims
 
 
 class Collection:
@@ -397,3 +498,66 @@ class BossResource(metaclass=ABCMeta):
             return ValueError("Unsupported data type")
 
         return bit_depth
+
+    def get_isotropic_level(self):
+        """Method to get the resolution level where the data has become isotropic
+
+        Returns:
+            int
+        """
+        if not self._coord_frame:
+            self.populate_coord_frame()
+
+        if not self._experiment:
+            self.populate_experiment()
+
+        return get_isotropic_level(self._experiment.hierarchy_method,
+                                   self._coord_frame.x_voxel_size,
+                                   self._coord_frame.y_voxel_size,
+                                   self._coord_frame.z_voxel_size)
+
+    def get_downsampled_voxel_dims(self, iso=False):
+        """Method to return a list, mapping resolution levels to voxel dimensions
+
+        Args:
+            iso(bool): If requesting isotropic dimensions (for anisotropic channels)
+
+        Returns:
+            (dict)
+        """
+        if not self._coord_frame:
+            self.populate_coord_frame()
+
+        if not self._experiment:
+            self.populate_experiment()
+
+        return get_downsampled_voxel_dims(self._experiment.num_hierarchy_levels,
+                                          self.get_isotropic_level(),
+                                          self._experiment.hierarchy_method,
+                                          self._coord_frame.x_voxel_size,
+                                          self._coord_frame.y_voxel_size,
+                                          self._coord_frame.z_voxel_size,
+                                          iso)
+
+    def get_downsampled_extent_dims(self, iso=False):
+        """Method to return a list, mapping resolution levels to extent dimensions
+
+        Args:
+            iso(bool): If requesting isotropic dimensions (for anisotropic channels)
+
+        Returns:
+            (dict)
+        """
+        if not self._coord_frame:
+            self.populate_coord_frame()
+
+        if not self._experiment:
+            self.populate_experiment()
+
+        return get_downsampled_extent_dims(self._experiment.num_hierarchy_levels,
+                                           self.get_isotropic_level(),
+                                           self._experiment.hierarchy_method,
+                                           self._coord_frame.x_stop,
+                                           self._coord_frame.y_stop,
+                                           self._coord_frame.z_stop,
+                                           iso)
