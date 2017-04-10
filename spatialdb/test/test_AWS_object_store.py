@@ -148,9 +148,9 @@ class AWSObjectStoreTestMixin(object):
         """Test method for checking if cuboids exist in S3 index"""
         os = AWSObjectStore(self.object_store_config)
 
-        expected_keys = ["1&1&1&0&0&12", "1&1&1&0&0&13", "1&1&1&0&0&14"]
-        test_keys = ["1&1&1&0&0&100", "1&1&1&0&0&13", "1&1&1&0&0&14",
-                     "1&1&1&0&0&15"]
+        expected_keys = ["CACHED-CUBOID&1&1&1&0&0&12", "CACHED-CUBOID&1&1&1&0&0&13", "CACHED-CUBOID&1&1&1&0&0&14"]
+        test_keys = ["CACHED-CUBOID&1&1&1&0&0&100", "CACHED-CUBOID&1&1&1&0&0&13", "CACHED-CUBOID&1&1&1&0&0&14",
+                     "CACHED-CUBOID&1&1&1&0&0&15"]
 
         expected_object_keys = os.cached_cuboid_to_object_keys(expected_keys)
 
@@ -169,9 +169,9 @@ class AWSObjectStoreTestMixin(object):
         the cache miss key index parameter"""
         os = AWSObjectStore(self.object_store_config)
 
-        expected_keys = ["1&1&1&0&0&12", "1&1&1&0&0&13", "1&1&1&0&0&14"]
-        test_keys = ["1&1&1&0&0&100", "1&1&1&0&0&13", "1&1&1&0&0&14",
-                     "1&1&1&0&0&15"]
+        expected_keys = ["CACHED-CUBOID&1&1&1&0&0&12", "CACHED-CUBOID&1&1&1&0&0&13", "CACHED-CUBOID&1&1&1&0&0&14"]
+        test_keys = ["CACHED-CUBOID&1&1&1&0&0&100", "CACHED-CUBOID&1&1&1&0&0&13", "CACHED-CUBOID&1&1&1&0&0&14",
+                     "CACHED-CUBOID&1&1&1&0&0&15"]
 
         expected_object_keys = os.cached_cuboid_to_object_keys(expected_keys)
 
@@ -213,6 +213,73 @@ class AWSObjectStoreTestMixin(object):
         returned_data = os.get_objects(object_keys)
         for rdata, sdata in zip(returned_data, fake_data):
             assert rdata == sdata
+
+    def test_get_object_key_parts(self):
+        """Test to get an object key parts"""
+        os = AWSObjectStore(self.object_store_config)
+        object_key = os.generate_object_key(self.resource, 0, 2, 56)
+
+        parts = os.get_object_key_parts(object_key)
+
+        self.assertEqual(object_key, '631424bf68302b683a0be521101c192b&4&3&2&0&2&56')
+        self.assertEqual(parts.hash, "631424bf68302b683a0be521101c192b")
+        self.assertEqual(parts.collection_id, "4")
+        self.assertEqual(parts.experiment_id, "3")
+        self.assertEqual(parts.channel_id, "2")
+        self.assertEqual(parts.resolution, "0")
+        self.assertEqual(parts.time_sample, "2")
+        self.assertEqual(parts.morton_id, "56")
+        self.assertEqual(parts.is_iso, False)
+
+    def test_generate_object_keys_iso_anisotropic_below_fork(self):
+        """Test to create object key when asking for isotropic data, in an anisotropic channel, below the iso fork"""
+        os = AWSObjectStore(self.object_store_config)
+        object_keys = os.generate_object_key(self.resource, 0, 2, 56, iso=True)
+
+        assert object_keys == '631424bf68302b683a0be521101c192b&4&3&2&0&2&56'
+
+    def test_generate_object_keys_iso_anisotropic_above_fork(self):
+        """Test to create object key when asking for isotropic data, in an anisotropic channel, above the iso fork"""
+        os = AWSObjectStore(self.object_store_config)
+        object_keys = os.generate_object_key(self.resource, 3, 2, 56, iso=True)
+        assert object_keys == 'cf934dccf1764290fd3db83b9b46b07b&4&3&2&3&2&56'
+
+        object_keys = os.generate_object_key(self.resource, 5, 2, 56, iso=True)
+        assert object_keys == '068e7246f31aacac92ca74923b9da6f1&ISO&4&3&2&5&2&56'
+
+    def test_generate_object_keys_iso_isotropic(self):
+        """Test to create object key when asking for isotropic data, in an isotropic channel"""
+        data = self.setup_helper.get_image8_dict()
+        data['experiment']['hierarchy_method'] = "isotropic"
+        data['coord_frame']['z_voxel_size'] = 4
+        resource = BossResourceBasic(data)
+
+        os = AWSObjectStore(self.object_store_config)
+        object_keys = os.generate_object_key(resource, 0, 2, 56, iso=True)
+        assert object_keys == '631424bf68302b683a0be521101c192b&4&3&2&0&2&56'
+
+        object_keys = os.generate_object_key(resource, 3, 2, 56, iso=True)
+        assert object_keys == 'cf934dccf1764290fd3db83b9b46b07b&4&3&2&3&2&56'
+
+        object_keys = os.generate_object_key(resource, 5, 2, 56, iso=True)
+        assert object_keys == '831adead1bc05b24d0799206ee9fe832&4&3&2&5&2&56'
+
+    def test_get_object_key_parts_iso(self):
+        """Test to get an object key parts after the iso split on an anisotropic channel"""
+        os = AWSObjectStore(self.object_store_config)
+        object_key = os.generate_object_key(self.resource, 5, 2, 56, iso=True)
+
+        parts = os.get_object_key_parts(object_key)
+
+        self.assertEqual(object_key, '068e7246f31aacac92ca74923b9da6f1&ISO&4&3&2&5&2&56')
+        self.assertEqual(parts.hash, "068e7246f31aacac92ca74923b9da6f1")
+        self.assertEqual(parts.collection_id, "4")
+        self.assertEqual(parts.experiment_id, "3")
+        self.assertEqual(parts.channel_id, "2")
+        self.assertEqual(parts.resolution, "5")
+        self.assertEqual(parts.time_sample, "2")
+        self.assertEqual(parts.morton_id, "56")
+        self.assertEqual(parts.is_iso, True)
 
 
 class TestAWSObjectStore(AWSObjectStoreTestMixin, unittest.TestCase):

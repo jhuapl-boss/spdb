@@ -14,6 +14,7 @@
 
 from abc import ABCMeta, abstractmethod
 import boto3
+import collections
 import json
 import hashlib
 import numpy as np
@@ -225,14 +226,47 @@ class AWSObjectStore(ObjectStore):
         self.obj_ind = ObjectIndices(
             conf['s3_index_table'], conf['id_index_table'], conf['id_count_table'], get_region())
 
-
     @staticmethod
     def object_key_chunks(object_keys, chunk_size):
         """Yield successive chunk_size chunks from the list of keys in object_keys"""
         for ii in range(0, len(object_keys), chunk_size):
             yield object_keys[ii:ii + chunk_size]
 
-    def generate_object_key(self, resource, resolution, time_sample, morton_id):
+    @staticmethod
+    def get_object_key_parts(object_key):
+        """
+
+        Args:
+            object_key (str): An object-key for a cuboid
+
+        Returns:
+            (collections.namedtuple)
+        """
+        KeyParts = collections.namedtuple('KeyParts', ['hash', 'collection_id', 'experiment_id', 'channel_id',
+                                                       'resolution', 'time_sample', 'morton_id', 'is_iso'])
+        # Parse key
+        parts = object_key.split("&")
+
+        hash = parts[0]
+
+        if parts[1] == "ISO":
+            iso_offset = 1
+            is_iso = True
+        else:
+            iso_offset = 0
+            is_iso = False
+
+        collection_id = parts[1 + iso_offset]
+        experiment_id = parts[2 + iso_offset]
+        channel_id = parts[3 + iso_offset]
+        resolution = parts[4 + iso_offset]
+        time_sample = parts[5 + iso_offset]
+        morton_id = parts[6 + iso_offset]
+
+        return KeyParts(hash=hash, collection_id=collection_id, experiment_id=experiment_id, channel_id=channel_id,
+                        resolution=resolution, time_sample=time_sample, morton_id=morton_id, is_iso=is_iso)
+
+    def generate_object_key(self, resource, resolution, time_sample, morton_id, iso=False):
         """Generate Key for an object stored in the S3 cuboid bucket
 
             hash&{lookup_key}&resolution&time_sample&morton_id
@@ -242,12 +276,17 @@ class AWSObjectStore(ObjectStore):
             resolution (int): the resolution level
             morton_id (int): Morton ID of the cuboids
             time_sample (int):  time samples of the cuboids
+            iso (bool): Flag indicating if the isotropic version of a downsampled channel should be requested
 
         Returns:
             list[str]: A list of keys for each cuboid
 
         """
-        base_key = '{}&{}&{}&{}'.format(resource.get_lookup_key(), resolution, time_sample, morton_id)
+        experiment = resource.get_experiment()
+        if iso is True and resolution > resource.get_isotropic_level() and experiment.hierarchy_method.lower() == "anisotropic":
+            base_key = 'ISO&{}&{}&{}&{}'.format(resource.get_lookup_key(), resolution, time_sample, morton_id)
+        else:
+            base_key = '{}&{}&{}&{}'.format(resource.get_lookup_key(), resolution, time_sample, morton_id)
 
         # Hash
         hash_str = hashlib.md5(base_key.encode()).hexdigest()
@@ -276,7 +315,7 @@ class AWSObjectStore(ObjectStore):
 
         object_keys = self.cached_cuboid_to_object_keys(key_list)
 
-        # TODO: Possibly could use batch read to speed up
+        # TODO: Should use batch read to speed up
         dynamodb = boto3.client('dynamodb', region_name=get_region())
 
         s3_key_index = []
@@ -316,17 +355,17 @@ class AWSObjectStore(ObjectStore):
         dynamodb = boto3.client('dynamodb', region_name=get_region())
 
         # Get lookup key and resolution from object key
-        vals = object_key.split("&")
+        parts = self.get_object_key_parts(object_key)
 
         # range key is exp&ch&res&task
-        ingest_job_range = "{}&{}&{}&{}".format(vals[2], vals[3], vals[4], ingest_job)
+        ingest_job_range = "{}&{}&{}&{}".format(parts.experiment_id, parts.channel_id, parts.resolution, ingest_job)
 
         try:
             dynamodb.put_item(
                 TableName=self.config['s3_index_table'],
                 Item={'object-key': {'S': object_key},
                       'version-node': {'N': "{}".format(version)},
-                      'ingest-job-hash': {'S': "{}".format(vals[1])},
+                      'ingest-job-hash': {'S': "{}".format(parts.collection_id)},
                       'ingest-job-range': {'S': ingest_job_range}},
                 ReturnConsumedCapacity='NONE',
                 ReturnItemCollectionMetrics='NONE',
@@ -443,8 +482,6 @@ class AWSObjectStore(ObjectStore):
                 FunctionName=self.config["page_in_lambda_function"],
                 InvocationType='Event',
                 Payload=json.dumps(params).encode())
-
-            # TODO: Check if response comes back on an EVENT type invoke and throw error on error if so
 
         return object_keys
 
@@ -703,7 +740,7 @@ class AWSObjectStore(ObjectStore):
         Do a cutout and return the unique ids within the specified region.
 
         0 is never returned as an id.
-
+ 
         Args:
             cutout_fcn (function): SpatialDB's cutout method.  Provided for naive search of ids in sub-regions
             resource (project.BossResource): Data model info based on the request or target resource

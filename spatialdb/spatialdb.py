@@ -251,8 +251,10 @@ class SpatialDB:
                 y_pixel_offset - new XYZ extent of the up-sampled cuboid
 
         """
-        # TODO: This currently only works with slice based resolution hierarchies.  Update to handle all cases.
-        if resource.get_experiment().hierarchy_method.lower() != "slice":
+        # TODO: This currently only works with anisotropic based resolution hierarchies.
+        # If a request is for iso style data within an anisotropic channel this will fail as well.
+        # Update to handle all cases.
+        if resource.get_experiment().hierarchy_method.lower() != "anisotropic":
             raise SpdbError('Not Implemented',
                             'Dynamic up-sampling of only slice based resolution hierarchies is currently supported',
                             ErrorCodes.FUTURE)
@@ -358,40 +360,44 @@ class SpatialDB:
             time_sample_range = [0, 1]
 
         # if cutout is below resolution, get a smaller cube and scaleup
-        # ONLY FOR ANNO CHANNELS - if data is missing on the current resolution but exists else where...extrapolate
+        # ONLY FOR ANNO CHANNELS - if data is missing on the current resolution but exists elsewhere...extrapolate
         # resource.get_channel().base_resolution is the "base" resolution and you assume data exists there.
-        # If propagated you don't have to worry about this.
+        # If downsampled you don't have to worry about this.
         # currently we don't upsample annotations when hardening the database, so don't need to check for propagated.
 
         # Create namedtuple for consistency with re-sampling paths through the code
         result_tuple = namedtuple('ResampleCoords',
                                   ['corner', 'extent', 'x_pixel_offset', 'y_pixel_offset'])
 
-        # Check if you need to scale a cutout due to off-base resolution cutouts/propagation state
+        # Check if you need to scale a cutout due to off-base resolution cutout and the downsample state
         channel = resource.get_channel()
         if not channel.is_image():
-            # The channel is an annotation!
+            # The channel is an annotation so we can dynamically re-sample
             base_res = channel.base_resolution
 
             if base_res > resolution:
+                # Desired cutout is below base res in hierarchy (higher res image). Must up-sample cutout dynamically
+                # Find the effective dimensions of the up-sampled cutout
                 raise SpdbError('Not Implemented',
-                                'Dynamic resolution scaling not yet implemented.',
+                                'Dynamic resolution up-sampling not yet implemented.',
                                 ErrorCodes.FUTURE)
-                # Must up-sample cutout dynamically find the effective dimensions of the up-sampled cutout
-                #cutout_coords = self._up_sample_cutout(resource, corner, extent, resolution)
 
-                #[x_cube_dim, y_cube_dim, z_cube_dim] = cube_dim = CUBOIDSIZE[base_res]
-                #cutout_resolution = base_res
+                # cutout_coords = self._up_sample_cutout(resource, corner, extent, resolution)
 
-            elif not channel.is_image() and base_res < resolution and not resource.is_propagated():
+                # [x_cube_dim, y_cube_dim, z_cube_dim] = cube_dim = CUBOIDSIZE[base_res]
+                # cutout_resolution = base_res
+
+            elif not channel.is_image() and base_res < resolution and not resource.is_downsampled():
+                # Currently, let's not support this. We can cutout a smaller cube and up-sample for the user, but do not
+                # want to deal with cutting out large regions and down-sampling
                 raise SpdbError('Not Implemented',
-                                'Dynamic resolution scaling not yet implemented.',
+                                'Dynamic resolution down-sampling not yet implemented.',
                                 ErrorCodes.FUTURE)
                 # If cutout is an annotation channel, above base resolution (lower res), and NOT propagated, down-sample
-                #cutout_coords = self._down_sample_cutout(resource, corner, extent, resolution)
+                # cutout_coords = self._down_sample_cutout(resource, corner, extent, resolution)
 
-                #[x_cube_dim, y_cube_dim, z_cube_dim] = cube_dim = CUBOIDSIZE[base_res]
-                #cutout_resolution = base_res
+                # [x_cube_dim, y_cube_dim, z_cube_dim] = cube_dim = CUBOIDSIZE[base_res]
+                # cutout_resolution = base_res
             else:
                 # this is the default path when not DYNAMICALLY scaling the resolution
 
@@ -572,29 +578,33 @@ class SpatialDB:
         # A smaller cube was cutout due to off-base resolution query: up-sample and trim
         base_res = channel.base_resolution
         if not channel.is_image() and base_res > resolution:
-            # TODO: optimizing zoomData and rename when implementing propagate
-            out_cube.zoomData(base_res - resolution)
+            raise SpdbError('Not Implemented',
+                            'Dynamic resolution up-sampling not yet implemented.',
+                            ErrorCodes.FUTURE)
+            # TODO: implement dynamic re-sampling
+            # out_cube.zoomData(base_res - resolution)
 
             # need to trim based on the cube cutout at new resolution
-            out_cube.trim(corner[0] % (x_cube_dim * (2 ** (base_res - resolution))) + cutout_coords.x_pixel_offset,
-                          extent[0],
-                          corner[1] % (y_cube_dim * (2 ** (base_res - resolution))) + cutout_coords.y_pixel_offset,
-                          extent[1],
-                          corner[2] % z_cube_dim,
-                          extent[2])
+            # out_cube.trim(corner[0] % (x_cube_dim * (2 ** (base_res - resolution))) + cutout_coords.x_pixel_offset,
+            #               extent[0],
+            #               corner[1] % (y_cube_dim * (2 ** (base_res - resolution))) + cutout_coords.y_pixel_offset,
+            #               extent[1],
+            #               corner[2] % z_cube_dim,
+            #               extent[2])
 
         # A larger cube was cutout due to off-base resolution query: down-sample and trim
-        elif not channel.is_image() and base_res < resolution and not resource.is_propagated():
-            # TODO: optimizing downScale and rename when implementing propagate
-            out_cube.downScale(resolution - base_res)
-
-            # need to trim based on the cube cutout at new resolution
-            out_cube.trim(corner[0] % (x_cube_dim * (2 ** (base_res - resolution))),
-                          extent[0],
-                          corner[1] % (y_cube_dim * (2 ** (base_res - resolution))),
-                          extent[1],
-                          corner[2] % z_cube_dim,
-                          extent[2])
+        elif not channel.is_image() and base_res < resolution and not resource.is_downsampled():
+            raise SpdbError('Not Implemented',
+                            'Dynamic resolution down-sampling not yet implemented.',
+                            ErrorCodes.FUTURE)
+            # out_cube.downScale(resolution - base_res)
+            # # need to trim based on the cube cutout at new resolution
+            # out_cube.trim(corner[0] % (x_cube_dim * (2 ** (base_res - resolution))),
+            #               extent[0],
+            #               corner[1] % (y_cube_dim * (2 ** (base_res - resolution))),
+            #               extent[1],
+            #               corner[2] % z_cube_dim,
+            #               extent[2])
 
         # Trim cube since cutout was not cuboid aligned
         elif extent[0] % x_cube_dim == 0 and \
@@ -696,6 +706,7 @@ class SpatialDB:
 
         # Get current cube from db, merge with new cube, write back to the to db
         # TODO: Move splitting up data and computing morton into c-lib as single method
+        page_out_cnt = 0
         for z in range(z_num_cubes):
             for y in range(y_num_cubes):
                 for x in range(x_num_cubes):
@@ -740,13 +751,12 @@ class SpatialDB:
 
                             if not in_page_out:
                                 # Good to trigger lambda!
-                                blog.debug("Writing Cuboid - Trying to trigger page out")
                                 self.objectio.trigger_page_out({"kv_config": self.kv_config,
                                                                 "state_config": self.state_conf,
                                                                 "object_store_config": self.object_store_config},
                                                                write_cuboid_key,
                                                                resource)
-                                blog.info("Writing Cuboid - Triggered Page Out: {}".format(write_cuboid_key))
+                                page_out_cnt += 1
                                 # All done. continue.
                             else:
                                 # Ended up in page out during transaction. Make delayed write.
@@ -756,6 +766,7 @@ class SpatialDB:
                                                                       resolution,
                                                                       morton_idx,
                                                                       t, resource.to_json())
+        blog.info("Triggered {} Page Out Operations".format(page_out_cnt))
 
     def get_bounding_box(self, resource, resolution, id, bb_type='loose'):
         """
@@ -781,8 +792,7 @@ class SpatialDB:
             self.cutout, resource, resolution, int(id),
             loose['x_range'], loose['y_range'], loose['z_range'], loose['t_range'])
 
-    def _get_ids_in_region_naive(
-            self, resource, resolution, corner, extent, t_range=[0, 1], version=0):
+    def _get_ids_in_region_naive(self, resource, resolution, corner, extent, t_range=[0, 1], version=0):
         """
         Get all ids in the given region w/o taking advantage of the DynamoDB indexes.
 
@@ -813,8 +823,7 @@ class SpatialDB:
 
         return {'ids': ids}
 
-    def get_ids_in_region(
-            self, resource, resolution, corner, extent, t_range=[0, 1], version=0):
+    def get_ids_in_region(self, resource, resolution, corner, extent, t_range=[0, 1], version=0):
         """
         Get all ids in the given region.
 
