@@ -77,6 +77,7 @@ ndlib_ctypes.isotropicBuild32.argtypes = [array_2d_uint32, array_2d_uint32, arra
 ndlib_ctypes.isotropicBuildF32.argtypes = [array_2d_float32, array_2d_float32, array_2d_float32, cp.POINTER(cp.c_int)]
 ndlib_ctypes.addDataZSlice.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int), cp.POINTER(cp.c_int)]
 ndlib_ctypes.addDataIsotropic.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int), cp.POINTER(cp.c_int)]
+ndlib_ctypes.addAnnotationData.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int), cp.POINTER(cp.c_int)]
 ndlib_ctypes.unique.argtypes = [array_1d_uint64, array_1d_uint64, cp.c_int]
 
 # setting the return type of the function in C
@@ -112,6 +113,7 @@ ndlib_ctypes.isotropicBuild32.restype = None
 ndlib_ctypes.isotropicBuildF32.restype = None
 ndlib_ctypes.addDataZSlice.restype = None
 ndlib_ctypes.addDataIsotropic.restype = None
+ndlib_ctypes.addAnnotationData.restype = None
 ndlib_ctypes.unique.restype = cp.c_int
 
 
@@ -448,6 +450,22 @@ def addDataToZSliceStack_ctype(cube, output, offset):
     dims = [i for i in cube.data.shape]
     ndlib_ctypes.addDataZSlice(cube.data, output, (cp.c_int * len(offset))(*offset), (cp.c_int * len(dims))(*dims))
 
+def addAnnotationData_ctype(volume, output, cubes, dim):
+    """
+    Downsample Annotations from a volume of shape (cubes * dim) into an output
+    cube of shape (dim).
+
+    Args:
+        volume (Buffer) : Raw numpy array of input data (shape == cubes * dim)
+        output (Buffer) : Raw numpy array for output data (shape == dim)
+        cubes (XYZ|ZYX) : The number of cubes of size dim contained in volume
+                          (Should be either 2x2x1 or 2x2x2)
+        dim (XYZ|ZYX) : The dimensions of ouput and the cubes contained in volume
+    """
+
+    convert = lambda x: (cp.c_int * len(x))(*x)
+
+    ndlib_ctypes.addAnnotationData(volume, output, convert(cubes.zyx), convert(dim.zyx))
 
 def unique(data):
     """Return the unique elements in the array.

@@ -1,12 +1,12 @@
 /*
 * Copyright 2014 NeuroData (http://neurodata.io)
-* 
+*
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
 * You may obtain a copy of the License at
-* 
+*
 *     http://www.apache.org/licenses/LICENSE-2.0
-* 
+*
 * Unless required by applicable law or agreed to in writing, software
 * distributed under the License is distributed on an "AS IS" BASIS,
 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,7 +17,7 @@
 
 /*
  * Add Data Functions
- * Naive implementation 
+ * Naive implementation
  */
 
 #include<stdint.h>
@@ -105,4 +105,55 @@ void addDataIsotropic ( uint32_t * cube, uint32_t * output, int * offset, int * 
         int output_index = ( (i+offset[2]) *ydim*xdim*2*2 ) + ( (j+offset[1]) *xdim*2 ) + (k+offset[0]);
         output[output_index] = getAnnValue ( cube[index1], cube[index2], cube[index3], cube[index4] );
       }
+}
+
+/*
+ * Downsample Annotations from a volume of shape (cubes * dims) into an output cube
+ * of shape (dims).
+ *
+ * Note: Currently only supports downsampling by a factor of 1x2x2 or 2x2x2 (ZYX)
+ *
+ * Args:
+ *      volume (NumPy array) : Size is (cubes * dims)
+ *      output (NumPy array) : Size is (dims)
+ *      cubes ([z,y,x]) : Number of cubes of size dims in volume
+ *      dims ([z,y,x]) : Dimensions of a single cube in volume / of the output buffer
+ */
+void addAnnotationData(uint32_t * volume, uint32_t * output, int * cubes, int * dims)
+{
+    int x,y,z;
+    uint32_t annotation;
+
+    int dim_z = dims[0];
+    int dim_y = dims[1];
+    int dim_x = dims[2];
+    int cube_z = cubes[0];
+    int cube_y = cubes[1];
+    int cube_x = cubes[2];
+
+    // for zyx in range(dims)
+    for(z=0; z<dim_z; z++)
+        for(y=0; y<dim_y; y++)
+            for(x=0; x<dim_x; x++)
+            {
+                // index1 === zyx * cubes
+                uint32_t index1 = (z * cube_z * dim_y * dim_x) + (y * cube_y * dim_x) + (x * cube_x);
+                uint32_t index2 = (z * cube_z * dim_y * dim_x) + (y * cube_y * dim_x) + (x * cube_x + 1);
+                uint32_t index3 = (z * cube_z * dim_y * dim_x) + (y * cube_y * dim_x + 1) + (x * cube_x);
+                uint32_t index4 = (z * cube_z * dim_y * dim_x) + (y * cube_y * dim_x + 1) + (x * cube_x + 1);
+                annotation = getAnnValue ( volume[index1], volume[index2], volume[index3], volume[index4] );
+
+                if(annotation == 0 && cube_z == 2)
+                {
+                    uint32_t index1 = (z * cube_z * dim_y * dim_x + 1) + (y * cube_y * dim_x) + (x * cube_x);
+                    uint32_t index2 = (z * cube_z * dim_y * dim_x + 1) + (y * cube_y * dim_x) + (x * cube_x + 1);
+                    uint32_t index3 = (z * cube_z * dim_y * dim_x + 1) + (y * cube_y * dim_x + 1) + (x * cube_x);
+                    uint32_t index4 = (z * cube_z * dim_y * dim_x + 1) + (y * cube_y * dim_x + 1) + (x * cube_x + 1);
+                    annotation = getAnnValue ( volume[index1], volume[index2], volume[index3], volume[index4] );
+                }
+
+                // output_index === zyx
+                int output_index = (z * dim_y * dim_x) + (y * dim_x) + (x);
+                output[output_index] = annotation;
+            }
 }
