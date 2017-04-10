@@ -81,6 +81,7 @@ class TestAWSObjectStoreInt(AWSObjectStoreTestIntegrationMixin, AWSObjectStoreTe
         # Setup Data
         self.data = self.layer.setup_helper.get_image8_dict()
         self.resource = BossResourceBasic(self.data)
+        self.setup_helper = self.layer.setup_helper
 
         # Setup config
         self.object_store_config = self.layer.object_store_config

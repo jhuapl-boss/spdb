@@ -71,6 +71,38 @@ class RedisKVIOTestMixin(object):
         assert all_keys[cached[0]] == "CACHED-CUBOID&4&3&2&2&0&34"
         assert all_keys[cached[1]] == "CACHED-CUBOID&4&3&2&2&0&35"
 
+    def test_get_missing_read_cache_keys_iso_below_res(self):
+        """Test for querying for keys missing in the cache when asking for iso data but below res fork"""
+        # Put some keys in the cache
+        rkv = RedisKVIO(self.config_data)
+        keys = rkv.generate_cached_cuboid_keys(self.resource, 0, [0], [34, 35, 36], iso=True)
+        for k in keys:
+            self.cache_client.set(k, "dummy")
+
+        missing, cached, all_keys = rkv.get_missing_read_cache_keys(self.resource, 0, [0, 2], [33, 34, 35], iso=True)
+
+        assert len(missing) == 4
+        assert len(cached) == 2
+
+        assert all_keys[cached[0]] == "CACHED-CUBOID&4&3&2&0&0&34"
+        assert all_keys[cached[1]] == "CACHED-CUBOID&4&3&2&0&0&35"
+
+    def test_get_missing_read_cache_keys_iso_above_res(self):
+        """Test for querying for keys missing in the cache when asking for iso data but below res fork"""
+        # Put some keys in the cache
+        rkv = RedisKVIO(self.config_data)
+        keys = rkv.generate_cached_cuboid_keys(self.resource, 6, [0], [34, 35, 36], iso=True)
+        for k in keys:
+            self.cache_client.set(k, "dummy")
+
+        missing, cached, all_keys = rkv.get_missing_read_cache_keys(self.resource, 6, [0, 2], [33, 34, 35], iso=True)
+
+        assert len(missing) == 4
+        assert len(cached) == 2
+
+        assert all_keys[cached[0]] == "CACHED-CUBOID&ISO&4&3&2&6&0&34"
+        assert all_keys[cached[1]] == "CACHED-CUBOID&ISO&4&3&2&6&0&35"
+
     def test_write_cuboid_to_cache_key(self):
         """Test converting from write cuboid keys to cache keys"""
         # Put some keys in the cache

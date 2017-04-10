@@ -31,6 +31,7 @@ class ErrorCodes(IntEnum):
     DATATYPE_MISMATCH = 106
     OBJECT_STORE_ERROR = 107
     RESOURCE_LOCKED = 108
+    RESOLUTION_MISMATCH = 109
 
 
 class SpdbError(Exception):

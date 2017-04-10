@@ -70,7 +70,7 @@ class RedisKVIO(KVIO):
         No rollback with redis"""
         pass
 
-    def get_missing_read_cache_keys(self, resource, resolution, time_sample_range, morton_idx_list):
+    def get_missing_read_cache_keys(self, resource, resolution, time_sample_range, morton_idx_list, iso=False):
         """Retrieve the indexes of missing cubes in the cache db based on a morton ID list and time samples
 
         When using redis as the cache backend, you don't need to keep a secondary index and can get this info
@@ -81,6 +81,7 @@ class RedisKVIO(KVIO):
             resolution (int): the resolution level
             time_sample_range (list[int]): the start and stop index of the time samples
             morton_idx_list (list[int]): a list of Morton ID of the cuboids to get
+            iso (bool): flag indicating if you want to try to get the isotropic version of a channel
 
         Returns:
             (list(int), list(int), list(str)): A tuple of lists with the first being an index of missing keys
@@ -88,7 +89,7 @@ class RedisKVIO(KVIO):
         """
         # Get the cached-cuboid keys
         all_cuboid_keys = self.generate_cached_cuboid_keys(resource, resolution,
-                                                           list(range(*time_sample_range)), morton_idx_list)
+                                                           list(range(*time_sample_range)), morton_idx_list, iso=iso)
 
         # Query Redis for key existence, refreshing the cache timeout if exists
         try:

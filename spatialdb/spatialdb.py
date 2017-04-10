@@ -328,7 +328,7 @@ class SpatialDB:
         return result_tuple(effcorner, effdim, None, None)
 
     # Main Interface Methods
-    def cutout(self, resource, corner, extent, resolution, time_sample_range=None, filter_ids=None):
+    def cutout(self, resource, corner, extent, resolution, time_sample_range=None, filter_ids=None, iso=False):
         """Extract a cube of arbitrary size. Need not be aligned to cuboid boundaries.
 
         corner represents the location of the cutout and extent the size.  As an example in 1D, if asking for
@@ -342,8 +342,9 @@ class SpatialDB:
             corner ((int, int, int)): the xyz location of the corner of the cutout
             extent ((int, int, int)): the xyz extents
             resolution (int): the resolution level
-            time_sample_range list((int)):  a range of time samples to get [start, stop). Default is [0,1) if omitted
+            time_sample_range (list((int)):  a range of time samples to get [start, stop). Default is [0,1) if omitted
             filter_ids (optional[list]): Defaults to None. Otherwise, is a list of uint64 ids to filter cutout by.
+            iso (bool): Flag indicating if you want to get to the "isotropic" version of a cuboid, if available
 
         Returns:
             cube.Cube: The cutout data stored in a Cube instance
@@ -449,7 +450,8 @@ class SpatialDB:
         missing_key_idx, cached_key_idx, all_keys = self.kvio.get_missing_read_cache_keys(resource,
                                                                                           cutout_resolution,
                                                                                           time_sample_range,
-                                                                                          list_of_idxs)
+                                                                                          list_of_idxs,
+                                                                                          iso=iso)
         # Wait for cuboids that are currently being written to finish
         start_time = datetime.now()
         dirty_keys = all_keys
@@ -636,7 +638,7 @@ class SpatialDB:
 
         return out_cube
 
-    def write_cuboid(self, resource, corner, resolution, cuboid_data, time_sample_start=0):
+    def write_cuboid(self, resource, corner, resolution, cuboid_data, time_sample_start=0, iso=False):
         """ Write a 3D/4D volume to the key-value store. Used by API/cache in consistent mode as it reconciles writes
 
         If cuboid_data.ndim == 4, data in time-series format - assume t,z,y,x
@@ -649,6 +651,7 @@ class SpatialDB:
             cuboid_data (numpy.ndarray): Matrix of data to write as cuboids
             time_sample_start (int): if cuboid_data.ndim == 3, the time sample for the data
                                      if cuboid_data.ndim == 4, the time sample for cuboid_data[0, :, :, :]
+            iso (bool): Flag indicating if you want to write to the "isotropic" version of a channel, if available
 
         Returns:
             None
@@ -662,6 +665,13 @@ class SpatialDB:
             raise SpdbError('Resource Locked',
                             'The requested resource is locked due to excessive write errors. Contact support.',
                             ErrorCodes.RESOURCE_LOCKED)
+
+        # Check to make sure the user is writing data at the BASE RESOLUTION
+        channel = resource.get_channel()
+        if channel.base_resolution != resolution:
+            raise SpdbError('Resolution Mismatch',
+                            "You can only write data to a channel's base resolution. Base Resolution: {}, Request Resolution: {}".format(channel.base_resolution, resolution),
+                            ErrorCodes.RESOLUTION_MISMATCH)
 
         # Check if time-series
         if cuboid_data.ndim == 4:
@@ -700,7 +710,11 @@ class SpatialDB:
                        x_offset:x_offset + dim[0]] = cuboid_data
 
         # Get keys ready
-        base_write_cuboid_key = "WRITE-CUBOID&{}&{}".format(resource.get_lookup_key(), resolution)
+        experiment = resource.get_experiment()
+        if iso is True and resolution > resource.get_isotropic_level() and experiment.hierarchy_method.lower() == "anisotropic":
+            base_write_cuboid_key = "WRITE-CUBOID&ISO&{}&{}".format(resource.get_lookup_key(), resolution)
+        else:
+            base_write_cuboid_key = "WRITE-CUBOID&{}&{}".format(resource.get_lookup_key(), resolution)
 
         blog.info("Writing Cuboid - Base Key: {}".format(base_write_cuboid_key))
 

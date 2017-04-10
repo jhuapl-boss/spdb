@@ -740,7 +740,7 @@ class AWSObjectStore(ObjectStore):
         Do a cutout and return the unique ids within the specified region.
 
         0 is never returned as an id.
- 
+
         Args:
             cutout_fcn (function): SpatialDB's cutout method.  Provided for naive search of ids in sub-regions
             resource (project.BossResource): Data model info based on the request or target resource

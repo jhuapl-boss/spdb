@@ -49,7 +49,7 @@ class KVIO(metaclass=ABCMeta):
         """Rollback the transaction. To be called on exceptions."""
         return NotImplemented
 
-    def generate_cached_cuboid_keys(self, resource, resolution, time_sample_list, morton_idx_list):
+    def generate_cached_cuboid_keys(self, resource, resolution, time_sample_list, morton_idx_list, iso=False):
         """Generate Keys for cuboids that are in the READ CACHE of the redis cache db
 
         The keys are ordered by time sample followed by morton ID (e.g. 1&1, 1&2, 1&3, 2&1, 2&2, 2&3)
@@ -63,12 +63,17 @@ class KVIO(metaclass=ABCMeta):
             resolution (int): the resolution level
             morton_idx_list (list[int]): a list of Morton ID of the cuboids to get
             time_sample_list (list[int]): a list of time samples of the cuboids to get
+            iso (bool): A flag indicating if you want the isotropic version of a channel
 
         Returns:
             list[str]: A list of keys for each cuboid
 
         """
-        base_key = 'CACHED-CUBOID&{}&{}'.format(resource.get_lookup_key(), resolution)
+        experiment = resource.get_experiment()
+        if iso is True and resolution > resource.get_isotropic_level() and experiment.hierarchy_method.lower() == "anisotropic":
+            base_key = 'CACHED-CUBOID&ISO&{}&{}'.format(resource.get_lookup_key(), resolution)
+        else:
+            base_key = 'CACHED-CUBOID&{}&{}'.format(resource.get_lookup_key(), resolution)
 
         # Get the combinations of time and morton, properly ordered
         key_suffix_list = itertools.product(time_sample_list, morton_idx_list)

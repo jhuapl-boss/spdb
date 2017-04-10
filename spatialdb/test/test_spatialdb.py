@@ -19,7 +19,7 @@ from mockredis import mock_strict_redis_client
 import collections
 
 from spdb.project import BossResourceBasic
-from spdb.spatialdb import Cube, SpatialDB
+from spdb.spatialdb import Cube, SpatialDB, SpdbError
 from spdb.c_lib.ndtype import CUBOIDSIZE
 
 import numpy as np
@@ -206,6 +206,19 @@ class SpatialDBImageDataTestMixin(object):
         cube2 = db.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
+
+    def test_write_cuboid_off_base_res(self):
+        """Test writing a cuboid to not the base resolution"""
+        # Generate random data
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube1.random()
+        cube1.morton_id = 0
+
+        db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        # populate dummy data
+        with self.assertRaises(SpdbError):
+            db.write_cuboid(self.resource, (0, 0, 0), 5, cube1.data, time_sample_start=0)
 
 
 @patch('redis.StrictRedis', mock_strict_redis_client)
