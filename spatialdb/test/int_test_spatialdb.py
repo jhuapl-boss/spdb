@@ -191,6 +191,104 @@ class SpatialDBImageDataIntegrationTestMixin(object):
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
 
+    def test_cutout_no_time_multi_unaligned_hit_iso_below(self):
+        """Test write_cuboid and cutout methods - no time - multi - unaligned - hit - isotropic, below iso fork"""
+        # Generate random data
+        cube1 = Cube.create_cube(self.resource, [400, 400, 8])
+        cube1.random()
+        cube1.morton_id = 0
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        sp.write_cuboid(self.resource, (200, 600, 3), 0, cube1.data, iso=True)
+
+        cube2 = sp.cutout(self.resource, (200, 600, 3), (400, 400, 8), 0, iso=True)
+
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+
+        # do it again...should be in cache
+        cube2 = sp.cutout(self.resource, (200, 600, 3), (400, 400, 8), 0, iso=True)
+
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+
+    def test_cutout_no_time_multi_unaligned_hit_iso_above(self):
+        """Test write_cuboid and cutout methods - no time - multi - unaligned - hit - isotropic, above iso fork"""
+        data = self.data
+        data["channel"]["base_resolution"] = 5
+        resource = BossResourceBasic(data)
+
+        # Generate random data
+        cube1 = Cube.create_cube(resource, [400, 400, 8])
+        cube1.random()
+        cube1.morton_id = 0
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        sp.write_cuboid(resource, (200, 600, 3), 5, cube1.data, iso=True)
+
+        cube2 = sp.cutout(resource, (200, 600, 3), (400, 400, 8), 5, iso=True)
+
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+
+        # do it again...should be in cache
+        cube2 = sp.cutout(resource, (200, 600, 3), (400, 400, 8), 5, iso=True)
+
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+
+    def test_cutout_iso_not_present(self):
+        """Test write_cuboid and cutout methods with iso option, testing iso is stored in parallel"""
+        data = self.data
+        data["channel"]["base_resolution"] = 5
+        resource = BossResourceBasic(data)
+
+        # Generate random data
+        cube1 = Cube.create_cube(resource, [400, 400, 8])
+        cube1.random()
+        cube1.morton_id = 0
+
+        cubez = Cube.create_cube(resource, [400, 400, 8])
+        cubez.zeros()
+        cubez.morton_id = 0
+
+        # Write at 5, not iso, and verify
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        sp.write_cuboid(resource, (200, 600, 3), 5, cube1.data, iso=False)
+
+        cube2 = sp.cutout(resource, (200, 600, 3), (400, 400, 8), 5, iso=False)
+
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+
+        # Get at res 5 iso, which should be blank
+        cube2 = sp.cutout(resource, (200, 600, 3), (400, 400, 8), 5, iso=True)
+
+        np.testing.assert_array_equal(cubez.data, cube2.data)
+
+    def test_cutout_iso_below_fork(self):
+        """Test write_cuboid and cutout methods with iso option, testing iso is equal below the res fork"""
+        # Generate random data
+        cube1 = Cube.create_cube(self.resource, [400, 400, 8])
+        cube1.random()
+        cube1.morton_id = 0
+
+        cubez = Cube.create_cube(self.resource, [400, 400, 8])
+        cubez.zeros()
+        cubez.morton_id = 0
+
+        # Write at 5, not iso, and verify
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        sp.write_cuboid(self.resource, (200, 600, 3), 0, cube1.data, iso=False)
+
+        cube2 = sp.cutout(self.resource, (200, 600, 3), (400, 400, 8), 0, iso=False)
+
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+
+        # Get at res 5 iso, which should be equal to non-iso call
+        cube2 = sp.cutout(self.resource, (200, 600, 3), (400, 400, 8), 0, iso=True)
+
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+
 
 class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
                                          SpatialDBImageDataIntegrationTestMixin, unittest.TestCase):
