@@ -77,7 +77,7 @@ ndlib_ctypes.isotropicBuild32.argtypes = [array_2d_uint32, array_2d_uint32, arra
 ndlib_ctypes.isotropicBuildF32.argtypes = [array_2d_float32, array_2d_float32, array_2d_float32, cp.POINTER(cp.c_int)]
 ndlib_ctypes.addDataZSlice.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int), cp.POINTER(cp.c_int)]
 ndlib_ctypes.addDataIsotropic.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int), cp.POINTER(cp.c_int)]
-ndlib_ctypes.addAnnotationData.argtypes = [array_3d_uint32, array_3d_uint32, cp.POINTER(cp.c_int), cp.POINTER(cp.c_int)]
+ndlib_ctypes.addAnnotationData.argtypes = [array_3d_uint64, array_3d_uint64, cp.POINTER(cp.c_int), cp.POINTER(cp.c_int)]
 ndlib_ctypes.unique.argtypes = [array_1d_uint64, array_1d_uint64, cp.c_int]
 
 # setting the return type of the function in C
@@ -459,7 +459,7 @@ def addAnnotationData_ctype(volume, output, cubes, dim):
         volume (Buffer) : Raw numpy array of input data (shape == cubes * dim)
         output (Buffer) : Raw numpy array for output data (shape == dim)
         cubes (XYZ|ZYX) : The number of cubes of size dim contained in volume
-                          (Should be either 2x2x1 or 2x2x2)
+                          (Should be either 2x2x1 or 2x2x2 XYZ)
         dim (XYZ|ZYX) : The dimensions of ouput and the cubes contained in volume
     """
 

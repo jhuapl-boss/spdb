@@ -47,6 +47,28 @@ uint32_t getAnnValue ( uint32_t value00, uint32_t value01, uint32_t value10, uin
   return value;
 }
 
+uint64_t getAnnValue64 ( uint64_t value00, uint64_t value01, uint64_t value10, uint64_t value11 )
+{
+  uint64_t value = value00;
+
+  if ( value == 0 )
+    value = value01;
+
+  if ( value10 != 0 )
+    if ( value == 0 )
+      value = value10;
+    else if ( value10 == value00 || value10 == value01 )
+      value = value10;
+
+  if ( value11 != 0 )
+    if ( value == 0 )
+      value = value10;
+    else if ( value11 == value00 || value11 == value01 || value11 == value10 )
+      value = value11;
+
+  return value;
+}
+
 
 // Add the contribution of the input data to the next level at the given offset in the output cube
 
@@ -119,10 +141,10 @@ void addDataIsotropic ( uint32_t * cube, uint32_t * output, int * offset, int * 
  *      cubes ([z,y,x]) : Number of cubes of size dims in volume
  *      dims ([z,y,x]) : Dimensions of a single cube in volume / of the output buffer
  */
-void addAnnotationData(uint32_t * volume, uint32_t * output, int * cubes, int * dims)
+void addAnnotationData(uint64_t * volume, uint64_t * output, int * cubes, int * dims)
 {
     int x,y,z;
-    uint32_t annotation;
+    uint64_t annotation;
 
     int dim_z = dims[0];
     int dim_y = dims[1];
@@ -141,7 +163,7 @@ void addAnnotationData(uint32_t * volume, uint32_t * output, int * cubes, int * 
                 uint32_t index2 = (z * cube_z * dim_y * dim_x) + (y * cube_y * dim_x) + (x * cube_x + 1);
                 uint32_t index3 = (z * cube_z * dim_y * dim_x) + (y * cube_y * dim_x + 1) + (x * cube_x);
                 uint32_t index4 = (z * cube_z * dim_y * dim_x) + (y * cube_y * dim_x + 1) + (x * cube_x + 1);
-                annotation = getAnnValue ( volume[index1], volume[index2], volume[index3], volume[index4] );
+                annotation = getAnnValue64 ( volume[index1], volume[index2], volume[index3], volume[index4] );
 
                 if(annotation == 0 && cube_z == 2)
                 {
@@ -149,7 +171,7 @@ void addAnnotationData(uint32_t * volume, uint32_t * output, int * cubes, int * 
                     uint32_t index2 = (z * cube_z * dim_y * dim_x + 1) + (y * cube_y * dim_x) + (x * cube_x + 1);
                     uint32_t index3 = (z * cube_z * dim_y * dim_x + 1) + (y * cube_y * dim_x + 1) + (x * cube_x);
                     uint32_t index4 = (z * cube_z * dim_y * dim_x + 1) + (y * cube_y * dim_x + 1) + (x * cube_x + 1);
-                    annotation = getAnnValue ( volume[index1], volume[index2], volume[index3], volume[index4] );
+                    annotation = getAnnValue64 ( volume[index1], volume[index2], volume[index3], volume[index4] );
                 }
 
                 // output_index === zyx
