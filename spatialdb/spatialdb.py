@@ -376,7 +376,7 @@ class SpatialDB:
             # The channel is an annotation so we can dynamically re-sample
             base_res = channel.base_resolution
 
-            if base_res > resolution:
+            if base_res > resolution and not resource.is_downsampled():
                 # Desired cutout is below base res in hierarchy (higher res image). Must up-sample cutout dynamically
                 # Find the effective dimensions of the up-sampled cutout
                 raise SpdbError('Not Implemented',
@@ -579,7 +579,7 @@ class SpatialDB:
 
         # A smaller cube was cutout due to off-base resolution query: up-sample and trim
         base_res = channel.base_resolution
-        if not channel.is_image() and base_res > resolution:
+        if not channel.is_image() and base_res > resolution and not resource.is_downsampled():
             raise SpdbError('Not Implemented',
                             'Dynamic resolution up-sampling not yet implemented.',
                             ErrorCodes.FUTURE)
