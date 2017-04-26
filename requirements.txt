@@ -6,4 +6,3 @@ nose2
 numpy==1.11.1
 moto
 boto3
-hvac
