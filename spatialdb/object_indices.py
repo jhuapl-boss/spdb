@@ -175,10 +175,8 @@ class ObjectIndices:
                     elif ex.response["Error"]["Code"] == "ProvisionedThroughputExceededException":
                         blog.info('ID Index Update: Backoff required to update ID index for cube: {}'.format(obj_key))
                         # Need to back off!
-                        if backoff > 0:
-                            time.sleep(.01)
-                        else:
-                            time.sleep(((2 ** backoff) + (random.randint(0, 1000) / 1000.0))/10.0)
+                        time.sleep(((2 ** backoff) + (random.randint(0, 1000) / 1000.0))/10.0)
+
                     else:
                         # Something else bad happened
                         raise SpdbError(
@@ -223,10 +221,7 @@ class ObjectIndices:
                         elif ex.response["Error"]["Code"] == "ProvisionedThroughputExceededException":
                             blog.info('ID Index Update: Backoff required to update cube index for ID: {}'.format(channel_id_key))
                             # Need to back off!
-                            if backoff > 0:
-                                time.sleep(.01)
-                            else:
-                                time.sleep(((2 ** backoff) + (random.randint(0, 1000) / 1000.0))/10.0)
+                            time.sleep(((2 ** backoff) + (random.randint(0, 1000) / 1000.0))/10.0)
                         else:
                             # Something else bad happened
                             raise SpdbError(
