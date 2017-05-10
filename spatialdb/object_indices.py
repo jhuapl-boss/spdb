@@ -22,6 +22,7 @@ import hashlib
 import datetime
 import numpy as np
 import time
+import random
 
 from spdb.spatialdb.error import SpdbError, ErrorCodes
 
@@ -76,6 +77,24 @@ class ObjectIndices:
         hash_str = hashlib.md5(base_key.encode()).hexdigest()
         return '{}&{}'.format(hash_str, base_key)
 
+    def generate_object_key(self, resource, resolution, time_sample, morton):
+        """
+        Generate key used by DynamoDB id index table to store cuboids keys associated with the given resource and id.
+
+        Args:
+            resource (BossResource): Data model info based on the request or target resource.
+            resolution (int): Resolution level.
+            time_sample (string|int): Time sample for the object, typically always 0 since we don't store indices off 0
+            morton (string|uint64): Morton ID of the object
+
+        Returns:
+            (string): key to get cuboids associated with the given resource and id.
+        """
+        # TODO: Consolidate all key operations
+        base_key = '{}&{}&{}&{}'.format(resource.get_lookup_key(), resolution, time_sample, morton)
+        hash_str = hashlib.md5(base_key.encode()).hexdigest()
+        return '{}&{}'.format(hash_str, base_key)
+
     def generate_reserve_id_key(self, resource):
         """
         Generate key used by DynamoDB id count table to store unique ID counters
@@ -110,6 +129,9 @@ class ObjectIndices:
         Raises:
             (SpdbError): Failure performing update_item operation on DynamoDB.
         """
+        # Setup Logger
+        blog = BossLogger().logger
+
         for obj_key, cube in zip(key_list, cube_list):
             # Find unique ids in this cube.
             ids = np.unique(cube)
@@ -117,56 +139,101 @@ class ObjectIndices:
             # Convert ids to a string.
             ids_str_list = self._make_ids_strings(ids)
 
-            if len(ids_str_list) == 0:
+            num_ids = len(ids_str_list)
+            blog.info("ID Index Update - Num unique IDs in cube: {}".format(num_ids))
+            if num_ids == 0:
                 # No need to update if there are no non-zero ids in the cuboid.
-                print('Object key: {} has no ids'.format(obj_key))
+                blog.info('Object key: {} has no ids'.format(obj_key))
                 continue
 
             # Associate these ids with their cuboid in the s3 cuboid index table.
-            try:
-                response = self.dynamodb.update_item(
-                    TableName=self.s3_index_table,
-                    Key={'object-key': {'S': obj_key}, 'version-node': {'N': "{}".format(version)}},
-                    UpdateExpression='SET #idset = :ids',
-                    ExpressionAttributeNames={'#idset': 'id-set'},
-                    ExpressionAttributeValues={':ids': {'NS': ids_str_list}},
-                    ReturnConsumedCapacity='NONE')
-                if response['ResponseMetadata']['HTTPStatusCode'] != 200:
-                    raise SpdbError(
-                        "Error updating {} in cuboid index table in DynamoDB.".format(obj_key),
-                        ErrorCodes.OBJECT_STORE_ERROR)
-            except botocore.exceptions.ClientError as ex:
-                print("Caught exception: {}".format(ex))
-                raise SpdbError(
-                    "Error updating {} in cuboid index table in DynamoDB: {} ".format(obj_key, ex),
-                    ErrorCodes.OBJECT_STORE_ERROR)
+            # TODO: Generalize backoff and use in all DynamoDB requests
+            for backoff in range(0, 6):
+                try:
+                    response = self.dynamodb.update_item(
+                        TableName=self.s3_index_table,
+                        Key={'object-key': {'S': obj_key}, 'version-node': {'N': "{}".format(version)}},
+                        UpdateExpression='SET #idset = :ids',
+                        ExpressionAttributeNames={'#idset': 'id-set'},
+                        ExpressionAttributeValues={':ids': {'NS': ids_str_list}},
+                        ReturnConsumedCapacity='NONE')
 
+                    if response['ResponseMetadata']['HTTPStatusCode'] != 200:
+                        # Update Failed, but not at the client level
+                        raise SpdbError(
+                            "Failed to update ID index for cube: {}".format(obj_key),
+                            ErrorCodes.OBJECT_STORE_ERROR)
 
-            # Add object key to this id's cuboid set.
+                    # If you got here good to move on
+                    break
+                except botocore.exceptions.ClientError as ex:
+                    if ex.response["Error"]["Code"] == "413":
+                        # DynamoDB Key is too big to write or update
+                        blog.warning('ID Index Update: Too many IDs present. Failed to update ID index for cube: {}'.format(obj_key))
+                        return False
+
+                    elif ex.response["Error"]["Code"] == "ProvisionedThroughputExceededException":
+                        blog.info('ID Index Update: Backoff required to update ID index for cube: {}'.format(obj_key))
+                        # Need to back off!
+                        if backoff > 0:
+                            time.sleep(.01)
+                        else:
+                            time.sleep(((2 ** backoff) + (random.randint(0, 1000) / 1000.0))/10.0)
+                    else:
+                        # Something else bad happened
+                        raise SpdbError(
+                            "Error updating {} in cuboid index table in DynamoDB: {} ".format(obj_key, ex),
+                            ErrorCodes.OBJECT_STORE_ERROR)
+
+            # Get the morton of the object key. Since we only support annotation indices at t=0
+            obj_morton = obj_key.split("&")[-1]
+
+            # Add object key to every id's cuboid set.
             for id in ids:
                 if id == 0:
                     # 0 is not a valid id (unclassified pixel).
                     continue
 
                 channel_id_key = self.generate_channel_id_key(resource, resolution, id)
-                try:
-                    response = self.dynamodb.update_item(
-                        TableName=self.id_index_table,
-                        Key={'channel-id-key': {'S': channel_id_key}, 'version': {'N': "{}".format(version)}},
-                        UpdateExpression='ADD #cuboidset :objkey',
-                        ExpressionAttributeNames={'#cuboidset': 'cuboid-set'},
-                        ExpressionAttributeValues={':objkey': {'SS': [obj_key]}},
-                        ReturnConsumedCapacity='NONE')
+                for backoff in range(0, 6):
+                    try:
 
-                    if response['ResponseMetadata']['HTTPStatusCode'] != 200:
-                        raise SpdbError(
-                            "Error updating {} in id index table in DynamoDB.".format(channel_id_key),
-                            ErrorCodes.OBJECT_STORE_ERROR)
-                except botocore.exceptions.ClientError as ex:
-                    print("Caught exception: {}".format(ex))
-                    raise SpdbError(
-                        "Error updating {} in id index table in DynamoDB.  Id present in too many cuboids.".format(channel_id_key),
-                        ErrorCodes.OBJECT_STORE_ERROR)
+                        # Make request to dynamodb
+                        response = self.dynamodb.update_item(
+                            TableName=self.id_index_table,
+                            Key={'channel-id-key': {'S': channel_id_key}, 'version': {'N': "{}".format(version)}},
+                            UpdateExpression='ADD #cuboidset :objkey',
+                            ExpressionAttributeNames={'#cuboidset': 'cuboid-set'},
+                            ExpressionAttributeValues={':objkey': {'SS': [obj_morton]}},
+                            ReturnConsumedCapacity='NONE')
+
+                        if response['ResponseMetadata']['HTTPStatusCode'] != 200:
+                            raise SpdbError("Failed to update cube index for ID: {}".format(channel_id_key),
+                                ErrorCodes.OBJECT_STORE_ERROR)
+
+                        # If you got here good to move on
+                        break
+
+                    except botocore.exceptions.ClientError as ex:
+                        if ex.response["Error"]["Code"] == "413":
+                            # DynamoDB Key is too big to write or update. Just skip it.
+                            blog.warning('ID Index Update: ID in too many cubes. Failed to update cube index for ID: {}'.format(channel_id_key))
+                            break
+
+                        elif ex.response["Error"]["Code"] == "ProvisionedThroughputExceededException":
+                            blog.info('ID Index Update: Backoff required to update cube index for ID: {}'.format(channel_id_key))
+                            # Need to back off!
+                            if backoff > 0:
+                                time.sleep(.01)
+                            else:
+                                time.sleep(((2 ** backoff) + (random.randint(0, 1000) / 1000.0))/10.0)
+                        else:
+                            # Something else bad happened
+                            raise SpdbError(
+                                "Error updating cube index for id {}: {} ".format(channel_id_key, ex),
+                                ErrorCodes.OBJECT_STORE_ERROR)
+
+        return True
 
     def get_cuboids(self, resource, resolution, id, version=0):
         """
@@ -212,7 +279,19 @@ class ObjectIndices:
                 "Error cuboid-set attribute is not string set in id index table of DynamoDB.",
                 ErrorCodes.OBJECT_STORE_ERROR)
 
-        return response['Item']['cuboid-set']['SS']
+        # Handle legacy vs. updated index values
+        # Legacy version stored the entire object key. The updated version stores only the morton and we need to
+        # add the rest of the object key information at runtime
+        # TODO: Migrate all legacy indices and remove this for loop
+        cuboid_set = []
+        for cuboid_str in response['Item']['cuboid-set']['SS']:
+            if len(cuboid_str) < 21:
+                # Compute cuboid object-keys as this is a "new" index value. Use t=0
+                cuboid_set.append(self.generate_object_key(resource, resolution, 0, cuboid_str))
+            else:
+                cuboid_set.append(cuboid_str)
+
+        return cuboid_set
 
     def get_loose_bounding_box(self, resource, resolution, id):
         """
