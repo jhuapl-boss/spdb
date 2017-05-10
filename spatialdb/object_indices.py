@@ -23,6 +23,7 @@ import datetime
 import numpy as np
 import time
 import random
+import logging
 
 from spdb.spatialdb.error import SpdbError, ErrorCodes
 
@@ -131,6 +132,7 @@ class ObjectIndices:
         """
         # Setup Logger
         blog = BossLogger().logger
+        blog.setLevel(logging.INFO)
 
         for obj_key, cube in zip(key_list, cube_list):
             # Find unique ids in this cube.
