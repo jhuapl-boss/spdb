@@ -131,7 +131,9 @@ class ObjectIndices:
             (SpdbError): Failure performing update_item operation on DynamoDB.
         """
         # Setup Logger
-        blog = BossLogger().logger
+        # blog = BossLogger().logger
+        # blog.setLevel(logging.INFO)
+        blog = logging.getLogger()
         blog.setLevel(logging.INFO)
 
         for obj_key, cube in zip(key_list, cube_list):
@@ -143,9 +145,11 @@ class ObjectIndices:
 
             num_ids = len(ids_str_list)
             blog.info("ID Index Update - Num unique IDs in cube: {}".format(num_ids))
+            print("Print: ID Index Update - Num unique IDs in cube: {}".format(num_ids))
             if num_ids == 0:
                 # No need to update if there are no non-zero ids in the cuboid.
                 blog.info('Object key: {} has no ids'.format(obj_key))
+                print('Print: Object key: {} has no ids'.format(obj_key))
                 continue
 
             # Associate these ids with their cuboid in the s3 cuboid index table.
