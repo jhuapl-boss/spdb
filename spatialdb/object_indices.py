@@ -23,11 +23,8 @@ import datetime
 import numpy as np
 import time
 import random
-import logging
 
 from spdb.spatialdb.error import SpdbError, ErrorCodes
-
-from bossutils.logger import BossLogger
 
 
 class ObjectIndices:
@@ -130,12 +127,6 @@ class ObjectIndices:
         Raises:
             (SpdbError): Failure performing update_item operation on DynamoDB.
         """
-        # Setup Logger
-        # blog = BossLogger().logger
-        # blog.setLevel(logging.INFO)
-        blog = logging.getLogger()
-        blog.setLevel(logging.INFO)
-
         for obj_key, cube in zip(key_list, cube_list):
             # Find unique ids in this cube.
             ids = np.unique(cube)
@@ -144,12 +135,10 @@ class ObjectIndices:
             ids_str_list = self._make_ids_strings(ids)
 
             num_ids = len(ids_str_list)
-            blog.info("ID Index Update - Num unique IDs in cube: {}".format(num_ids))
-            print("Print: ID Index Update - Num unique IDs in cube: {}".format(num_ids))
+            print("ID Index Update - Num unique IDs in cube: {}".format(num_ids))
             if num_ids == 0:
                 # No need to update if there are no non-zero ids in the cuboid.
-                blog.info('Object key: {} has no ids'.format(obj_key))
-                print('Print: Object key: {} has no ids'.format(obj_key))
+                print('Object key: {} has no ids'.format(obj_key))
                 continue
 
             # Associate these ids with their cuboid in the s3 cuboid index table.
@@ -175,11 +164,11 @@ class ObjectIndices:
                 except botocore.exceptions.ClientError as ex:
                     if ex.response["Error"]["Code"] == "413":
                         # DynamoDB Key is too big to write or update
-                        blog.warning('ID Index Update: Too many IDs present. Failed to update ID index for cube: {}'.format(obj_key))
+                        print('WARNING: ID Index Update: Too many IDs present. Failed to update ID index for cube: {}'.format(obj_key))
                         return False
 
                     elif ex.response["Error"]["Code"] == "ProvisionedThroughputExceededException":
-                        blog.info('ID Index Update: Backoff required to update ID index for cube: {}'.format(obj_key))
+                        print('INFO: ID Index Update: Backoff required to update ID index for cube: {}'.format(obj_key))
                         # Need to back off!
                         time.sleep(((2 ** backoff) + (random.randint(0, 1000) / 1000.0))/10.0)
 
@@ -221,11 +210,11 @@ class ObjectIndices:
                     except botocore.exceptions.ClientError as ex:
                         if ex.response["Error"]["Code"] == "413":
                             # DynamoDB Key is too big to write or update. Just skip it.
-                            blog.warning('ID Index Update: ID in too many cubes. Failed to update cube index for ID: {}'.format(channel_id_key))
+                            print('WARNING: ID Index Update: ID in too many cubes. Failed to update cube index for ID: {}'.format(channel_id_key))
                             break
 
                         elif ex.response["Error"]["Code"] == "ProvisionedThroughputExceededException":
-                            blog.info('ID Index Update: Backoff required to update cube index for ID: {}'.format(channel_id_key))
+                            print('INFO: ID Index Update: Backoff required to update cube index for ID: {}'.format(channel_id_key))
                             # Need to back off!
                             time.sleep(((2 ** backoff) + (random.randint(0, 1000) / 1000.0))/10.0)
                         else:
