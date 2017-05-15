@@ -153,29 +153,45 @@ void addAnnotationData(uint64_t * volume, uint64_t * output, int * cubes, int * 
     int cube_y = cubes[1];
     int cube_x = cubes[2];
 
-    // for zyx in range(dims)
+    // DP NOTE: could be sizeof(uint64_t)
+    int dsize = 8; // size of an individual element in volume / output
+
+    /* Offset calculations (DP NOTE: may assume C ordered arrays)
+     * z,y,x is the target index within the output array
+     * z,y,x * cubes is the corner index within the volume array of a
+     *               cubes size area to downsample into a single result
+     *               normally downsampling a 1x2x2 or 2x2x2 into 1x1x1
+     *
+     * To calculate the offset of the first byte of data in a numpy array
+     * idx * array.strides or
+     * (idx_z, idx_y, idx_x) * (dim_x * dim_y * dsize, dim_x * dsize, dsize)
+     */
+    #define OFFSET(val_x, val_y, val_z) (((val_z) * cube_z * dim_x * dim_y * dsize) + \
+                                         ((val_y) * cube_y * dim_x * dsize) + \
+                                         ((val_x) * cube_x * dsize))
+
     for(z=0; z<dim_z; z++)
         for(y=0; y<dim_y; y++)
             for(x=0; x<dim_x; x++)
             {
                 // index1 === zyx * cubes
-                uint32_t index1 = (z * cube_z * dim_y * dim_x) + (y * cube_y * dim_x) + (x * cube_x);
-                uint32_t index2 = (z * cube_z * dim_y * dim_x) + (y * cube_y * dim_x) + (x * cube_x + 1);
-                uint32_t index3 = (z * cube_z * dim_y * dim_x) + (y * cube_y * dim_x + 1) + (x * cube_x);
-                uint32_t index4 = (z * cube_z * dim_y * dim_x) + (y * cube_y * dim_x + 1) + (x * cube_x + 1);
+                uint32_t index1 = OFFSET(z, y, x);
+                uint32_t index2 = OFFSET(z, y, x + 1);
+                uint32_t index3 = OFFSET(z, y + 1, x);
+                uint32_t index4 = OFFSET(z, y + 1, x + 1);
                 annotation = getAnnValue64 ( volume[index1], volume[index2], volume[index3], volume[index4] );
 
                 if(annotation == 0 && cube_z == 2)
                 {
-                    uint32_t index1 = (z * cube_z * dim_y * dim_x + 1) + (y * cube_y * dim_x) + (x * cube_x);
-                    uint32_t index2 = (z * cube_z * dim_y * dim_x + 1) + (y * cube_y * dim_x) + (x * cube_x + 1);
-                    uint32_t index3 = (z * cube_z * dim_y * dim_x + 1) + (y * cube_y * dim_x + 1) + (x * cube_x);
-                    uint32_t index4 = (z * cube_z * dim_y * dim_x + 1) + (y * cube_y * dim_x + 1) + (x * cube_x + 1);
+                    index1 = OFFSET(z + 1, y, x);
+                    index2 = OFFSET(z + 1, y, x + 1);
+                    index3 = OFFSET(z + 1, y + 1, x);
+                    index4 = OFFSET(z + 1, y + 1, x + 1);
                     annotation = getAnnValue64 ( volume[index1], volume[index2], volume[index3], volume[index4] );
                 }
 
                 // output_index === zyx
-                int output_index = (z * dim_y * dim_x) + (y * dim_x) + (x);
+                int output_index = (z * dim_y * dim_x * dsize) + (y * dim_x * dsize) + (x * dsize);
                 output[output_index] = annotation;
             }
 }
