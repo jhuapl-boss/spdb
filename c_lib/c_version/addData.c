@@ -166,7 +166,7 @@ void addAnnotationData(uint64_t * volume, uint64_t * output, int * cubes, int * 
      * idx * array.strides or
      * (idx_z, idx_y, idx_x) * (dim_x * dim_y * dsize, dim_x * dsize, dsize)
      */
-    #define OFFSET(val_x, val_y, val_z) (((val_z) * cube_z * dim_x * dim_y * dsize) + \
+    #define OFFSET(val_z, val_y, val_x) (((val_z) * cube_z * dim_x * dim_y * dsize) + \
                                          ((val_y) * cube_y * dim_x * dsize) + \
                                          ((val_x) * cube_x * dsize))
 
