@@ -131,6 +131,18 @@ class SpatialDB:
         # Get all cuboid byte arrays from db
         cuboids = self.kvio.get_cubes(key_list)
 
+        return self.sort_cubes(resource, cuboids)
+
+    def sort_cubes(self, resource, cuboids):
+        """Sort cubes by time sample and then by morton id
+        
+        Args:
+            resource (spdb.project.BossResource): Data model info based on the request or target resource
+            cuboids (int, int, bytes): A tuple of the morton id, time sample and the blosc compressed byte array using the numpy interface
+
+        Returns:
+            list(cube.Cube): The cuboid data with time-series support, packed into Cube instances, sorted by morton id
+        """
         # Group by morton
         cuboids = sorted(cuboids, key=lambda element: (element[0], element[1]))
 
@@ -328,7 +340,7 @@ class SpatialDB:
         return result_tuple(effcorner, effdim, None, None)
 
     # Main Interface Methods
-    def cutout(self, resource, corner, extent, resolution, time_sample_range=None, filter_ids=None, iso=False):
+    def cutout(self, resource, corner, extent, resolution, time_sample_range=None, filter_ids=None, iso=False, no_cache=False):
         """Extract a cube of arbitrary size. Need not be aligned to cuboid boundaries.
 
         corner represents the location of the cutout and extent the size.  As an example in 1D, if asking for
@@ -345,6 +357,7 @@ class SpatialDB:
             time_sample_range (list((int)):  a range of time samples to get [start, stop). Default is [0,1) if omitted
             filter_ids (optional[list]): Defaults to None. Otherwise, is a list of uint64 ids to filter cutout by.
             iso (bool): Flag indicating if you want to get to the "isotropic" version of a cuboid, if available
+            no_cache (bool): True to read directly from S3 and bypass the cache.
 
         Returns:
             cube.Cube: The cutout data stored in a Cube instance
@@ -471,37 +484,63 @@ class SpatialDB:
             # Sleep a bit so you don't kill the DB
             time.sleep(0.05)
 
+        #
+        # All dirty cubes flushed, can begin reading.
+        #
+
         s3_key_idx = []
         cache_cuboids = []
         s3_cuboids = []
         zero_cuboids = []
+
+        if no_cache:
+            # If not using the cache, then consider all keys are missing.
+            blog.debug("Bypassing cache; loading all cuboids directly from S3")
+            missing_key_idx = [key for key in all_keys]
+
         if len(missing_key_idx) > 0:
             # There are keys that are missing in the cache
             # Get index of missing keys that are in S3
             s3_key_idx, zero_key_idx = self.objectio.cuboids_exist(all_keys, missing_key_idx)
 
             if len(s3_key_idx) > 0:
-                blog.debug("Data missing from cache, but present in S3")
-
-                if len(s3_key_idx) > self.read_lambda_threshold:
-                    # Trigger page-in of available blocks from object store and wait for completion
-                    blog.debug("Triggering Lambda Page-in")
-                    self.page_in_cubes(itemgetter(*s3_key_idx)(all_keys))
-                else:
-                    # Read cuboids from S3 into cache directly
-                    # Convert cuboid-cache keys to object keys
-                    blog.debug("Paging-in Keys Directly")
+                if no_cache:
                     temp_keys = self.objectio.cached_cuboid_to_object_keys(itemgetter(*s3_key_idx)(all_keys))
 
                     # Get objects
                     temp_cubes = self.objectio.get_objects(temp_keys)
+                    # keys will be just the morton id and time sample.
+                    keys_and_cubes = []
+                    for key, cube in zip(temp_keys, temp_cubes):
+                        vals = key.split("&")
+                        keys_and_cubes.append((int(vals[-1]), int(vals[-2]), cube))
+                    s3_cuboids = self.sort_cubes(resource, keys_and_cubes)
+                else:
+                    # Load data into cache.
+                    blog.debug("Data missing from cache, but present in S3")
 
-                    # write to cache
-                    blog.debug("put keys on direct page in: {}".format(itemgetter(*s3_key_idx)(all_keys)))
-                    self.kvio.put_cubes(itemgetter(*s3_key_idx)(all_keys), temp_cubes)
+                    if len(s3_key_idx) > self.read_lambda_threshold:
+                        # Trigger page-in of available blocks from object store and wait for completion
+                        blog.debug("Triggering Lambda Page-in")
+                        self.page_in_cubes(itemgetter(*s3_key_idx)(all_keys))
+                    else:
+                        # Read cuboids from S3 into cache directly
+                        # Convert cuboid-cache keys to object keys
+                        blog.debug("Paging-in Keys Directly")
+                        temp_keys = self.objectio.cached_cuboid_to_object_keys(itemgetter(*s3_key_idx)(all_keys))
+
+                        # Get objects
+                        temp_cubes = self.objectio.get_objects(temp_keys)
+
+                        # write to cache
+                        blog.debug("put keys on direct page in: {}".format(itemgetter(*s3_key_idx)(all_keys)))
+                        self.kvio.put_cubes(itemgetter(*s3_key_idx)(all_keys), temp_cubes)
 
             if len(zero_key_idx) > 0:
-                blog.debug("Data missing in cache, but not in S3")
+                if not no_cache:
+                    blog.debug("Data missing in cache, but not in S3")
+                else:
+                    blog.debug("No data for some keys, making cuboids with zeros")
 
                 # Keys that don't exist in object store render as zeros
                 [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
@@ -514,59 +553,64 @@ class SpatialDB:
                     zero_cuboids.append(temp_cube)
 
         # Get cubes from the cache database (either already there or freshly paged in)
-        # TODO: Optimize access to cache data and checking for dirty cubes
-        if len(s3_key_idx) > 0:
-            blog.debug("Get cubes from cache that were paged in from S3")
-            blog.debug(itemgetter(*s3_key_idx)(all_keys))
+        if not no_cache:
+            # TODO: Optimize access to cache data and checking for dirty cubes
+            if len(s3_key_idx) > 0:
+                blog.debug("Get cubes from cache that were paged in from S3")
+                blog.debug(itemgetter(*s3_key_idx)(all_keys))
 
-            s3_cuboids = self.get_cubes(resource, itemgetter(*s3_key_idx)(all_keys))
+                s3_cuboids = self.get_cubes(resource, itemgetter(*s3_key_idx)(all_keys))
 
-            # Record misses that were found in S3 for possible pre-fetching
-            self.cache_state.add_cache_misses(itemgetter(*s3_key_idx)(all_keys))
+                # Record misses that were found in S3 for possible pre-fetching
+                self.cache_state.add_cache_misses(itemgetter(*s3_key_idx)(all_keys))
 
-        # Get previously cached cubes, waiting for dirty cubes to be updated if needed
-        if len(cached_key_idx) > 0:
-            blog.debug("Get cubes that were already present in the cache")
+            # Get previously cached cubes, waiting for dirty cubes to be updated if needed
+            if len(cached_key_idx) > 0:
+                blog.debug("Get cubes that were already present in the cache")
 
-            # Get the cached keys once in list form
-            cached_keys_list = itemgetter(*cached_key_idx)(all_keys)
-            if isinstance(cached_keys_list, str):
-                cached_keys_list = [cached_keys_list]
-            if isinstance(cached_keys_list, tuple):
-                cached_keys_list = list(cached_keys_list)
+                # Get the cached keys once in list form
+                cached_keys_list = itemgetter(*cached_key_idx)(all_keys)
+                if isinstance(cached_keys_list, str):
+                    cached_keys_list = [cached_keys_list]
+                if isinstance(cached_keys_list, tuple):
+                    cached_keys_list = list(cached_keys_list)
 
-            # Split clean and dirty keys
-            dirty_flags = self.kvio.is_dirty(cached_keys_list)
-            dirty_keys, clean_keys = [], []
-            for key, flag in zip(cached_keys_list, dirty_flags):
-                (dirty_keys if flag else clean_keys).append(key)
-
-            # Get all the clean cubes immediately, removing them from the list of cached keys to get
-            for k in clean_keys:
-                cached_keys_list.remove(k)
-            cache_cuboids.extend(self.get_cubes(resource, clean_keys))
-
-            # Get the dirty ones when you can with a timeout
-            start_time = datetime.now()
-            while dirty_keys:
+                # Split clean and dirty keys
                 dirty_flags = self.kvio.is_dirty(cached_keys_list)
                 dirty_keys, clean_keys = [], []
                 for key, flag in zip(cached_keys_list, dirty_flags):
                     (dirty_keys if flag else clean_keys).append(key)
 
-                if clean_keys:
-                    # Some keys are ready now. Remove from list and get them
-                    for k in clean_keys:
-                        cached_keys_list.remove(k)
-                    cache_cuboids.extend(self.get_cubes(resource, clean_keys))
+                # Get all the clean cubes immediately, removing them from the list of cached keys to get
+                for k in clean_keys:
+                    cached_keys_list.remove(k)
+                cache_cuboids.extend(self.get_cubes(resource, clean_keys))
 
-                if (datetime.now() - start_time).seconds > self.dirty_read_timeout:
-                    # Took too long! Something must have crashed
-                    raise SpdbError('{} second timeout reached while waiting for dirty cubes to be flushed.'.format(self.dirty_read_timeout),
-                                    ErrorCodes.ASYNC_ERROR)
+                # Get the dirty ones when you can with a timeout
+                start_time = datetime.now()
+                while dirty_keys:
+                    dirty_flags = self.kvio.is_dirty(cached_keys_list)
+                    dirty_keys, clean_keys = [], []
+                    for key, flag in zip(cached_keys_list, dirty_flags):
+                        (dirty_keys if flag else clean_keys).append(key)
 
-                # Sleep a bit so you don't kill the DB
-                time.sleep(0.05)
+                    if clean_keys:
+                        # Some keys are ready now. Remove from list and get them
+                        for k in clean_keys:
+                            cached_keys_list.remove(k)
+                        cache_cuboids.extend(self.get_cubes(resource, clean_keys))
+
+                    if (datetime.now() - start_time).seconds > self.dirty_read_timeout:
+                        # Took too long! Something must have crashed
+                        raise SpdbError('{} second timeout reached while waiting for dirty cubes to be flushed.'.format(self.dirty_read_timeout),
+                                        ErrorCodes.ASYNC_ERROR)
+
+                    # Sleep a bit so you don't kill the DB
+                    time.sleep(0.05)
+
+        #
+        # At this point, have all cuboids whether or not the cache was used.
+        #
 
         # Add all cuboids (which have all time samples packed in already) to final cube of data
         for cube in cache_cuboids + s3_cuboids + zero_cuboids:
