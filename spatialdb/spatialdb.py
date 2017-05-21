@@ -496,7 +496,7 @@ class SpatialDB:
         if no_cache:
             # If not using the cache, then consider all keys are missing.
             blog.debug("Bypassing cache; loading all cuboids directly from S3")
-            missing_key_idx = [i for i, key in enumerate(all_keys)]
+            missing_key_idx = [i for i in range(len(all_keys))]
 
         if len(missing_key_idx) > 0:
             # There are keys that are missing in the cache
