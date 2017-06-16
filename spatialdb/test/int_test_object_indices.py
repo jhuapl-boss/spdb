@@ -174,7 +174,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
             self.assertIn('Item', response)
             self.assertIn('cuboid-set', response['Item'])
             self.assertIn('SS', response['Item']['cuboid-set'])
-            self.assertIn(object_key, response['Item']['cuboid-set']['SS'])
+            self.assertIn(object_key.split("&")[-1], response['Item']['cuboid-set']['SS'])
 
     def test_update_id_indices_add_new_cuboids_to_existing_ids(self):
         """
@@ -221,8 +221,9 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         self.assertIn('Item', response)
         self.assertIn('cuboid-set', response['Item'])
         self.assertIn('SS', response['Item']['cuboid-set'])
-        self.assertIn(object_key, response['Item']['cuboid-set']['SS'])
-        self.assertIn(new_object_key, response['Item']['cuboid-set']['SS'])
+        # Check that mortons are there since using "new" index style
+        self.assertIn(object_key.split("&")[-1], response['Item']['cuboid-set']['SS'])
+        self.assertIn(new_object_key.split("&")[-1], response['Item']['cuboid-set']['SS'])
 
         # Confirm cuboids for id 1000.
         key1000 = self.obj_ind.generate_channel_id_key(resource, resolution, 1000)
@@ -236,8 +237,9 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         self.assertIn('Item', response2)
         self.assertIn('cuboid-set', response2['Item'])
         self.assertIn('SS', response2['Item']['cuboid-set'])
-        self.assertIn(object_key, response2['Item']['cuboid-set']['SS'])
-        self.assertIn(new_object_key, response2['Item']['cuboid-set']['SS'])
+        # Check that mortons are there since using "new" index style
+        self.assertIn(object_key.split("&")[-1], response2['Item']['cuboid-set']['SS'])
+        self.assertIn(new_object_key.split("&")[-1], response2['Item']['cuboid-set']['SS'])
 
     def test_too_many_ids_in_cuboid(self):
         """
@@ -251,11 +253,49 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         mortonid = XYZMorton([0, 0, 0])
         obj_keys = [self.obj_store.generate_object_key(resource, resolution, time_sample, mortonid)]
         cubes = [np.random.randint(2000000, size=(16, 512, 512), dtype='uint64')]
-        with self.assertRaises(SpdbError) as ex:
-            self.obj_ind.update_id_indices(
-                resource, resolution, obj_keys, cubes, version)
-        self.assertEqual(ErrorCodes.OBJECT_STORE_ERROR, ex.exception.error_code)
 
+        # If too many ids, the index is skipped, logged, and False is returned to the caller.
+        result = self.obj_ind.update_id_indices(resource, resolution, obj_keys, cubes, version)
+        self.assertFalse(result)
+
+    def test_legacy_cuboids_in_id_index(self):
+        """Tet to verify that legacy and "new" cuboid indices in the ID index table both work
+
+        Returns:
+
+        """
+        bytes = np.zeros(10, dtype='uint64')
+        bytes[1] = 222
+        bytes[2] = 222
+        bytes[5] = 555
+        bytes[8] = 1001
+        expected_ids = ['222', '555', '1001', '12345']
+        version = 0
+        resource = BossResourceBasic(data=get_anno_dict())
+        resolution = 1
+        time_sample = 0
+        morton_id = 2000
+        object_key = self.obj_store.generate_object_key(
+            resource, resolution, time_sample, morton_id)
+
+        # Write a legacy index
+        self.dynamodb.update_item(TableName=self.object_store_config["id_index_table"],
+                                  Key={'channel-id-key': {'S': self.obj_ind.generate_channel_id_key(resource,
+                                                                                                    resolution,
+                                                                                                    12345)},
+                                       'version': {'N': "{}".format(version)}},
+                                  UpdateExpression='ADD #cuboidset :objkey',
+                                  ExpressionAttributeNames={'#cuboidset': 'cuboid-set'},
+                                  ExpressionAttributeValues={':objkey': {'SS': [object_key]}},
+                                  ReturnConsumedCapacity='NONE')
+
+        # Add new index values
+        self.obj_ind.update_id_indices(resource, resolution, [object_key], [bytes], version)
+
+        # Confirm each id has the object_key in its cuboid-set attribute.
+        for id in expected_ids:
+            cuboid_object_keys = self.obj_ind.get_cuboids(resource, resolution, id)
+            self.assertEqual(cuboid_object_keys[0], object_key)
 
     @unittest.skip('test takes too long for normal integration tests')
     def test_too_many_cuboids_for_id_index(self):
@@ -288,17 +328,18 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         self.assertEqual(ErrorCodes.OBJECT_STORE_ERROR, ex.exception.error_code)
 
     def test_get_cuboids(self):
+        resource = BossResourceBasic(data=get_anno_dict())
         id = 22222
         bytes = np.zeros(10, dtype='uint64')
         bytes[1] = id
-        key = 'hash_coll_exp_chan_key_cuboids'
+        resolution = 1
+        key = self.obj_store.generate_object_key(resource, resolution, 0, 56)
         version = 0
         resource = BossResourceBasic(data=get_anno_dict())
-        resolution = 1
 
         new_bytes = np.zeros(4, dtype='uint64')
         new_bytes[0] = id     # Pre-existing id.
-        new_key = 'hash_coll_exp_chan_key_cuboids2'
+        new_key = self.obj_store.generate_object_key(resource, resolution, 0, 59)
 
         self.obj_ind.update_id_indices(
             resource, resolution, [key, new_key], [bytes, new_bytes], version)

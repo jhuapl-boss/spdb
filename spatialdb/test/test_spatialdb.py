@@ -175,6 +175,14 @@ class SpatialDBImageDataTestMixin(object):
 
         np.testing.assert_array_equal(np.sum(cube.data), 0)
 
+    def test_cutout_no_time_single_aligned_zero_no_cache(self):
+        """Test the get_cubes method - no time - single - bypass cache"""
+        db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        cube = db.cutout(self.resource, (7, 88, 243), (self.x_dim, self.y_dim, self.z_dim), 0, no_cache=True)
+
+        np.testing.assert_array_equal(np.sum(cube.data), 0)
+
     def test_cutout_no_time_single_aligned_hit(self):
         """Test the get_cubes method - no time - single"""
         # Generate random data

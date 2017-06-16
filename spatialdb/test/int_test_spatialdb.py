@@ -36,6 +36,24 @@ class SpatialDBImageDataIntegrationTestMixin(object):
     y_dim = cuboid_size[1]
     z_dim = cuboid_size[2]
 
+    def test_cutout_no_time_single_no_cache(self):
+        """Test the get_cubes method - no time - single - bypass cache"""
+        # Generate random data
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube1.random()
+        cube1.morton_id = 0
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data)
+
+        # Cutout using cache to make sure cube finished writing to S3 first.
+        sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
+
+        cube2 = sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0, no_cache=True)
+
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+
     def test_cutout_no_time_single_aligned_hit(self):
         """Test the get_cubes method - no time - single - hit"""
         # Generate random data
@@ -126,6 +144,42 @@ class SpatialDBImageDataIntegrationTestMixin(object):
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
 
+    def test_cutout_no_time_single_aligned_hit_shifted_no_cache(self):
+        """Test the get_cubes method - no time - single - hit - shifted into a different location - bypass cache"""
+        # Generate random data
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube1.random()
+        cube1.morton_id = 0
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        sp.write_cuboid(self.resource, (self.x_dim, self.y_dim, 0), 0, cube1.data)
+
+        # Cutout using cache to make sure cube finished writing to S3 first.
+        sp.cutout(self.resource, (self.x_dim, self.y_dim, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
+
+        cube2 = sp.cutout(self.resource, (self.x_dim, self.y_dim, 0), (self.x_dim, self.y_dim, self.z_dim), 0, no_cache=True)
+
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+
+    def test_cutout_no_time_single_unaligned_no_cache(self):
+        """Test the get_cubes method - no time - single - unaligned - bypass cache"""
+        # Generate random data
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube1.random()
+        cube1.morton_id = 0
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        sp.write_cuboid(self.resource, (600, 0, 0), 0, cube1.data)
+
+        # Cutout using cache to make sure cube finished writing to S3 first.
+        sp.cutout(self.resource, (600, 0, 0), (self.x_dim, self.y_dim, 16), 0)
+
+        cube2 = sp.cutout(self.resource, (600, 0, 0), (self.x_dim, self.y_dim, 16), 0, no_cache=True)
+
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+
     def test_cutout_no_time_single_unaligned_hit(self):
         """Test the get_cubes method - no time - single - unaligned - hit"""
         # Generate random data
@@ -138,6 +192,25 @@ class SpatialDBImageDataIntegrationTestMixin(object):
         sp.write_cuboid(self.resource, (600, 0, 0), 0, cube1.data)
 
         cube2 = sp.cutout(self.resource, (600, 0, 0), (self.x_dim, self.y_dim, 16), 0)
+
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+
+    def test_cutout_time0_single_aligned_no_cache(self):
+        """Test the get_cubes method - w/ time - single - bypass cache"""
+        # Generate random data
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim], time_range=[0, 5])
+        cube1.random()
+        cube1.morton_id = 0
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data)
+
+        # Cutout using cache to make sure cube finished writing to S3 first.
+        sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0, time_sample_range=[0, 5])
+
+        cube2 = sp.cutout(
+            self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0, time_sample_range=[0, 5], no_cache=True)
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
 
@@ -156,6 +229,25 @@ class SpatialDBImageDataIntegrationTestMixin(object):
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
 
+    def test_cutout_time_offset_single_aligned_no_cache(self):
+        """Test the get_cubes method - w/ time - single - bypass cache"""
+        # Generate random data
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim], time_range=[0, 3])
+        cube1.random()
+        cube1.morton_id = 0
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data, time_sample_start=6)
+
+        # Cutout using cache to make sure cube finished writing to S3 first.
+        sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0, time_sample_range=[6, 9])
+
+        cube2 = sp.cutout(
+            self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0, time_sample_range=[6, 9], no_cache=True)
+
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+
     def test_cutout_time_offset_single_aligned_hit(self):
         """Test the get_cubes method - w/ time - single - hit"""
         # Generate random data
@@ -168,6 +260,24 @@ class SpatialDBImageDataIntegrationTestMixin(object):
         sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data, time_sample_start=6)
 
         cube2 = sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0, time_sample_range=[6, 9])
+
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+
+    def test_cutout_no_time_multi_unaligned_no_cache(self):
+        """Test the get_cubes method - no time - multi - unaligned - bypass cache"""
+        # Generate random data
+        cube1 = Cube.create_cube(self.resource, [400, 400, 8])
+        cube1.random()
+        cube1.morton_id = 0
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        sp.write_cuboid(self.resource, (200, 600, 3), 0, cube1.data)
+
+        # Cutout using cache to make sure cube finished writing to S3 first.
+        sp.cutout(self.resource, (200, 600, 3), (400, 400, 8), 0)
+
+        cube2 = sp.cutout(self.resource, (200, 600, 3), (400, 400, 8), 0, no_cache=True)
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
 
