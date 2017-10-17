@@ -71,7 +71,22 @@ class ObjectIndices:
         Returns:
             (string): key to get cuboids associated with the given resource and id.
         """
-        base_key = '{}&{}&{}'.format(resource.get_lookup_key(), resolution, id)
+        return self.generate_channel_id_key_from_lookup_key(
+            resource.get_lookup_key(), resolution, id)
+
+    def generate_channel_id_key_from_lookup_key(self, lookup_key, resolution, id):
+        """
+        Generate key used by DynamoDB id index table to store cuboids keys associated with the given lookup_key and id.
+
+        Args:
+            lookup_key (string): Data model info based on the request or target resource.
+            resolution (int): Resolution level.
+            id (string|uint64): Object id.
+
+        Returns:
+            (string): key to get cuboids associated with the given resource and id.
+        """
+        base_key = '{}&{}&{}'.format(lookup_key, resolution, id)
         hash_str = hashlib.md5(base_key.encode()).hexdigest()
         return '{}&{}'.format(hash_str, base_key)
 
