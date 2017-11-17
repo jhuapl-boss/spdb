@@ -4,6 +4,6 @@ mockredispy==2.9.3
 blosc==1.2.8
 nose2
 numpy==1.11.1
-moto
+moto>=1.1.24
 boto3
 hvac

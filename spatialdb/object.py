@@ -19,13 +19,14 @@ import json
 import hashlib
 import numpy as np
 from .error import SpdbError, ErrorCodes
-from .object_indices import ObjectIndices
 from .region import Region
 from spdb.c_lib.ndlib import XYZMorton
 
 from bossutils.aws import get_region
 
 import boto3
+
+# Note there are additional imports at the bottom of the file.
 
 
 class ObjectStore(metaclass=ABCMeta):
@@ -224,7 +225,9 @@ class AWSObjectStore(ObjectStore):
         # call the base class constructor
         ObjectStore.__init__(self, conf)
         self.obj_ind = ObjectIndices(
-            conf['s3_index_table'], conf['id_index_table'], conf['id_count_table'], get_region())
+            conf['s3_index_table'], conf['id_index_table'], 
+            conf['id_count_table'], conf['cuboid_bucket'], 
+            get_region())
 
     @staticmethod
     def object_key_chunks(object_keys, chunk_size):
@@ -266,7 +269,8 @@ class AWSObjectStore(ObjectStore):
         return KeyParts(hash=hash, collection_id=collection_id, experiment_id=experiment_id, channel_id=channel_id,
                         resolution=resolution, time_sample=time_sample, morton_id=morton_id, is_iso=is_iso)
 
-    def generate_object_key(self, resource, resolution, time_sample, morton_id, iso=False):
+    @staticmethod
+    def generate_object_key(resource, resolution, time_sample, morton_id, iso=False):
         """Generate Key for an object stored in the S3 cuboid bucket
 
             hash&{lookup_key}&resolution&time_sample&morton_id
@@ -778,7 +782,14 @@ class AWSObjectStore(ObjectStore):
                 for z in cuboid_bounds.z_cuboids:
                     morton = XYZMorton([x, y, z])
                     for t in range(t_range[0], t_range[1]):
-                        key_list.append(self.generate_object_key(
+                        key_list.append(AWSObjectStore.generate_object_key(
                             resource, resolution, t, morton))
 
         return key_list
+
+
+
+# Import statement at the bottom to avoid problems with circular imports.
+# http://effbot.org/zone/import-confusion.htm
+from .object_indices import ObjectIndices
+

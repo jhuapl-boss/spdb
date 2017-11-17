@@ -15,6 +15,7 @@
 from spdb.c_lib.ndlib import unique
 from spdb.c_lib.ndlib import MortonXYZ, XYZMorton
 from spdb.c_lib.ndtype import CUBOIDSIZE
+from .annocube import AnnotateCube64
 from .error import SpdbError, ErrorCodes
 import boto3
 import botocore
@@ -26,19 +27,38 @@ import random
 
 from spdb.spatialdb.error import SpdbError, ErrorCodes
 
+# Note there are additional imports at the bottom of the file.
+
+LAST_PARTITION_KEY = 'lastPartitionKey'
 
 class ObjectIndices:
     """
     Class that handles the DynamoDB tracking of object IDs.  This class
     supports the AWS Object Store.
     """
-    def __init__(self, s3_index_table, id_index_table, id_count_table, region, dynamodb_url=None):
+
+    def __init__(
+        self, s3_index_table, id_index_table, id_count_table, cuboid_bucket, 
+        region, dynamodb_url=None):
+        """
+        Constructor.
+
+        Args:
+            s3_index_table (string): Name of the cuboid index Dynamo table.
+            id_index_table (string): Name of the id index Dynamo table.
+            id_count_table (string): Name of the id count Dynamo table.
+            cuboid_bucket (string): Name of the S3 bucket that stores cuboids.
+            region (string): AWS region to run in.
+            dynamodb_url (optional[string]): Specific Dynamo URL to use (supply for testing).
+        """
         self.s3_index_table = s3_index_table
         self.id_index_table = id_index_table
         self.id_count_table = id_count_table
+        self.cuboid_bucket = cuboid_bucket
 
         self.dynamodb = boto3.client(
             'dynamodb', region_name=region, endpoint_url=dynamodb_url)
+        self.s3 = boto3.client('s3', region_name=region)
 
     def _make_ids_strings(self, ids):
         """
@@ -61,7 +81,7 @@ class ObjectIndices:
 
     def generate_channel_id_key(self, resource, resolution, id):
         """
-        Generate key used by DynamoDB id index table to store cuboids keys associated with the given resource and id.
+        Generate key used by DynamoDB id index table to store cuboids morton ids associated with the given resource and id.
 
         Args:
             resource (BossResource): Data model info based on the request or target resource.
@@ -71,40 +91,24 @@ class ObjectIndices:
         Returns:
             (string): key to get cuboids associated with the given resource and id.
         """
-        return self.generate_channel_id_key_from_lookup_key(
-            resource.get_lookup_key(), resolution, id)
-
-    def generate_channel_id_key_from_lookup_key(self, lookup_key, resolution, id):
-        """
-        Generate key used by DynamoDB id index table to store cuboids keys associated with the given lookup_key and id.
-
-        Args:
-            lookup_key (string): Data model info based on the request or target resource.
-            resolution (int): Resolution level.
-            id (string|uint64): Object id.
-
-        Returns:
-            (string): key to get cuboids associated with the given resource and id.
-        """
-        base_key = '{}&{}&{}'.format(lookup_key, resolution, id)
+        base_key = '{}&{}&{}'.format(resource.get_lookup_key(), resolution, id)
         hash_str = hashlib.md5(base_key.encode()).hexdigest()
         return '{}&{}'.format(hash_str, base_key)
 
-    def generate_object_key(self, resource, resolution, time_sample, morton):
+    def generate_channel_id_key_from_parts(self, key_parts, id):
         """
-        Generate key used by DynamoDB id index table to store cuboids keys associated with the given resource and id.
+        Generate key used by DynamoDB id index table to store cuboids morton ids associated with the given resource and id.
 
         Args:
-            resource (BossResource): Data model info based on the request or target resource.
-            resolution (int): Resolution level.
-            time_sample (string|int): Time sample for the object, typically always 0 since we don't store indices off 0
-            morton (string|uint64): Morton ID of the object
+            key_parts (AWSObjectStore.KeyParts): Decomposed object key.
+            id (string|uint64): Object id.
 
         Returns:
             (string): key to get cuboids associated with the given resource and id.
         """
-        # TODO: Consolidate all key operations
-        base_key = '{}&{}&{}&{}'.format(resource.get_lookup_key(), resolution, time_sample, morton)
+        base_key = '{}&{}&{}&{}&{}'.format(
+            key_parts.collection_id, key_parts.experiment_id,key_parts.channel_id,
+            key_parts.resolution, id)
         hash_str = hashlib.md5(base_key.encode()).hexdigest()
         return '{}&{}'.format(hash_str, base_key)
 
@@ -293,7 +297,7 @@ class ObjectIndices:
         for cuboid_str in response['Item']['cuboid-set']['SS']:
             if len(cuboid_str) < 21:
                 # Compute cuboid object-keys as this is a "new" index value. Use t=0
-                cuboid_set.append(self.generate_object_key(resource, resolution, 0, cuboid_str))
+                cuboid_set.append(AWSObjectStore.generate_object_key(resource, resolution, 0, cuboid_str))
             else:
                 cuboid_set.append(cuboid_str)
 
@@ -655,3 +659,224 @@ class ObjectIndices:
                             ErrorCodes.SPDB_ERROR)
 
         return next_id
+
+    def write_s3_index(self, obj_key, version=0):
+        """
+        Loads the cuboid from S3, extracts its ids, and writes them to the S3 index.
+
+        Args:
+            obj_key (string): Object key of the cuboid in the S3 bucket.
+            version (optional[string|int]): Reserved for future use.
+
+        Returns:
+            ([string]): List of unique ids (as strings) contained in cuboid.
+        """
+        response = self.s3.get_object(Key=obj_key, Bucket=self.cuboid_bucket)
+        if response['ResponseMetadata']['HTTPStatusCode'] != 200:
+            raise SpdbError("Error reading cuboid from S3.",
+                ErrorCodes.OBJECT_STORE_ERROR)
+        cuboid_bytes_blosc = response['Body'].read()
+        cube = AnnotateCube64()
+        cuboid_bytes = cube.unpack_array(cuboid_bytes_blosc)
+
+        ids = np.unique(cuboid_bytes)
+        
+        # Convert ids to a string.
+        ids_str_list = self._make_ids_strings(ids)
+
+        self.dynamodb.update_item(
+            TableName=self.s3_index_table,
+            Key={'object-key': {'S': obj_key}, 'version-node': {'N': "{}".format(version)}},
+            UpdateExpression='SET #idset = :ids',
+            ExpressionAttributeNames={'#idset': 'id-set'},
+            ExpressionAttributeValues={':ids': {'NS': ids_str_list}},
+            ReturnConsumedCapacity='NONE')
+        return ids_str_list
+
+    def write_id_index(self, obj_key, id, version=0):
+        """
+        Extracts the morton id from the given object key and writes it to the 
+        id index.
+
+        Args:
+            obj_key (string): Cuboid object key in S3 cuboid index.
+            id (int): Id to write cuboid's morton id to.
+            version (optional[int]): Version - reserved for future use.
+        """
+        key_parts = AWSObjectStore.get_object_key_parts(obj_key)
+        key = self.generate_channel_id_key_from_parts(key_parts, id)
+        chunk_num = self.get_last_partition_key(key, version)
+        cuboid_morton = key_parts.morton_id
+
+        (found, _) = self.lookup(cuboid_morton, key, chunk_num, version)
+
+        if found:
+            return
+
+        actual_chunk = self.write_cuboid(cuboid_morton, key, chunk_num, version)
+
+        if actual_chunk > chunk_num:
+            self.update_last_partition_key(key, actual_chunk, version)
+
+    def get_last_partition_key(self, key, version=0):
+        """
+        Look up the last partition used to store mortons for the given key.
+
+        Args:
+            key (string): Key in the id index table without a chunk_num.
+            version (optional[int]): Version - reserved for future use.
+
+        Returns:
+            (int) Chunk number of last partition for given key.
+        """
+        resp = self.dynamodb.get_item(
+            TableName=self.id_index_table,
+            Key={'channel-id-key': {'S': key}, 'version': {'N': "{}".format(version)}},
+            ProjectionExpression=LAST_PARTITION_KEY)
+
+        if resp['ResponseMetadata']['HTTPStatusCode'] != 200:
+            raise SpdbError("Failed to update cube index for ID: {}".format(key),
+                ErrorCodes.OBJECT_STORE_ERROR)
+
+        # ToDo: error check
+        if LAST_PARTITION_KEY in resp:
+            chunk_num = resp[LAST_PARTITION_KEY]
+        else:
+            chunk_num = 0
+
+        return chunk_num
+
+    def lookup(self, cuboid_morton, default_key, last_chunk_num, version=0):
+        """
+        Look for the given morton in the id index.
+
+        Args:
+            cuboid_morton (string|int): Morton id of the cuboid.
+            default_key (string): Key in the id index table without a chunk_num.
+            last_chunk_num (int): Chunk number of last partition used for this object id.
+            version (optional[int]): Version - reserved for future use.
+
+        Returns:
+            (bool, int): True if cuboid found and the chunk_num of the key that contains the cuboid.  False, -1 if cuboid isn't found.
+        """
+        for i in range(last_chunk_num + 1):
+            if i == 0:
+                key = default_key
+            else:
+                key = '{}&{}'.format(default_key, i)
+
+            # Using a query so we don't actually return the set to the client.
+            resp = self.dynamodb.query(
+                TableName=self.id_index_table,
+                Select='COUNT',
+                KeyConditionExpression='#key=:keyvalue AND version=:version',
+                ExpressionAttributeNames={
+                    '#key': 'channel-id-key',
+                    '#cuboidset': 'cuboid-set'},
+                ExpressionAttributeValues={
+                    ':keyvalue': {'S': key},
+                    ':version': {'N': str(version)},
+                    ':morton': {'S': str(cuboid_morton)}},
+                FilterExpression='contains(#cuboidset, :morton)')
+
+            # If result set non empty, return True
+            if resp['Count'] > 0:
+                return (True, i)
+
+        return (False, -1)
+
+    def write_cuboid(self, cuboid_morton, key, chunk_num, version=0):
+        """
+        Write the morton id to the given key.
+
+        Will increment the key's chunk_num as necessary if the given key and chunk_num
+        combination's set is full.
+
+        Args:
+            cuboid_morton (string|int): Morton id of the cuboid.
+            key (string): Key in the id index table without a chunk_num.
+            chunk_num (int): Number to be appended to the key if greater than 0.
+            version (optional[int]): Version - reserved for future use.
+
+        Returns:
+            (int): chunk that the morton id was written to.
+        """
+        new_chunk_num = chunk_num
+
+        done = False
+
+        while not done:
+            if new_chunk_num > 0:
+                dynamo_key = '{}&{}'.format(key, new_chunk_num)
+            else:
+                dynamo_key = key
+
+            try:
+                self.write_cuboid_dynamo(cuboid_morton, dynamo_key, version)
+                done = True
+            except botocore.exceptions.ClientError as ex:
+                if ex.response['Error']['Code'] == '413':
+                    # Set full, try the next chunk.
+                    new_chunk_num = new_chunk_num + 1
+                else:
+                    raise ex
+
+        return new_chunk_num
+
+    def write_cuboid_dynamo(self, cuboid_morton, key, version=0):
+        """
+        Writes cuboid's morton id to the given key.
+
+        Helper for write_cuboid().
+
+        Args:
+            cuboid_morton (string|int): Morton id of the cuboid.
+            key (string): Key in the id index table.
+            version (optional[int]): Version - reserved for future use.
+
+        Raises:
+            (SpdbError): Can't talk to DynamoDB.
+        """
+        # Do DynamoDB set add op.
+        response = self.dynamodb.update_item(
+            TableName=self.id_index_table,
+            Key={'channel-id-key': {'S': key}, 'version': {'N': "{}".format(version)}},
+            UpdateExpression='ADD #cuboidset :objkey',
+            ExpressionAttributeNames={'#cuboidset': 'cuboid-set'},
+            ExpressionAttributeValues={':objkey': {'SS': [str(cuboid_morton)]}},
+            ReturnConsumedCapacity='NONE')
+
+        if response['ResponseMetadata']['HTTPStatusCode'] != 200:
+            raise SpdbError("Failed to update cube index for ID: {}".format(key),
+                ErrorCodes.OBJECT_STORE_ERROR)
+
+    def update_last_partition_key(self, key, chunk_num, version=0):
+        """
+        Update the last-partition-key to the given chunk_num if it greater than the current value.
+
+        This method does not retry if throttled.  If throttled, another invocation will
+        eventually update the last-partition-key.
+
+        Args:
+            key (string): Key in the id index table without a chunk_num.
+            chunk_num (int): Number to be appended to the key if greater than 0.
+            version (optional[int]): Version - reserved for future use.
+        """
+        response = self.dynamodb.update_item(
+            TableName=self.id_index_table,
+            Key={'channel-id-key': {'S': key}, 'version': {'N': "{}".format(version)}},
+            UpdateExpression='SET {} = :chunk_num'.format(LAST_PARTITION_KEY),
+            ExpressionAttributeValues={':chunk_num': {'N': str(chunk_num)}},
+            ConditionExpression=
+                'attribute_not_exists({0}) OR :chunk_num > {0}'.format(LAST_PARTITION_KEY))
+
+        if response['ResponseMetadata']['HTTPStatusCode'] != 200:
+            raise SpdbError("Failed to update {} for ID: {}".format(LAST_PARTITION_KEY, key),
+                ErrorCodes.OBJECT_STORE_ERROR)
+
+
+
+# Import statement at the bottom to avoid problems with circular imports.
+# http://effbot.org/zone/import-confusion.htm
+from .object import AWSObjectStore
+
