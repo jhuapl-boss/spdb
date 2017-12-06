@@ -146,15 +146,20 @@ void addAnnotationData(uint64_t * volume, uint64_t * output, int * cubes, int * 
     int x,y,z;
     uint64_t annotation;
 
+    // Dimensions of output and size of cubes in volume
     int dim_z = dims[0];
     int dim_y = dims[1];
     int dim_x = dims[2];
+
+    // Number of cubes in volume of dimension dims
     int cube_z = cubes[0];
     int cube_y = cubes[1];
     int cube_x = cubes[2];
 
-    // DP NOTE: could be sizeof(uint64_t)
-    int dsize = 8; // size of an individual element in volume / output
+    // Total size of volume, needed for scaling the offset
+    int size_z = dim_z * cube_z;
+    int size_y = dim_y * cube_y;
+    int size_x = dim_x * cube_x;
 
     /* Offset calculations (DP NOTE: may assume C ordered arrays)
      * z,y,x is the target index within the output array
@@ -164,11 +169,11 @@ void addAnnotationData(uint64_t * volume, uint64_t * output, int * cubes, int * 
      *
      * To calculate the offset of the first byte of data in a numpy array
      * idx * array.strides or
-     * (idx_z, idx_y, idx_x) * (dim_x * dim_y * dsize, dim_x * dsize, dsize)
+     * (idx_z, idx_y, idx_x) * (1, size_z, size_z * size_y)
      */
-    #define OFFSET(val_z, val_y, val_x) (((val_z) * cube_z * dim_x * dim_y * dsize) + \
-                                         ((val_y) * cube_y * dim_x * dsize) + \
-                                         ((val_x) * cube_x * dsize))
+    #define OFFSET(val_z, val_y, val_x) (((cube_z * val_z)) + \
+                                         ((cube_y * val_y) * size_z) + \
+                                         ((cube_x * val_x) * size_z * size_y))
 
     for(z=0; z<dim_z; z++)
         for(y=0; y<dim_y; y++)
@@ -191,7 +196,7 @@ void addAnnotationData(uint64_t * volume, uint64_t * output, int * cubes, int * 
                 }
 
                 // output_index === zyx
-                int output_index = (z * dim_y * dim_x * dsize) + (y * dim_x * dsize) + (x * dsize);
+                int output_index = (z) + (y * dim_z) + (x * dim_y * dim_z);
                 output[output_index] = annotation;
             }
 }
