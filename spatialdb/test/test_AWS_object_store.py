@@ -143,6 +143,7 @@ class AWSObjectStoreTestMixin(object):
         assert response['Item']['version-node']['N'] == "0"
         assert response['Item']['ingest-job-hash']['S'] == '1'
         assert response['Item']['ingest-job-range']['S'] == '1&1&0&0'
+        assert response['Item']['lookup-key']['S'] == '1&1&1&0'
 
     def test_cuboids_exist(self, fake_get_region):
         """Test method for checking if cuboids exist in S3 index"""
