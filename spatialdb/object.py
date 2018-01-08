@@ -360,13 +360,22 @@ class AWSObjectStore(ObjectStore):
         # range key is exp&ch&res&task
         ingest_job_range = "{}&{}&{}&{}".format(parts.experiment_id, parts.channel_id, parts.resolution, ingest_job)
 
+        # Partial lookup key stored so we can use a Dynamo query to find all cuboids
+        # tha belong to a channel.
+        lookup_key = '{}&{}&{}&{}'.format(
+            parts.collection_id, parts.experiment_id, parts.channel_id,
+            parts.resolution)
+
         try:
             dynamodb.put_item(
                 TableName=self.config['s3_index_table'],
-                Item={'object-key': {'S': object_key},
+                Item={
+                    'object-key': {'S': object_key},
                       'version-node': {'N': "{}".format(version)},
                       'ingest-job-hash': {'S': "{}".format(parts.collection_id)},
-                      'ingest-job-range': {'S': ingest_job_range}},
+                      'ingest-job-range': {'S': ingest_job_range},
+                      'lookup-key': {'S': lookup_key}
+                },
                 ReturnConsumedCapacity='NONE',
                 ReturnItemCollectionMetrics='NONE',
             )
