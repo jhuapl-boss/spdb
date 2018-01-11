@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from spdb.spatialdb.object_indices import ObjectIndices, LAST_PARTITION_KEY
-
+from spdb.spatialdb.object_indices import (ObjectIndices, LAST_PARTITION_KEY, 
+    REV_ID)
 from bossutils.aws import get_region
 import botocore
 import numpy as np
@@ -93,6 +93,70 @@ class ObjectIndicesTestMixin(object):
             _, _, kwargs1 = kall1
             self.assertEqual(exp_channel_key, kwargs1['Key']['channel-id-key']['S'])
 
+
+    def test_get_cuboids_single_chunk(self):
+        """
+        Test behavior when there is only one chunk of cuboids associated with
+        an object id.
+        """
+        res = 0
+        obj_id = 2555
+        version = 0
+        morton_id = '23'
+
+        with patch.object(self.obj_ind.dynamodb, 'get_item') as mock_get_item:
+            mock_get_item.return_value = {
+                'ResponseMetadata': {'HTTPStatusCode': 200},
+                'Item': { 
+                    'cuboid-set': {'SS': [morton_id]}
+                }
+            }
+
+            exp_key = AWSObjectStore.generate_object_key(
+                self.resource, res, 0, morton_id)
+
+            actual = self.obj_ind.get_cuboids(
+                self.resource, res, obj_id, version)
+
+            self.assertEqual([exp_key], actual)
+
+    def test_get_cuboids_multiple_chunks(self):
+        """
+        Test behavior when morton ids associated with an id span more than one
+        chunk in Dynamo.
+        """
+        res = 0
+        obj_id = 2555
+        version = 0
+        morton_id1 = '23'
+        morton_id2 = '58'
+
+        with patch.object(self.obj_ind.dynamodb, 'get_item') as mock_get_item:
+            mock_get_item.side_effect = [
+                {
+                    'ResponseMetadata': {'HTTPStatusCode': 200},
+                    'Item': { 
+                        'cuboid-set': {'SS': [morton_id1]},
+                        LAST_PARTITION_KEY: {'N': '1'}
+                    }
+                },
+                {
+                    'ResponseMetadata': {'HTTPStatusCode': 200},
+                    'Item': { 
+                        'cuboid-set': {'SS': [morton_id2]}
+                    }
+                }
+            ]
+
+            exp_key1 = AWSObjectStore.generate_object_key(
+                self.resource, res, 0, morton_id1)
+            exp_key2 = AWSObjectStore.generate_object_key(
+                self.resource, res, 0, morton_id2)
+
+            actual = self.obj_ind.get_cuboids(
+                self.resource, res, obj_id, version)
+
+            self.assertCountEqual([exp_key1, exp_key2], actual)
 
     def test_get_loose_bounding_box(self):
         resolution = 0
@@ -405,8 +469,9 @@ class ObjectIndicesTestMixin(object):
             chunk_num = 0
             version = 0
             morton = 3
-            actual = self.obj_ind.write_cuboid(morton, key, chunk_num, version)
-            fake_write_cuboid_dynamo.assert_called_with(morton, key, version)
+            rev_id = 10
+            actual = self.obj_ind.write_cuboid(morton, key, chunk_num, rev_id, version)
+            fake_write_cuboid_dynamo.assert_called_with(morton, key, rev_id, version)
             self.assertEqual(chunk_num, actual)
 
     def test_write_cuboid_chunk_n(self):
@@ -422,8 +487,9 @@ class ObjectIndicesTestMixin(object):
             exp_key = '{}&{}'.format(key, chunk_num)
             version = 0
             morton = 3
-            actual = self.obj_ind.write_cuboid(morton, key, chunk_num, version)
-            fake_write_cuboid_dynamo.assert_called_with(morton, exp_key, version)
+            rev_id = 10
+            actual = self.obj_ind.write_cuboid(morton, key, chunk_num, rev_id, version)
+            fake_write_cuboid_dynamo.assert_called_with(morton, exp_key, rev_id, version)
             self.assertEqual(chunk_num, actual)
 
     def test_write_cuboid_partition_full(self):
@@ -451,13 +517,14 @@ class ObjectIndicesTestMixin(object):
 
             version = 0
             morton = 8
+            rev_id = 10
 
-            actual = self.obj_ind.write_cuboid(morton, key, chunk_num, version)
+            actual = self.obj_ind.write_cuboid(morton, key, chunk_num, rev_id, version)
 
             # Should try to write to new partition after first try raises.
             exp_calls = [
-                unittest.mock.call(morton, exp_key1, version),
-                unittest.mock.call(morton, exp_key2, version)
+                unittest.mock.call(morton, exp_key1, rev_id, version),
+                unittest.mock.call(morton, exp_key2, None, version)
             ]
             fake_write_cuboid_dynamo.assert_has_calls(exp_calls)
 
@@ -490,9 +557,8 @@ class ObjectIndicesTestMixin(object):
             self.assertFalse(actual[0])
             self.assertEqual(-1, actual[1])
 
-    # moto requires optional parameters - fixed in 
-    # https://github.com/spulec/moto/pull/1333 but not available in pip yet.
-    @unittest.skip('Waiting for moto to be updated')
+    # moto not parsing KeyConditionExpression properly - last tried v1.1.25.
+    @unittest.skip('Waiting for moto to be fixed')
     def test_lookup_with_dynamo(self):
         res = 0
         id = 5555
@@ -504,26 +570,49 @@ class ObjectIndicesTestMixin(object):
         self.assertFalse(actual[0])
         self.assertEqual(-1, actual[1])
 
-    def test_get_last_partition_key(self):
+    def test_get_last_partition_key_and_rev_id(self):
         with patch.object(self.obj_ind.dynamodb, 'get_item') as fake_dynamodb_get_item:
-            expected = 2
+            expected_chunk = 2
+            expected_rev_id = 25
             fake_dynamodb_get_item.return_value = { 
-                LAST_PARTITION_KEY: expected,
+                'Item': {
+                    LAST_PARTITION_KEY: { 'N': str(expected_chunk) },
+                    REV_ID: { 'N': str(expected_rev_id) }
+                },
                 'ResponseMetadata': { 'HTTPStatusCode': 200 }
             }
             res = 0
             id = 5555
             version = 0
             key = self.obj_ind.generate_channel_id_key(self.resource, res, id)
-            actual = self.obj_ind.get_last_partition_key(key, version)
-            self.assertEqual(expected, actual)
+            actual = self.obj_ind.get_last_partition_key_and_rev_id(key, version)
+            self.assertEqual(expected_chunk, actual[0])
+            self.assertEqual(expected_rev_id, actual[1])
 
-    def test_get_last_partition_key_no_last_partition_key(self):
+    def test_get_last_partition_key_and_rev_id_no_last_partition_key_or_rev_id(self):
         """
-        If there is no last-partition-key, then should return 0.
+        If there is no lastPartitionKey or revId, then should return (0, None).
         """
         with patch.object(self.obj_ind.dynamodb, 'get_item') as fake_dynamodb_get_item:
-            expected = 0
+            expected_chunk = 0
+            expected_rev_id = None
+            fake_dynamodb_get_item.return_value = { 
+                'ResponseMetadata': { 'HTTPStatusCode': 200 },
+                'Item': {}
+            }
+            res = 0
+            id = 5555
+            version = 0
+            key = self.obj_ind.generate_channel_id_key(self.resource, res, id)
+            actual = self.obj_ind.get_last_partition_key_and_rev_id(key, version)
+            self.assertEqual(expected_chunk, actual[0])
+            self.assertEqual(expected_rev_id, actual[1])
+
+    def test_get_last_partition_key_and_rev_id_item_does_not_exist(self):
+        """
+        If the key does not exist at all, then should raise KeyError.
+        """
+        with patch.object(self.obj_ind.dynamodb, 'get_item') as fake_dynamodb_get_item:
             fake_dynamodb_get_item.return_value = { 
                 'ResponseMetadata': { 'HTTPStatusCode': 200 }
             }
@@ -531,8 +620,8 @@ class ObjectIndicesTestMixin(object):
             id = 5555
             version = 0
             key = self.obj_ind.generate_channel_id_key(self.resource, res, id)
-            actual = self.obj_ind.get_last_partition_key(key, version)
-            self.assertEqual(expected, actual)
+            with self.assertRaises(KeyError):
+                self.obj_ind.get_last_partition_key_and_rev_id(key, version)
 
     def test_write_id_index(self):
         """
@@ -544,6 +633,7 @@ class ObjectIndicesTestMixin(object):
         id = 4
         version = 0
         last_partition_key = 2
+        rev_id = 521
 
         obj_key = AWSObjectStore.generate_object_key(
             self.resource, res, time_sample, morton)
@@ -551,20 +641,22 @@ class ObjectIndicesTestMixin(object):
 
         with patch.multiple(
             self.obj_ind, 
-            get_last_partition_key=DEFAULT,
+            get_last_partition_key_and_rev_id=DEFAULT,
             lookup=DEFAULT,
             write_cuboid=DEFAULT,
             update_last_partition_key=DEFAULT
         ) as mocks:
 
-            mocks['get_last_partition_key'].return_value = last_partition_key
+            mocks['get_last_partition_key_and_rev_id'].return_value = (
+                last_partition_key, rev_id
+            )
             mocks['write_cuboid'].return_value = last_partition_key
             mocks['lookup'].return_value = (False, -1)
 
             self.obj_ind.write_id_index(obj_key, id, version)
 
             mocks['write_cuboid'].assert_called_with(
-                str(morton), chan_key, last_partition_key, version)
+                str(morton), chan_key, last_partition_key, rev_id, version)
             self.assertFalse(mocks['update_last_partition_key'].called)
 
     def test_write_id_index_overflow(self):
@@ -578,6 +670,8 @@ class ObjectIndicesTestMixin(object):
         id = 4
         version = 0
         last_partition_key = 2
+        rev_id = 224
+        no_rev_id = None
 
         obj_key = AWSObjectStore.generate_object_key(
             self.resource, res, time_sample, morton)
@@ -585,22 +679,24 @@ class ObjectIndicesTestMixin(object):
 
         with patch.multiple(
             self.obj_ind, 
-            get_last_partition_key=DEFAULT,
+            get_last_partition_key_and_rev_id=DEFAULT,
             lookup=DEFAULT,
             write_cuboid=DEFAULT,
             update_last_partition_key=DEFAULT
         ) as mocks:
 
-            mocks['get_last_partition_key'].return_value = last_partition_key
+            mocks['get_last_partition_key_and_rev_id'].return_value = (
+                last_partition_key, rev_id
+            )
             mocks['write_cuboid'].return_value = last_partition_key + 1
             mocks['lookup'].return_value = (False, -1)
 
             self.obj_ind.write_id_index(obj_key, id, version)
 
             mocks['write_cuboid'].assert_called_with(
-                str(morton), chan_key, last_partition_key, version)
+                str(morton), chan_key, last_partition_key, rev_id, version)
             mocks['update_last_partition_key'].assert_called_with(
-                chan_key, last_partition_key + 1, version)
+                chan_key, last_partition_key + 1,  version)
 
     def test_update_last_partition_key(self):
         """
@@ -616,18 +712,19 @@ class ObjectIndicesTestMixin(object):
 
         self.obj_ind.update_last_partition_key(chan_key, chunk_num, version)
 
-    def test_write_cuboid_dynamo(self):
+    def test_write_cuboid_dynamo_no_revision_id(self):
         """
-        Just exercise the Dynamo update_item call.
+        Just exercise the Dynamo update_item call with no revision id.
         """
         res = 0
         time_sample = 0
         morton = 11
         id = 4
         version = 0
+        rev_id = None
         chan_key = self.obj_ind.generate_channel_id_key(self.resource, res, id)
 
-        self.obj_ind.write_cuboid_dynamo(morton, chan_key, version)
+        self.obj_ind.write_cuboid_dynamo(morton, chan_key, rev_id, version)
 
 
 class TestObjectIndices(ObjectIndicesTestMixin, unittest.TestCase):
