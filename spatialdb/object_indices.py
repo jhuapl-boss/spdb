@@ -754,12 +754,13 @@ class ObjectIndices:
             ReturnConsumedCapacity='NONE')
         return ids_str_list
 
-    def write_id_index(self, obj_key, obj_id, version=0):
+    def write_id_index(self, max_used_capacity, obj_key, obj_id, version=0):
         """
         Extracts the morton id from the given object key and writes it to the 
-        id index.
+        id index table.
 
         Args:
+            max_used_capacity (int): After updating the table, if used write capacity exceeded this value, update the LAST_PARTITION_KEY for this object id.
             obj_key (string): Cuboid object key in S3 cuboid index.
             obj_id (int): Object (annotation) id to write cuboid's morton id to.
             version (optional[int]): Version - reserved for future use.
@@ -779,7 +780,7 @@ class ObjectIndices:
             pass
 
         actual_chunk = self.write_cuboid(
-            cuboid_morton, key, chunk_num, rev_id, version)
+            max_used_capacity, cuboid_morton, key, chunk_num, rev_id, version)
 
         if actual_chunk > chunk_num:
             self.update_last_partition_key(key, actual_chunk, version)
@@ -804,7 +805,7 @@ class ObjectIndices:
             ProjectionExpression='{},{}'.format(LAST_PARTITION_KEY, REV_ID))
 
         if resp['ResponseMetadata']['HTTPStatusCode'] != 200:
-            raise SpdbError("Failed to update cube index for ID: {}".format(key),
+            raise SpdbError("Failed to read attributes of ID: {}".format(key),
                 ErrorCodes.OBJECT_STORE_ERROR)
 
         # Key doesn't exist in table.
@@ -818,8 +819,30 @@ class ObjectIndices:
         else:
             chunk_num = 0
 
-        if REV_ID in item and 'N' in item[REV_ID]:
-            rev_id = int(item[REV_ID]['N'])
+        if chunk_num == 0:
+            rev_dict = item
+        else:
+            # Read the last chunk to get the correct revision id, if it exists.
+            last_key = '{}&{}'.format(key, chunk_num)
+            last_resp = self.dynamodb.get_item(
+                TableName=self.id_index_table,
+                Key={'channel-id-key': {'S': last_key}, 'version': {'N': "{}".format(version)}},
+                ProjectionExpression='{},{}'.format(LAST_PARTITION_KEY, REV_ID))
+
+            if last_resp['ResponseMetadata']['HTTPStatusCode'] != 200:
+                raise SpdbError("Failed to read attributes of ID: {}".format(last_key),
+                    ErrorCodes.OBJECT_STORE_ERROR)
+
+            if 'Item' not in last_resp:
+                # Key doesn't exist yet.  This is a valid state.  The previous
+                # key is considered full, so the LAST_PARTITION_KEY now points
+                # at key to be created.
+                rev_dict = {}
+            else:
+                rev_dict = last_resp['Item']
+
+        if REV_ID in rev_dict and 'N' in rev_dict[REV_ID]:
+            rev_id = int(rev_dict[REV_ID]['N'])
         else:
             rev_id = None
 
@@ -864,14 +887,17 @@ class ObjectIndices:
 
         return (False, -1)
 
-    def write_cuboid(self, cuboid_morton, key, chunk_num, rev_id, version=0):
+    def write_cuboid(
+            self, max_used_capacity, cuboid_morton, key, chunk_num, rev_id, 
+            version=0):
         """
         Write the morton id to the given key.
 
         Will increment the key's chunk_num as necessary if the given key and chunk_num
-        combination's set is full.
+        combination's set is full or max_used_capacity is exceeded.
 
         Args:
+            max_used_capacity (int): After updating the table, if used write capacity exceeded this value, update the LAST_PARTITION_KEY for this object id.
             cuboid_morton (string|int): Morton id of the cuboid.
             key (string): Key in the id index table without a chunk_num.
             chunk_num (int): Number to be appended to the key if greater than 0.
@@ -893,8 +919,12 @@ class ObjectIndices:
                 dynamo_key = key
 
             try:
-                self.write_cuboid_dynamo(
+                response = self.write_cuboid_dynamo(
                     cuboid_morton, dynamo_key, exp_rev_id, version)
+                if 'ConsumedCapacity' in response:
+                    used = response['ConsumedCapacity']
+                    if used >= max_used_capacity:
+                        new_chunk_num = new_chunk_num + 1
                 done = True
             except botocore.exceptions.ClientError as ex:
                 if ex.response['Error']['Code'] == '413':
@@ -921,6 +951,9 @@ class ObjectIndices:
             rev_id (int|None): Expected revision id when updating cuboid-set attribute.
             version (optional[int]): Version - reserved for future use.
 
+        Returns:
+            (dict): Response dictionary from DynamoDB.Client.update_item().
+
         Raises:
             (SpdbError): Can't talk to Dynamo or Dynamo condition check failed.
         """
@@ -937,7 +970,7 @@ class ObjectIndices:
                 REV_ID, REV_VALUE),
             'ExpressionAttributeNames': {'#cuboidset': 'cuboid-set'},
             'ExpressionAttributeValues': {':objkey': {'SS': [str(cuboid_morton)]}},
-            'ReturnConsumedCapacity':'NONE'
+            'ReturnConsumedCapacity':'TOTAL'
         }
 
         if rev_id is not None:
@@ -958,6 +991,8 @@ class ObjectIndices:
                 "Failed to update id index for ID: {} with morton id: {}".format(
                     key, cuboid_morton),
                 ErrorCodes.OBJECT_STORE_ERROR)
+
+        return response
 
     def update_last_partition_key(self, key, chunk_num, version=0):
         """

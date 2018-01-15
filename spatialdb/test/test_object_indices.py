@@ -78,6 +78,8 @@ class ObjectIndicesTestMixin(object):
             mock_update_item.return_value = {
                 'ResponseMetadata': { 'HTTPStatusCode': 200 }
             }
+
+            # Method under test.
             self.obj_ind.update_id_indices(self.resource, resolution, [key], [cube_data], version)
 
             # Expect only 2 calls because there's only 1 non-zero id.
@@ -115,6 +117,7 @@ class ObjectIndicesTestMixin(object):
             exp_key = AWSObjectStore.generate_object_key(
                 self.resource, res, 0, morton_id)
 
+            # Method under test.
             actual = self.obj_ind.get_cuboids(
                 self.resource, res, obj_id, version)
 
@@ -153,6 +156,7 @@ class ObjectIndicesTestMixin(object):
             exp_key2 = AWSObjectStore.generate_object_key(
                 self.resource, res, 0, morton_id2)
 
+            # Method under test.
             actual = self.obj_ind.get_cuboids(
                 self.resource, res, obj_id, version)
 
@@ -181,7 +185,10 @@ class ObjectIndicesTestMixin(object):
 
         with patch.object(self.obj_ind, 'get_cuboids') as fake_get_cuboids:
             fake_get_cuboids.return_value = [key0, key1, key2]
+
+            # Method under test.
             actual = self.obj_ind.get_loose_bounding_box(self.resource, resolution, id)
+
             expected = {
                 'x_range': [2*x_cube_dim, (6+1)*x_cube_dim],
                 'y_range': [1*y_cube_dim, (7+1)*y_cube_dim],
@@ -198,8 +205,10 @@ class ObjectIndicesTestMixin(object):
 
         with patch.object(self.obj_ind, 'get_cuboids') as fake_get_cuboids:
             fake_get_cuboids.return_value = []
+
             actual = self.obj_ind.get_loose_bounding_box(
                 self.resource, resolution, id)
+
             expected = None
             self.assertEqual(expected, actual)
 
@@ -441,6 +450,7 @@ class ObjectIndicesTestMixin(object):
                     fake_get_y_axis.return_value = y_min_max
                     fake_get_z_axis.return_value = z_min_max
 
+                    # Method under test.
                     actual = self.obj_ind.get_tight_bounding_box(
                         cutout_fcn, self.resource, resolution, id,
                         x_rng, y_rng, z_rng, t_rng)
@@ -470,7 +480,12 @@ class ObjectIndicesTestMixin(object):
             version = 0
             morton = 3
             rev_id = 10
-            actual = self.obj_ind.write_cuboid(morton, key, chunk_num, rev_id, version)
+            max_capacity = 100
+
+            # Method under test.
+            actual = self.obj_ind.write_cuboid(
+                max_capacity, morton, key, chunk_num, rev_id, version)
+
             fake_write_cuboid_dynamo.assert_called_with(morton, key, rev_id, version)
             self.assertEqual(chunk_num, actual)
 
@@ -488,7 +503,12 @@ class ObjectIndicesTestMixin(object):
             version = 0
             morton = 3
             rev_id = 10
-            actual = self.obj_ind.write_cuboid(morton, key, chunk_num, rev_id, version)
+            max_capacity = 100
+
+            # Method under test.
+            actual = self.obj_ind.write_cuboid(
+                max_capacity, morton, key, chunk_num, rev_id, version)
+
             fake_write_cuboid_dynamo.assert_called_with(morton, exp_key, rev_id, version)
             self.assertEqual(chunk_num, actual)
 
@@ -503,7 +523,7 @@ class ObjectIndicesTestMixin(object):
             resp = { 'Error': { 'Code': '413' } }
             fake_write_cuboid_dynamo.side_effect = [
                 botocore.exceptions.ClientError(resp, 'update_item'),
-                None
+                {}
             ]
 
             res = 0
@@ -518,13 +538,54 @@ class ObjectIndicesTestMixin(object):
             version = 0
             morton = 8
             rev_id = 10
+            max_capacity = 100
 
-            actual = self.obj_ind.write_cuboid(morton, key, chunk_num, rev_id, version)
+            # Method under test.
+            actual = self.obj_ind.write_cuboid(
+                max_capacity, morton, key, chunk_num, rev_id, version)
 
             # Should try to write to new partition after first try raises.
             exp_calls = [
                 unittest.mock.call(morton, exp_key1, rev_id, version),
                 unittest.mock.call(morton, exp_key2, None, version)
+            ]
+            fake_write_cuboid_dynamo.assert_has_calls(exp_calls)
+
+            # Should return chunk number of new partition.
+            self.assertEqual(new_chunk_num, actual)
+
+    def test_write_cuboid_max_capacity_exceeded(self):
+        """
+        Write of id to partition specified by key succeeds but set max capacity
+        for that chunk is exceeded.  In this case, the returned chunk_num 
+        should be incremented.
+        """
+        with patch.object(self.obj_ind, 'write_cuboid_dynamo') as fake_write_cuboid_dynamo:
+
+            fake_write_cuboid_dynamo.return_value = {
+                'ResponseMetadata': { 'HTTPStatusCode': 200 },
+                'ConsumedCapacity': 105.0
+            }
+
+            res = 0
+            id = 5555
+            chunk_num = 2
+            new_chunk_num = chunk_num + 1
+
+            key = self.obj_ind.generate_channel_id_key(self.resource, res, id)
+            exp_key1 = '{}&{}'.format(key, chunk_num)
+
+            version = 0
+            morton = 8
+            rev_id = 10
+            max_capacity = 100
+
+            # Method under test.
+            actual = self.obj_ind.write_cuboid(
+                max_capacity, morton, key, chunk_num, rev_id, version)
+
+            exp_calls = [
+                unittest.mock.call(morton, exp_key1, rev_id, version)
             ]
             fake_write_cuboid_dynamo.assert_has_calls(exp_calls)
 
@@ -540,7 +601,9 @@ class ObjectIndicesTestMixin(object):
             morton = 8
             last_chunk_num = 1
             version = 0
+
             actual = self.obj_ind.lookup(morton, key, last_chunk_num, version)
+
             self.assertTrue(actual[0])
             self.assertEqual(1, actual[1])
 
@@ -553,7 +616,9 @@ class ObjectIndicesTestMixin(object):
             morton = 8
             last_chunk_num = 1
             version = 0
+
             actual = self.obj_ind.lookup(morton, key, last_chunk_num, version)
+
             self.assertFalse(actual[0])
             self.assertEqual(-1, actual[1])
 
@@ -566,13 +631,18 @@ class ObjectIndicesTestMixin(object):
         morton = 8
         last_chunk_num = 1
         version = 0
+
         actual = self.obj_ind.lookup(morton, key, last_chunk_num, version)
+
         self.assertFalse(actual[0])
         self.assertEqual(-1, actual[1])
 
     def test_get_last_partition_key_and_rev_id(self):
+        """
+        Test when there is only one chunk for the entire object id.
+        """
         with patch.object(self.obj_ind.dynamodb, 'get_item') as fake_dynamodb_get_item:
-            expected_chunk = 2
+            expected_chunk = 0
             expected_rev_id = 25
             fake_dynamodb_get_item.return_value = { 
                 'Item': {
@@ -585,7 +655,52 @@ class ObjectIndicesTestMixin(object):
             id = 5555
             version = 0
             key = self.obj_ind.generate_channel_id_key(self.resource, res, id)
+
+            # Method under test.
             actual = self.obj_ind.get_last_partition_key_and_rev_id(key, version)
+
+            self.assertEqual(expected_chunk, actual[0])
+            self.assertEqual(expected_rev_id, actual[1])
+
+    def test_get_last_partition_key_and_rev_id_multiple_chunks(self):
+        """
+        When there multiple chunks, the revision id must come from the last 
+        chunk.
+        """
+        with patch.object(self.obj_ind.dynamodb, 'get_item') as fake_dynamodb_get_item:
+            expected_chunk = 2
+            first_chunk_rev_id = 229
+            expected_rev_id = 25
+            fake_dynamodb_get_item.side_effect = [
+                { 
+                    # Data from chunk 0.
+                    'Item': {
+                        LAST_PARTITION_KEY: { 'N': str(expected_chunk) },
+                        REV_ID: { 'N': str(first_chunk_rev_id) }
+                    },
+                    'ResponseMetadata': { 'HTTPStatusCode': 200 }
+                },
+                {
+                    # Data from chunk 2 (the last chunk).
+                    'Item': {
+                        REV_ID: { 'N': str(expected_rev_id) }
+                    },
+                    'ResponseMetadata': { 'HTTPStatusCode': 200 }
+                }
+            ]
+            res = 0
+            id = 5555
+            version = 0
+            key = self.obj_ind.generate_channel_id_key(self.resource, res, id)
+
+            # Method under test.
+            actual = self.obj_ind.get_last_partition_key_and_rev_id(key, version)
+
+            expected_last_chunk_key = '{}&{}'.format(key, expected_chunk)
+            self.assertEqual(2, fake_dynamodb_get_item.call_count)
+            (_, _, kwargs) = fake_dynamodb_get_item.mock_calls[1]
+            self.assertEqual(expected_last_chunk_key, kwargs['Key']['channel-id-key']['S'])
+
             self.assertEqual(expected_chunk, actual[0])
             self.assertEqual(expected_rev_id, actual[1])
 
@@ -604,7 +719,10 @@ class ObjectIndicesTestMixin(object):
             id = 5555
             version = 0
             key = self.obj_ind.generate_channel_id_key(self.resource, res, id)
+
+            # Method under test.
             actual = self.obj_ind.get_last_partition_key_and_rev_id(key, version)
+
             self.assertEqual(expected_chunk, actual[0])
             self.assertEqual(expected_rev_id, actual[1])
 
@@ -634,6 +752,7 @@ class ObjectIndicesTestMixin(object):
         version = 0
         last_partition_key = 2
         rev_id = 521
+        max_capacity = 100
 
         obj_key = AWSObjectStore.generate_object_key(
             self.resource, res, time_sample, morton)
@@ -653,16 +772,18 @@ class ObjectIndicesTestMixin(object):
             mocks['write_cuboid'].return_value = last_partition_key
             mocks['lookup'].return_value = (False, -1)
 
-            self.obj_ind.write_id_index(obj_key, id, version)
+            # Method under test.
+            self.obj_ind.write_id_index(max_capacity, obj_key, id, version)
 
             mocks['write_cuboid'].assert_called_with(
-                str(morton), chan_key, last_partition_key, rev_id, version)
+                max_capacity, str(morton), chan_key, last_partition_key, 
+                rev_id, version)
             self.assertFalse(mocks['update_last_partition_key'].called)
 
     def test_write_id_index_overflow(self):
         """
-        Case where a new Dynamo key does needs to be created because the
-        current key is full.
+        Case where a new Dynamo key needs to be created because the
+        current key is full.  The LAST_PARTITION_KEY should be updated.
         """
         res = 0
         time_sample = 0
@@ -672,6 +793,7 @@ class ObjectIndicesTestMixin(object):
         last_partition_key = 2
         rev_id = 224
         no_rev_id = None
+        max_capacity = 100
 
         obj_key = AWSObjectStore.generate_object_key(
             self.resource, res, time_sample, morton)
@@ -691,10 +813,12 @@ class ObjectIndicesTestMixin(object):
             mocks['write_cuboid'].return_value = last_partition_key + 1
             mocks['lookup'].return_value = (False, -1)
 
-            self.obj_ind.write_id_index(obj_key, id, version)
+            # Method under test.
+            self.obj_ind.write_id_index(max_capacity, obj_key, id, version)
 
             mocks['write_cuboid'].assert_called_with(
-                str(morton), chan_key, last_partition_key, rev_id, version)
+                max_capacity, str(morton), chan_key, last_partition_key, 
+                rev_id, version)
             mocks['update_last_partition_key'].assert_called_with(
                 chan_key, last_partition_key + 1,  version)
 
