@@ -297,6 +297,19 @@ class AWSObjectStore(ObjectStore):
 
         return "{}&{}".format(hash_str, base_key)
 
+    @staticmethod
+    def generate_lookup_key(collection_id, experiment_id, channel_id, resolution):
+        """
+        Generate the lookup key for storing as an attribute in the S3 index table.
+
+        This value will be the key of a global secondary index that allows
+        finding all the cuboids belonging to a particular channel in an 
+        efficient manner.
+        """
+        lookup_key = '{}&{}&{}&{}'.format(
+            collection_id, experiment_id, channel_id, resolution)
+        return lookup_key
+
     def cuboids_exist(self, key_list, cache_miss_key_idx=None, version=0):
         """
         Method to check if cuboids exist in S3 by checking the S3 Index table.
@@ -366,7 +379,7 @@ class AWSObjectStore(ObjectStore):
 
         # Partial lookup key stored so we can use a Dynamo query to find all cuboids
         # tha belong to a channel.
-        lookup_key = '{}&{}&{}&{}'.format(
+        lookup_key = self.generate_lookup_key(
             parts.collection_id, parts.experiment_id, parts.channel_id,
             parts.resolution)
 

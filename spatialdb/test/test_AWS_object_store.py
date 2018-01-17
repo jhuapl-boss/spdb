@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import unittest
+from unittest.mock import patch
 
 from spdb.project import BossResourceBasic
 from spdb.spatialdb import AWSObjectStore
@@ -26,6 +27,7 @@ import boto3
 from unittest.mock import patch
 
 
+@patch('spdb.spatialdb.object.get_region', autospec=True, return_value='us-east-1')
 class AWSObjectStoreTestMixin(object):
 
     def test_object_key_chunks(self, fake_get_region):
@@ -131,7 +133,7 @@ class AWSObjectStoreTestMixin(object):
         os.add_cuboid_to_index(dummy_key)
 
         # Get item
-        dynamodb = boto3.client('dynamodb', region_name='us-east-1')
+        dynamodb = boto3.client('dynamodb', region_name=fake_get_region())
         response = dynamodb.get_item(
             TableName=self.object_store_config['s3_index_table'],
             Key={'object-key': {'S': dummy_key},
@@ -283,7 +285,6 @@ class AWSObjectStoreTestMixin(object):
         self.assertEqual(parts.is_iso, True)
 
 
-@patch('spdb.spatialdb.object.get_region', return_value='us-east-1')
 class TestAWSObjectStore(AWSObjectStoreTestMixin, unittest.TestCase):
 
     @classmethod
