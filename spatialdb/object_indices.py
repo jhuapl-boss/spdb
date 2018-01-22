@@ -777,7 +777,8 @@ class ObjectIndices:
                 return
         except KeyError:
             # No key exists in table for this id.
-            pass
+            chunk_num = 0
+            rev_id = None
 
         actual_chunk = self.write_cuboid(
             max_used_capacity, cuboid_morton, key, chunk_num, rev_id, version)

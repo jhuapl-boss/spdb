@@ -780,6 +780,46 @@ class ObjectIndicesTestMixin(object):
                 rev_id, version)
             self.assertFalse(mocks['update_last_partition_key'].called)
 
+    def test_write_id_index_new_id(self):
+        """
+        Case where id is written to Dynamo for the first time.
+        """
+        res = 0
+        time_sample = 0
+        morton = 11
+        id = 4
+        version = 0
+        last_partition_key = 0
+        rev_id = None
+        max_capacity = 100
+
+        obj_key = AWSObjectStore.generate_object_key(
+            self.resource, res, time_sample, morton)
+        chan_key = self.obj_ind.generate_channel_id_key(self.resource, res, id)
+
+        with patch.multiple(
+            self.obj_ind, 
+            get_last_partition_key_and_rev_id=DEFAULT,
+            lookup=DEFAULT,
+            write_cuboid=DEFAULT,
+            update_last_partition_key=DEFAULT
+        ) as mocks:
+
+            # Id doesn't exist in Dynamo table, yet.
+            mocks['get_last_partition_key_and_rev_id'].side_effect = (
+                KeyError()
+            )
+            mocks['write_cuboid'].return_value = last_partition_key
+            mocks['lookup'].return_value = (False, -1)
+
+            # Method under test.
+            self.obj_ind.write_id_index(max_capacity, obj_key, id, version)
+
+            mocks['write_cuboid'].assert_called_with(
+                max_capacity, str(morton), chan_key, last_partition_key, 
+                rev_id, version)
+            self.assertFalse(mocks['update_last_partition_key'].called)
+
     def test_write_id_index_overflow(self):
         """
         Case where a new Dynamo key needs to be created because the
