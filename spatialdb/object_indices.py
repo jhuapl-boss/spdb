@@ -780,8 +780,13 @@ class ObjectIndices:
             chunk_num = 0
             rev_id = None
 
-        actual_chunk = self.write_cuboid(
-            max_used_capacity, cuboid_morton, key, chunk_num, rev_id, version)
+        try:
+            actual_chunk = self.write_cuboid(
+                max_used_capacity, cuboid_morton, key, chunk_num, rev_id, version)
+        except:
+            print('Failed to update key: {} with morton id: {}'.format(
+                key, cuboid_morton))
+            raise
 
         if actual_chunk > chunk_num:
             self.update_last_partition_key(key, actual_chunk, version)
