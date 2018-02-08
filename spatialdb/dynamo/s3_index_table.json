@@ -15,6 +15,10 @@
         {
             "AttributeName": "ingest-job-range",
             "AttributeType": "S"
+        },
+        {
+            "AttributeName": "lookup-key",
+            "AttributeType": "S"
         }
     ],
     "KeySchema": [
@@ -38,6 +42,22 @@
                 {
                     "AttributeName": "ingest-job-range",
                     "KeyType": "RANGE"
+                }
+            ],
+            "Projection": {
+                "ProjectionType": "KEYS_ONLY"
+            },
+            "ProvisionedThroughput": {
+                "ReadCapacityUnits": 15,
+                "WriteCapacityUnits": 15
+            }
+        },
+        {
+            "IndexName": "lookup-key-index",
+            "KeySchema": [
+                {
+                    "AttributeName": "lookup-key",
+                    "KeyType": "HASH"
                 }
             ],
             "Projection": {

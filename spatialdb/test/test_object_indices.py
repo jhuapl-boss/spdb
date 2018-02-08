@@ -563,8 +563,8 @@ class ObjectIndicesTestMixin(object):
         with patch.object(self.obj_ind, 'write_cuboid_dynamo') as fake_write_cuboid_dynamo:
 
             fake_write_cuboid_dynamo.return_value = {
-                'ResponseMetadata': { 'HTTPStatusCode': 200 },
-                'ConsumedCapacity': 105.0
+                'ResponseMetadata': {'HTTPStatusCode': 200},
+                'ConsumedCapacity': {'CapacityUnits': 105.0}
             }
 
             res = 0

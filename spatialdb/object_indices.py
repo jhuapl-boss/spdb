@@ -732,7 +732,8 @@ class ObjectIndices:
         Returns:
             ([string]): List of unique ids (as strings) contained in cuboid.
         """
-        response = self.s3.get_object(Key=obj_key, Bucket=self.cuboid_bucket)
+        key_version = '{}&{}'.format(obj_key, version)
+        response = self.s3.get_object(Key=key_version, Bucket=self.cuboid_bucket)
         if response['ResponseMetadata']['HTTPStatusCode'] != 200:
             raise SpdbError("Error reading cuboid from S3.",
                 ErrorCodes.OBJECT_STORE_ERROR)
@@ -745,13 +746,18 @@ class ObjectIndices:
         # Convert ids to a string.
         ids_str_list = self._make_ids_strings(ids)
 
-        self.dynamodb.update_item(
-            TableName=self.s3_index_table,
-            Key={'object-key': {'S': obj_key}, 'version-node': {'N': "{}".format(version)}},
-            UpdateExpression='SET #idset = :ids',
-            ExpressionAttributeNames={'#idset': 'id-set'},
-            ExpressionAttributeValues={':ids': {'NS': ids_str_list}},
-            ReturnConsumedCapacity='NONE')
+        if len(ids_str_list) > 0:
+            self.dynamodb.update_item(
+                TableName=self.s3_index_table,
+                Key={
+                    'object-key': {'S': obj_key}, 
+                    'version-node': {'N': "{}".format(version)}
+                },
+                UpdateExpression='SET #idset = :ids',
+                ExpressionAttributeNames={'#idset': 'id-set'},
+                ExpressionAttributeValues={':ids': {'NS': ids_str_list}},
+                ReturnConsumedCapacity='NONE')
+
         return ids_str_list
 
     def write_id_index(self, max_used_capacity, obj_key, obj_id, version=0):
@@ -928,7 +934,7 @@ class ObjectIndices:
                 response = self.write_cuboid_dynamo(
                     cuboid_morton, dynamo_key, exp_rev_id, version)
                 if 'ConsumedCapacity' in response:
-                    used = response['ConsumedCapacity']
+                    used = response['ConsumedCapacity']['CapacityUnits']
                     if used >= max_used_capacity:
                         new_chunk_num = new_chunk_num + 1
                 done = True
