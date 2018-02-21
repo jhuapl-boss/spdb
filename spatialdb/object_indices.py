@@ -39,10 +39,15 @@ LAST_PARTITION_KEY = 'lastPartitionKey'
 # updates of the cuboid-set.
 REV_ID = 'revId'
 
+# This Dynamo table attribute is the primary key of the global secondary
+# index, lookup-key-index.  When deleting an annotation channel, use this 
+# index to delete all ids belonging to that channel.
+LOOKUP_KEY = 'lookup-key'
+
 class ObjectIndices:
     """
     Class that handles the DynamoDB tracking of object IDs.  This class
-    supports the AWS Object Store.
+    supports the AWS Object Store.  The table name is idIndex.domain.boss.
     """
 
     def __init__(
@@ -774,6 +779,9 @@ class ObjectIndices:
         key_parts = AWSObjectStore.get_object_key_parts(obj_key)
         cuboid_morton = key_parts.morton_id
         key = self.generate_channel_id_key_from_parts(key_parts, obj_id)
+        lookup_key = AWSObjectStore.generate_lookup_key(
+            key_parts.collection_id, key_parts.experiment_id, 
+            key_parts.channel_id, key_parts.resolution)
 
         try:
             (chunk_num, rev_id) = self.get_last_partition_key_and_rev_id(
@@ -785,10 +793,18 @@ class ObjectIndices:
             # No key exists in table for this id.
             chunk_num = 0
             rev_id = None
+        except botocore.exceptions.ClientError as ex:
+            # In testing, saw ResourceNotFoundException in the middle of an
+            # indexing job.  Capturing RequestId so it can be sent to support
+            # if it happens again.
+            print('Request failed. RequestId: {}'.format(
+                ex.response['ResponseMetadata']['RequestId']))
+            raise
 
         try:
             actual_chunk = self.write_cuboid(
-                max_used_capacity, cuboid_morton, key, chunk_num, rev_id, version)
+                max_used_capacity, cuboid_morton, key, chunk_num, rev_id, 
+                lookup_key, version)
         except:
             print('Failed to update key: {} with morton id: {}'.format(
                 key, cuboid_morton))
@@ -901,7 +917,7 @@ class ObjectIndices:
 
     def write_cuboid(
             self, max_used_capacity, cuboid_morton, key, chunk_num, rev_id, 
-            version=0):
+            lookup_key, version=0):
         """
         Write the morton id to the given key.
 
@@ -911,9 +927,10 @@ class ObjectIndices:
         Args:
             max_used_capacity (int): After updating the table, if used write capacity exceeded this value, update the LAST_PARTITION_KEY for this object id.
             cuboid_morton (string|int): Morton id of the cuboid.
-            key (string): Key in the id index table without a chunk_num.
+            key (str): Key in the id index table without a chunk_num.
             chunk_num (int): Number to be appended to the key if greater than 0.
             rev_id (int|None): Expected revision id when updating cuboid-set attribute.
+            lookup_key (str): Key that identifies the channel and resolution of the cuboid.
             version (optional[int]): Version - reserved for future use.
 
         Returns:
@@ -932,7 +949,7 @@ class ObjectIndices:
 
             try:
                 response = self.write_cuboid_dynamo(
-                    cuboid_morton, dynamo_key, exp_rev_id, version)
+                    cuboid_morton, dynamo_key, exp_rev_id, lookup_key, version)
                 if 'ConsumedCapacity' in response:
                     used = response['ConsumedCapacity']['CapacityUnits']
                     if used >= max_used_capacity:
@@ -948,7 +965,8 @@ class ObjectIndices:
 
         return new_chunk_num
 
-    def write_cuboid_dynamo(self, cuboid_morton, key, rev_id, version=0):
+    def write_cuboid_dynamo(
+        self, cuboid_morton, key, rev_id, lookup_key, version=0):
         """
         Writes cuboid's morton id to the given key.
 
@@ -961,6 +979,7 @@ class ObjectIndices:
             cuboid_morton (string|int): Morton id of the cuboid.
             key (string): Key in the id index table.
             rev_id (int|None): Expected revision id when updating cuboid-set attribute.
+            lookup_key (str): Key that identifies the channel and resolution of the cuboid.
             version (optional[int]): Version - reserved for future use.
 
         Returns:
@@ -972,16 +991,24 @@ class ObjectIndices:
 
         # Expression attribute value for the revision id.
         REV_VALUE = ':revId'
+
         update_args = {
             'TableName': self.id_index_table,
             'Key': {
                 'channel-id-key': {'S': key}, 
                 'version': {'N': '{}'.format(version)}
             },
-            'UpdateExpression':'ADD #cuboidset :objkey SET {} = {}'.format(
-                REV_ID, REV_VALUE),
-            'ExpressionAttributeNames': {'#cuboidset': 'cuboid-set'},
-            'ExpressionAttributeValues': {':objkey': {'SS': [str(cuboid_morton)]}},
+            'UpdateExpression':
+                'ADD #cuboidset :objkey SET {} = {}, #lookupKey = if_not_exists(#lookupKey, :lookupKeyVal)'.format(
+                    REV_ID, REV_VALUE),
+            'ExpressionAttributeNames': {
+                '#cuboidset': 'cuboid-set', 
+                '#lookupKey': LOOKUP_KEY
+            },
+            'ExpressionAttributeValues': {
+                ':objkey': {'SS': [str(cuboid_morton)]},
+                ':lookupKeyVal': {'S': lookup_key}
+            },
             'ReturnConsumedCapacity':'TOTAL'
         }
 

@@ -33,7 +33,7 @@ Find cuboids based on the ingest job.
 None
 
 
-### project-index
+### lookup-key-index
 
 Find all cuboids in a collection, experiment, channel at a resolution level.
 

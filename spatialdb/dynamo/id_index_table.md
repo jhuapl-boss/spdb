@@ -17,11 +17,11 @@ contain a given annotation id.
 
 ## Global Secondary Indexes
 
-### project-index
+### lookup-key-index
 
 **This index is under consideration, but not yet created.**
 
-Easily find all ids belonging to a particular collection, experiment, channel, 
+Easily find all ids belonging to a particular collection, experiment, channel,
 and resolution.
 
 Potential use case: deleting ids belonging to a deleted channel.
