@@ -990,7 +990,9 @@ class ObjectIndices:
         """
 
         # Expression attribute value for the revision id.
-        REV_VALUE = ':revId'
+        CURRENT_REV_VALUE = ':currentRevId'
+
+        NEW_REV_VALUE = ':newRevId'
 
         update_args = {
             'TableName': self.id_index_table,
@@ -1000,7 +1002,7 @@ class ObjectIndices:
             },
             'UpdateExpression':
                 'ADD #cuboidset :objkey SET {} = {}, #lookupKey = if_not_exists(#lookupKey, :lookupKeyVal)'.format(
-                    REV_ID, REV_VALUE),
+                    REV_ID, NEW_REV_VALUE),
             'ExpressionAttributeNames': {
                 '#cuboidset': 'cuboid-set', 
                 '#lookupKey': LOOKUP_KEY
@@ -1014,13 +1016,15 @@ class ObjectIndices:
 
         if rev_id is not None:
             update_args['ConditionExpression'] = (
-                'attribute_exists({0}) AND {0} = {1}'.format(REV_ID, REV_VALUE))
-            update_args['ExpressionAttributeValues'][REV_VALUE] = (
+                'attribute_exists({0}) AND {0} = {1}'.format(REV_ID, CURRENT_REV_VALUE))
+            update_args['ExpressionAttributeValues'][CURRENT_REV_VALUE] = (
                 {'N': str(rev_id)})
+            update_args['ExpressionAttributeValues'][NEW_REV_VALUE] = (
+                {'N': str(rev_id+1)})
         else:
             update_args['ConditionExpression'] = (
                 'attribute_not_exists({0})'.format(REV_ID))
-            update_args['ExpressionAttributeValues'][REV_VALUE] = {'N': '0'}
+            update_args['ExpressionAttributeValues'][NEW_REV_VALUE] = {'N': '0'}
 
         # Do DynamoDB set add op.
         response = self.dynamodb.update_item(**update_args)
