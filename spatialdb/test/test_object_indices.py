@@ -515,15 +515,60 @@ class ObjectIndicesTestMixin(object):
                 morton, exp_key, rev_id, lookup_key, version)
             self.assertEqual(chunk_num, actual)
 
-    def test_write_cuboid_partition_full(self):
+    def test_write_cuboid_partition_full_413(self):
         """
         Write of id to partition specified by key is full, so chunk_num should
-        be incremented and id should be written to new parition.
+        be incremented and id should be written to new parition.  This test
+        uses error code 413.
         """
         with patch.object(self.obj_ind, 'write_cuboid_dynamo') as fake_write_cuboid_dynamo:
 
             # Raise exception on first call to simulate a full partition.
             resp = { 'Error': { 'Code': '413' } }
+            fake_write_cuboid_dynamo.side_effect = [
+                botocore.exceptions.ClientError(resp, 'update_item'),
+                {}
+            ]
+
+            res = 0
+            id = 5555
+            chunk_num = 2
+            new_chunk_num = chunk_num + 1
+
+            key = self.obj_ind.generate_channel_id_key(self.resource, res, id)
+            exp_key1 = '{}&{}'.format(key, chunk_num)
+            exp_key2 = '{}&{}'.format(key, new_chunk_num)
+
+            version = 0
+            morton = 8
+            rev_id = 10
+            lookup_key = '1&4&2&0'
+            max_capacity = 100
+
+            # Method under test.
+            actual = self.obj_ind.write_cuboid(
+                max_capacity, morton, key, chunk_num, rev_id, lookup_key, version)
+
+            # Should try to write to new partition after first try raises.
+            exp_calls = [
+                unittest.mock.call(morton, exp_key1, rev_id, lookup_key, version),
+                unittest.mock.call(morton, exp_key2, None, lookup_key, version)
+            ]
+            fake_write_cuboid_dynamo.assert_has_calls(exp_calls)
+
+            # Should return chunk number of new partition.
+            self.assertEqual(new_chunk_num, actual)
+
+    def test_write_cuboid_partition_full_validation_exception(self):
+        """
+        Write of id to partition specified by key is full, so chunk_num should
+        be incremented and id should be written to new parition.  This test
+        uses error code ValidationException.
+        """
+        with patch.object(self.obj_ind, 'write_cuboid_dynamo') as fake_write_cuboid_dynamo:
+
+            # Raise exception on first call to simulate a full partition.
+            resp = { 'Error': { 'Code': 'ValidationException' } }
             fake_write_cuboid_dynamo.side_effect = [
                 botocore.exceptions.ClientError(resp, 'update_item'),
                 {}

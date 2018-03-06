@@ -762,6 +762,8 @@ class ObjectIndices:
                 ExpressionAttributeNames={'#idset': 'id-set'},
                 ExpressionAttributeValues={':ids': {'NS': ids_str_list}},
                 ReturnConsumedCapacity='NONE')
+        else:
+            print('No non-zero ids for {}'.format(obj_key))
 
         return ids_str_list
 
@@ -954,12 +956,20 @@ class ObjectIndices:
                     used = response['ConsumedCapacity']['CapacityUnits']
                     if used >= max_used_capacity:
                         new_chunk_num = new_chunk_num + 1
+                        print('Incrementing chunk number to {}, write capacity exceeded'.format(
+                            new_chunk_num))
                 done = True
             except botocore.exceptions.ClientError as ex:
-                if ex.response['Error']['Code'] == '413':
+                if (ex.response['Error']['Code'] == '413' or 
+                    # In 6Mar2018 testing, got ValidationException instead of 
+                    # 413 when exceeding 400KB item size limit.
+                    ex.response['Error']['Code'] == 'ValidationException'
+                ):
                     # Set full, try the next chunk.
                     new_chunk_num = new_chunk_num + 1
                     exp_rev_id = None
+                    print('Incrementing chunk number to {}, item size exceeded'.format(
+                        new_chunk_num))
                 else:
                     raise ex
 
