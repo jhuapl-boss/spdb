@@ -159,7 +159,8 @@ class ObjectIndices:
         Raises:
             (SpdbError): Failure performing update_item operation on DynamoDB.
         """
-        # # TODO SH Hotfix put in place to stop idIndex from populating.  IdIndex Table is preventing data loading.
+        # # TODO SH Enabled legacy object indicies to get us past December 2017 delieverable.
+        # # TODO SH Disabled legacy object indicies as the ingest queue is stuck with the following error: An error occurred (ValidationException) when calling the UpdateItem operation: Item size to update has exceeded the maximum allowed size - Code: 107}}
         # for obj_key, cube in zip(key_list, cube_list):
         #     # Find unique ids in this cube.
         #     ids = np.unique(cube)

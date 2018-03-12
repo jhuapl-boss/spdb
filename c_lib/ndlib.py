@@ -458,14 +458,14 @@ def addAnnotationData_ctype(volume, output, cubes, dim):
     Args:
         volume (Buffer) : Raw numpy array of input data (shape == cubes * dim)
         output (Buffer) : Raw numpy array for output data (shape == dim)
-        cubes (XYZ|ZYX) : The number of cubes of size dim contained in volume
-                          (Should be either 2x2x1 or 2x2x2 XYZ)
-        dim (XYZ|ZYX) : The dimensions of ouput and the cubes contained in volume
+        cubes (tuple(z,y,x)) : The number of cubes of size dim contained in volume
+                               (Should be either (1,2,2) or (2,2,2)
+        dim (tuple(z,y,x)) : The dimensions of ouput and the cubes contained in volume
     """
 
     convert = lambda x: (cp.c_int * len(x))(*x)
 
-    ndlib_ctypes.addAnnotationData(volume, output, convert(cubes.zyx), convert(dim.zyx))
+    ndlib_ctypes.addAnnotationData(volume, output, convert(cubes), convert(dim))
 
 def unique(data):
     """Return the unique elements in the array.
