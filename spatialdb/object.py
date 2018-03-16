@@ -20,6 +20,7 @@ import hashlib
 import numpy as np
 from .error import SpdbError, ErrorCodes
 from .region import Region
+from random import randrange
 from spdb.c_lib.ndlib import XYZMorton
 
 from bossutils.aws import get_region
@@ -28,6 +29,16 @@ import boto3
 
 # Note there are additional imports at the bottom of the file.
 
+"""
+Append a number between 0 and LOOKUP_KEY_MAX_N when generating a lookup_key.
+Because lookup-key-index uses lookup_key as its key, this needs to spread over
+multiple keys to avoid DynamoDB throttling during ingest.
+
+If this value is updated after use in production, it may be increased but
+NEVER decreased unless every instance in the table is rewritten to be within
+the smaller range.
+"""
+LOOKUP_KEY_MAX_N = 100
 
 class ObjectStore(metaclass=ABCMeta):
     def __init__(self, object_store_conf):
@@ -305,9 +316,14 @@ class AWSObjectStore(ObjectStore):
         This value will be the key of a global secondary index that allows
         finding all the cuboids belonging to a particular channel in an 
         efficient manner.
+
+        Note that the cuboids for a channel are spread over 
+        LOOKUP_KEY_MAX_N + 1 keys to avoid hot spots and throttling during
+        ingest.
         """
-        lookup_key = '{}&{}&{}&{}'.format(
-            collection_id, experiment_id, channel_id, resolution)
+        lookup_key = '{}&{}&{}&{}#{}'.format(
+            collection_id, experiment_id, channel_id, resolution, 
+            randrange(LOOKUP_KEY_MAX_N))
         return lookup_key
 
     def cuboids_exist(self, key_list, cache_miss_key_idx=None, version=0):

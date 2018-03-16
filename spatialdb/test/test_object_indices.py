@@ -26,7 +26,7 @@ from spdb.spatialdb.object import AWSObjectStore
 from spdb.spatialdb import SpatialDB
 from spdb.spatialdb.cube import Cube
 import unittest
-from unittest.mock import patch, DEFAULT
+from unittest.mock import patch, DEFAULT, ANY
 import random
 
 from bossutils import configuration
@@ -808,10 +808,6 @@ class ObjectIndicesTestMixin(object):
             self.resource, res, time_sample, morton)
         chan_key = self.obj_ind.generate_channel_id_key(self.resource, res, id)
         key_parts = AWSObjectStore.get_object_key_parts(obj_key)
-        lookup_key = AWSObjectStore.generate_lookup_key(
-            key_parts.collection_id, key_parts.experiment_id, 
-            key_parts.channel_id, key_parts.resolution)
-
 
         with patch.multiple(
             self.obj_ind, 
@@ -832,8 +828,8 @@ class ObjectIndicesTestMixin(object):
 
             mocks['write_cuboid'].assert_called_with(
                 max_capacity, str(morton), chan_key, last_partition_key, 
-                rev_id, lookup_key, version)
-            self.assertFalse(mocks['update_last_partition_key'].called)
+                rev_id, ANY, version)
+            mocks['update_last_partition_key'].assert_not_called()
 
     def test_write_id_index_new_id(self):
         """
@@ -852,10 +848,6 @@ class ObjectIndicesTestMixin(object):
             self.resource, res, time_sample, morton)
         chan_key = self.obj_ind.generate_channel_id_key(self.resource, res, id)
         key_parts = AWSObjectStore.get_object_key_parts(obj_key)
-        lookup_key = AWSObjectStore.generate_lookup_key(
-            key_parts.collection_id, key_parts.experiment_id, 
-            key_parts.channel_id, key_parts.resolution)
-
 
         with patch.multiple(
             self.obj_ind, 
@@ -877,8 +869,8 @@ class ObjectIndicesTestMixin(object):
 
             mocks['write_cuboid'].assert_called_with(
                 max_capacity, str(morton), chan_key, last_partition_key, 
-                rev_id, lookup_key, version)
-            self.assertFalse(mocks['update_last_partition_key'].called)
+                rev_id, ANY, version)
+            mocks['update_last_partition_key'].assert_not_called()
 
     def test_write_id_index_overflow(self):
         """
@@ -899,9 +891,6 @@ class ObjectIndicesTestMixin(object):
             self.resource, res, time_sample, morton)
         chan_key = self.obj_ind.generate_channel_id_key(self.resource, res, id)
         key_parts = AWSObjectStore.get_object_key_parts(obj_key)
-        lookup_key = AWSObjectStore.generate_lookup_key(
-            key_parts.collection_id, key_parts.experiment_id, 
-            key_parts.channel_id, key_parts.resolution)
 
         with patch.multiple(
             self.obj_ind, 
@@ -922,7 +911,7 @@ class ObjectIndicesTestMixin(object):
 
             mocks['write_cuboid'].assert_called_with(
                 max_capacity, str(morton), chan_key, last_partition_key, 
-                rev_id, lookup_key, version)
+                rev_id, ANY, version)
             mocks['update_last_partition_key'].assert_called_with(
                 chan_key, last_partition_key + 1,  version)
 
