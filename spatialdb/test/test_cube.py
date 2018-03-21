@@ -371,6 +371,34 @@ class TestImageCube8(unittest.TestCase):
         assert c.is_time_series is True
         assert c2.is_time_series is True
 
+    def test_blosc_missing_time_step(self):
+        """Test case when one of the cuboids at a time step is missing.  This
+        happens when trying to load from the cache.  Only keys in the cache
+        are passed to from_blosc().
+        """
+        EXTENTS = [10, 20, 5]
+        cube_t0_1 = ImageCube8(EXTENTS, [0, 2])
+        cube_t3 = ImageCube8(EXTENTS)
+        exp_cube = ImageCube8(EXTENTS, [0, 4])
+        exp_cube.zeros()
+        exp_cube.overwrite(cube_t0_1.data, [0, 2])
+        exp_cube.overwrite(cube_t3.data, [3, 4])
+
+        cube_bytes_t0 = cube_t0_1.to_blosc_by_time_index(0)
+        cube_bytes_t1 = cube_t0_1.to_blosc_by_time_index(1)
+        cube_bytes_t3 = cube_t3.to_blosc_by_time_index(0)
+        cube_list = (cube_bytes_t0, cube_bytes_t1, cube_bytes_t3)
+
+        actual_cube = ImageCube8(EXTENTS, [0, 4])
+
+        missing_time_step = [2]
+
+        # Method under test.
+        actual_cube.from_blosc(cube_list, [0, 4], missing_time_step)
+
+        np.testing.assert_array_equal(exp_cube.data, actual_cube.data)
+        assert actual_cube.is_time_series is True
+
     def test_factory_no_time(self):
         """Test the Cube factory in Cube"""
 
@@ -761,6 +789,34 @@ class TestImageCube16(unittest.TestCase):
         assert c.time_range == c2.time_range
         assert c.is_time_series is True
         assert c2.is_time_series is True
+
+    def test_blosc_missing_time_step(self):
+        """Test case when one of the cuboids at a time step is missing.  This
+        happens when trying to load from the cache.  Only keys in the cache
+        are passed to from_blosc().
+        """
+        EXTENTS = [10, 20, 5]
+        cube_t0_1 = ImageCube16(EXTENTS, [0, 2])
+        cube_t3 = ImageCube16(EXTENTS)
+        exp_cube = ImageCube16(EXTENTS, [0, 4])
+        exp_cube.zeros()
+        exp_cube.overwrite(cube_t0_1.data, [0, 2])
+        exp_cube.overwrite(cube_t3.data, [3, 4])
+
+        cube_bytes_t0 = cube_t0_1.to_blosc_by_time_index(0)
+        cube_bytes_t1 = cube_t0_1.to_blosc_by_time_index(1)
+        cube_bytes_t3 = cube_t3.to_blosc_by_time_index(0)
+        cube_list = (cube_bytes_t0, cube_bytes_t1, cube_bytes_t3)
+
+        actual_cube = ImageCube16(EXTENTS, [0, 4])
+
+        missing_time_step = [2]
+
+        # Method under test.
+        actual_cube.from_blosc(cube_list, [0, 4], missing_time_step)
+
+        np.testing.assert_array_equal(exp_cube.data, actual_cube.data)
+        assert actual_cube.is_time_series is True
 
     def test_overwrite_dtype_mismatch(self):
         c_base = ImageCube16([10, 10, 10])
