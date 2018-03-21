@@ -201,7 +201,7 @@ class Cube(metaclass=ABCMeta):
 
         return data_mat
 
-    def from_blosc(self, byte_arrays, time_sample_range=None):
+    def from_blosc(self, byte_arrays, time_sample_range=None, missing_time_steps=[]):
         # TODO: Conditional properties of this method are challenging for the developer. break into multiple methods
         """Uncompress and populate Cube data from a Blosc serialized and compressed byte array using the numpy interface
 
@@ -233,18 +233,23 @@ class Cube(metaclass=ABCMeta):
                 # Got a list of byte arrays, so assume they are each 4-D, corresponding to time samples
 
                 # Unpack all of the arrays into the cube
-                for idx, t in enumerate(range(time_sample_range[0], time_sample_range[1])):
-                    if idx == 0:
+                b_arr_idx = 0
+                missing_gen = self.missing_ts_gen(missing_time_steps)
+                missing_t = next(missing_gen)
+                for data_idx, t in enumerate(range(time_sample_range[0], time_sample_range[1])):
+                    if data_idx == 0:
                         # On first cube get the size and allocate properly
-                        temp_mat = self.unpack_array(byte_arrays[idx], 1)
-
-                        # allocate
                         self.data = np.zeros(shape=(time_sample_range[1] - time_sample_range[0],
                                                     self.z_dim, self.y_dim, self.x_dim), dtype=self.data.dtype)
-
-                        self.data[idx, :, :, :] = temp_mat
+                    if t == missing_t:
+                        # No data for this time step.
+                        self.data[data_idx, :, :, :] = np.zeros(
+                            shape=(1, self.z_dim, self.y_dim, self.x_dim), 
+                            dtype=self.data.dtype)
+                        missing_t = next(missing_gen)
                     else:
-                        self.data[idx, :, :, :] = self.unpack_array(byte_arrays[idx], 1)
+                        self.data[data_idx, :, :, :] = self.unpack_array(byte_arrays[b_arr_idx], 1)
+                        b_arr_idx += 1
             else:
                 # If you get a single array assume it is the complete 4D array
                 self.data[:, :, :, :] = self.unpack_array(byte_arrays, self.time_range[1] - self.time_range[0])
@@ -255,6 +260,21 @@ class Cube(metaclass=ABCMeta):
                             ErrorCodes.SERIALIZATION_ERROR)
 
         self._created_from_zeros = False
+
+    def missing_ts_gen(self, missing_time_samples):
+        """
+        Generator for tracking which time samples are missing. 
+
+        Args:
+            (list[int]): List of missing time samples in ascending order.
+
+        Yields:
+            (int|None): Current missing time sample or None.
+        """
+        for sample in missing_time_samples:
+            yield sample
+        while True:
+            yield None
 
     def is_not_zeros(self):
         """Check if the data matrix is all zeros
