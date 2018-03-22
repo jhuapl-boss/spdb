@@ -47,7 +47,7 @@ LOOKUP_KEY = 'lookup-key'
 class ObjectIndices:
     """
     Class that handles the DynamoDB tracking of object IDs.  This class
-    supports the AWS Object Store.  The table name is idIndex.domain.boss.
+    supports the AWS Object Store.  The table name is idIndex.domain.tld.
     """
 
     def __init__(
@@ -940,7 +940,7 @@ class ObjectIndices:
             (int): chunk that the morton id was written to.
         """
         new_chunk_num = chunk_num
-        exp_rev_id = rev_id
+        expected_rev_id = rev_id
 
         done = False
 
@@ -952,7 +952,7 @@ class ObjectIndices:
 
             try:
                 response = self.write_cuboid_dynamo(
-                    cuboid_morton, dynamo_key, exp_rev_id, lookup_key, version)
+                    cuboid_morton, dynamo_key, expected_rev_id, lookup_key, version)
                 if 'ConsumedCapacity' in response:
                     used = response['ConsumedCapacity']['CapacityUnits']
                     if used >= max_used_capacity:
@@ -968,7 +968,7 @@ class ObjectIndices:
                 ):
                     # Set full, try the next chunk.
                     new_chunk_num = new_chunk_num + 1
-                    exp_rev_id = None
+                    expected_rev_id = None
                     print('Incrementing chunk number to {}, item size exceeded'.format(
                         new_chunk_num))
                 else:
