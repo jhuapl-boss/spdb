@@ -9,11 +9,7 @@
             "AttributeType": "N"
         },
         {
-            "AttributeName": "ingest-job-hash",
-            "AttributeType": "S"
-        },
-        {
-            "AttributeName": "ingest-job-range",
+            "AttributeName": "lookup-key",
             "AttributeType": "S"
         }
     ],
@@ -29,15 +25,11 @@
     ],
     "GlobalSecondaryIndexes": [
         {
-            "IndexName": "ingest-job-index",
+            "IndexName": "lookup-key-index",
             "KeySchema": [
                 {
-                    "AttributeName": "ingest-job-hash",
+                    "AttributeName": "lookup-key",
                     "KeyType": "HASH"
-                },
-                {
-                    "AttributeName": "ingest-job-range",
-                    "KeyType": "RANGE"
                 }
             ],
             "Projection": {

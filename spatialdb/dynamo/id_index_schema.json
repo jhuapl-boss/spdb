@@ -17,6 +17,28 @@
         {
             "AttributeName": "version",
             "AttributeType": "N"
+        },
+        {
+            "AttributeName": "lookup-key",
+            "AttributeType": "S"
+        }
+    ],
+    "GlobalSecondaryIndexes": [
+        {
+            "IndexName": "lookup-key-index",
+            "KeySchema": [
+                {
+                    "AttributeName": "lookup-key",
+                    "KeyType": "HASH"
+                }
+            ],
+            "Projection": {
+                "ProjectionType": "KEYS_ONLY"
+            },
+            "ProvisionedThroughput": {
+                "ReadCapacityUnits": 15,
+                "WriteCapacityUnits": 15
+            }
         }
     ],
     "ProvisionedThroughput":{
