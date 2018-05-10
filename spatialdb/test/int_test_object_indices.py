@@ -66,6 +66,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
 
         self.obj_store = AWSObjectStore(self.object_store_config)
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_update_id_indices_new_entry_in_cuboid_index(self):
         """
         Test adding ids to new cuboids in the s3 cuboid index.
@@ -96,6 +97,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         self.assertIn('NS', response['Item']['id-set'])
         self.assertCountEqual(expected, response['Item']['id-set']['NS'])
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_update_id_indices_replaces_existing_entry_in_cuboid_index(self):
         """
         Test calling update_id_indices() replaces existing id set in the s3 cuboid index.
@@ -140,6 +142,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         expected = ['55', '1000', '4444']
         self.assertCountEqual(expected, response['Item']['id-set']['NS'])
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_update_id_indices_new_entry_for_id_index(self):
         """
         Test adding new ids to the id index.
@@ -177,6 +180,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
             self.assertIn('SS', response['Item']['cuboid-set'])
             self.assertIn(object_key.split("&")[-1], response['Item']['cuboid-set']['SS'])
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_update_id_indices_add_new_cuboids_to_existing_ids(self):
         """
         Test that new cuboid object keys are added to the cuboid-set attributes of pre-existing ids.
@@ -242,6 +246,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         self.assertIn(object_key.split("&")[-1], response2['Item']['cuboid-set']['SS'])
         self.assertIn(new_object_key.split("&")[-1], response2['Item']['cuboid-set']['SS'])
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_too_many_ids_in_cuboid(self):
         """
         Test error handling when a cuboid has more unique ids than DynamoDB
@@ -259,6 +264,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         result = self.obj_ind.update_id_indices(resource, resolution, obj_keys, cubes, version)
         self.assertFalse(result)
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_legacy_cuboids_in_id_index(self):
         """Tet to verify that legacy and "new" cuboid indices in the ID index table both work
 
@@ -328,6 +334,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
                 resource, resolution, obj_keys, cubes, version)
         self.assertEqual(ErrorCodes.OBJECT_STORE_ERROR, ex.exception.error_code)
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_get_cuboids(self):
         resource = BossResourceBasic(data=get_anno_dict())
         id = 22222
@@ -351,6 +358,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         expected = [key, new_key]
         self.assertCountEqual(expected, actual)
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_get_loose_bounding_box(self):
         id = 33333
         resolution = 0
