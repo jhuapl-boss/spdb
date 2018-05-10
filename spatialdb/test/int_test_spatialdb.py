@@ -590,6 +590,7 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
             sp.cutout(self.resource, corner, cube_dim_tuple, resolution, 
                 filter_ids=['foo', 55555])
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_get_ids_in_region_single_cube(self):
         """Test single cuboid using DynamoDB index."""
         cube_dim_tuple = (self.x_dim, self.y_dim, self.z_dim)
@@ -622,6 +623,7 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         self.assertIn('ids', actual)
         self.assertCountEqual(expected, actual['ids'])
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_get_ids_in_region_multiple_partial_cubes(self):
         """
         Region cuboid aligned in x, but doesn't span full cuboids in the y 
@@ -663,6 +665,7 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         self.assertIn('ids', actual)
         self.assertCountEqual(expected, actual['ids'])
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_get_ids_in_region_multiple_cubes_and_x_partials(self):
         """
         Region has some full cuboids and some partial cuboids along the x axis.
@@ -716,6 +719,7 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         self.assertIn('ids', actual)
         self.assertCountEqual(expected, actual['ids'])
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_get_ids_in_region_multiple_cubes_and_y_partials(self):
         """
         Region has some full cuboids and some partial cuboids along the y axis.
@@ -768,6 +772,7 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         self.assertIn('ids', actual)
         self.assertCountEqual(expected, actual['ids'])
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_get_ids_in_region_multiple_cubes_and_z_partials(self):
         """
         Region has some full cuboids and some partial cuboids along the z axis.
@@ -820,6 +825,7 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
         self.assertIn('ids', actual)
         self.assertCountEqual(expected, actual['ids'])
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_get_tight_bounding_box_single_cuboid(self):
         """
         Get the tight bounding box for an object that exists within a single cuboid.
@@ -874,6 +880,7 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
 
         self.assertEqual(expected, actual)
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_get_tight_bounding_box_multi_cuboids_x_axis(self):
         """
         Get the tight bounding box for an object that exists in two cuboids on the x axis.
@@ -940,6 +947,7 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
 
         self.assertEqual(expected, actual)
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_get_tight_bounding_box_multi_cuboids_y_axis(self):
         """
         Get the tight bounding box for an object that exists in two cuboids on the y axis.
@@ -1006,6 +1014,7 @@ class TestIntegrationSpatialDBImage64Data(SpatialDBImageDataTestMixin,
 
         self.assertEqual(expected, actual)
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_get_tight_bounding_box_multi_cuboids_z_axis(self):
         """
         Get the tight bounding box for an object that exists in two cuboids on the y axis.
