@@ -460,6 +460,13 @@ class SpatialDB:
         lowxyz = ndlib.MortonXYZ(list_of_idxs[0])
 
         if no_cache:
+            # TODO SH As 10/3/18 the boss get_cutout is not scaling. This is a quick hack to get us back up and running at scale.
+            #      Ideally we want to have two options:
+            #      1) no-cache which would skip the cache for reads but would still check for dirty keys
+            #      2) We will also add a "raw" option which would skip both.
+            #      Since the system is not scaling now we are switching the only option "no-cache" to avoid checking
+            #      for writes as well.  This means it would be possible for someone to retreive stale data.
+            #
             blog.debug("Bypassing write check of dirty keys")
             missing_key_idx = []
             cached_key_idx = []
