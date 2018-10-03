@@ -460,7 +460,7 @@ class SpatialDB:
         lowxyz = ndlib.MortonXYZ(list_of_idxs[0])
 
         if no_cache:
-            blog.debug("In 1st no_cache If")
+            blog.debug("Bypassing write check of dirty keys")
             missing_key_idx = []
             cached_key_idx = []
             all_keys = self.kvio.generate_cached_cuboid_keys(resource, cutout_resolution,
