@@ -369,6 +369,9 @@ class SpatialDB:
         boss_logger = BossLogger()
         boss_logger.setLevel("info")
         blog = boss_logger.logger
+        if no_cache and raw:
+            blog.debug("Both no_cache and raw options were set to True")
+            raise SpdbError("Both raw and no_cache cannot be True. Only set no_cache OR raw to True. ")
 
         if not time_sample_range:
             # If not time sample list defined, used default of 0
