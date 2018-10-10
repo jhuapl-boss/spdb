@@ -22,6 +22,7 @@ from .error import SpdbError, ErrorCodes
 from .object_indices import ObjectIndices
 from .region import Region
 from spdb.c_lib.ndlib import XYZMorton
+import traceback
 
 from bossutils.aws import get_region
 
@@ -370,8 +371,9 @@ class AWSObjectStore(ObjectStore):
                 ReturnConsumedCapacity='NONE',
                 ReturnItemCollectionMetrics='NONE',
             )
-        except:
-            raise SpdbError("Error adding object-key to index.",
+        except Exception as ex:
+            traceback.print_exc()
+            raise SpdbError("Error adding object-key to index: {}".format(ex),
                             ErrorCodes.SPDB_ERROR)
 
     def cached_cuboid_to_object_keys(self, keys):
