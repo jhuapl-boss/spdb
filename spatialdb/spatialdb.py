@@ -340,7 +340,7 @@ class SpatialDB:
         return result_tuple(effcorner, effdim, None, None)
 
     # Main Interface Methods
-    def cutout(self, resource, corner, extent, resolution, time_sample_range=None, filter_ids=None, iso=False, no_cache=False, raw=False):
+    def cutout(self, resource, corner, extent, resolution, time_sample_range=None, filter_ids=None, iso=False, access_mode="cache"):
         """Extract a cube of arbitrary size. Need not be aligned to cuboid boundaries.
 
         corner represents the location of the cutout and extent the size.  As an example in 1D, if asking for
@@ -357,8 +357,10 @@ class SpatialDB:
             time_sample_range (list((int)):  a range of time samples to get [start, stop). Default is [0,1) if omitted
             filter_ids (optional[list]): Defaults to None. Otherwise, is a list of uint64 ids to filter cutout by.
             iso (bool): Flag indicating if you want to get to the "isotropic" version of a cuboid, if available
-            no_cache (bool): True to read directly from S3 and bypass the cache while still checking for dirty keys. 
-            raw (bool): True to read directly from S3 and bypass cache and checking for dirty keys. 
+            access_mode (string): Indicates one of three possible modes.
+                cache = Will use cache and check for dirty keys
+                no_cache = Will skip checking the cache but check for dirty keys
+                raw = Will skip checking the cache and dirty keys
 
         Returns:
             cube.Cube: The cutout data stored in a Cube instance
@@ -369,9 +371,6 @@ class SpatialDB:
         boss_logger = BossLogger()
         boss_logger.setLevel("info")
         blog = boss_logger.logger
-        if no_cache and raw:
-            blog.debug("Both no_cache and raw options were set to True")
-            raise SpdbError("Both raw and no_cache cannot be True. Only set no_cache OR raw to True. ")
 
         if not time_sample_range:
             # If not time sample list defined, used default of 0
@@ -463,16 +462,16 @@ class SpatialDB:
         # xyz offset stored for later use
         lowxyz = ndlib.MortonXYZ(list_of_idxs[0])
 
-        # If the user specifies the raw flag, then the system will bypass checking for dirty keys. 
+        # If the user specifies the access_mode to be raw, then the system will bypass checking for dirty keys. 
         # This option is only recommended for large quickly scaling ingest jobs. 
-        if raw:
+        if access_mode == "raw":
             blog.debug("Bypassing write check of dirty keys")
             missing_key_idx = []
             cached_key_idx = []
             all_keys = self.kvio.generate_cached_cuboid_keys(resource, cutout_resolution,
                                                              list(range(*time_sample_range)), list_of_idxs, iso=iso)
 
-        # If the user specified either no_cache or both flags are negative. Then the system will check for dirty keys. 
+        # If the user specified either no_cache or cache as the access_mode. Then the system will check for dirty keys. 
         else:
             # Get index of missing keys for cuboids to read
             missing_key_idx, cached_key_idx, all_keys = self.kvio.get_missing_read_cache_keys(resource,
@@ -509,8 +508,8 @@ class SpatialDB:
         s3_cuboids = []
         zero_cuboids = []
 
-        # If either no_cache or raw flags are True then bypass the cache and load all cuboids directly from S3
-        if no_cache or raw:
+        # If access_mode is either raw or no_cache, then bypass the cache and load all cuboids directly from S3
+        if access_mode == "no_cache" or access_mode == "raw":
             # If not using the cache or raw flags, then consider all keys are missing.
             blog.debug("Bypassing cache; loading all cuboids directly from S3")
             missing_key_idx = [i for i in range(len(all_keys))]
@@ -521,7 +520,7 @@ class SpatialDB:
             s3_key_idx, zero_key_idx = self.objectio.cuboids_exist(all_keys, missing_key_idx)
 
             if len(s3_key_idx) > 0:
-                if no_cache or raw:
+                if access_mode == "no_cache" or access_mode == "raw":
                     temp_keys = self.objectio.cached_cuboid_to_object_keys(itemgetter(*s3_key_idx)(all_keys))
 
                     # Get objects
@@ -554,7 +553,7 @@ class SpatialDB:
                         self.kvio.put_cubes(itemgetter(*s3_key_idx)(all_keys), temp_cubes)
 
             if len(zero_key_idx) > 0:
-                if not no_cache or raw:
+                if  access_mode == "no_cache" or access_mode == "raw":
                     blog.debug("Data missing in cache, but not in S3")
                 else:
                     blog.debug("No data for some keys, making cuboids with zeros")
@@ -570,7 +569,7 @@ class SpatialDB:
                     zero_cuboids.append(temp_cube)
 
         # Get cubes from the cache database (either already there or freshly paged in)
-        if not no_cache or raw:
+        if  access_mode =="cache":
             # TODO: Optimize access to cache data and checking for dirty cubes
             if len(s3_key_idx) > 0:
                 blog.debug("Get cubes from cache that were paged in from S3")
