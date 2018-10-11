@@ -465,6 +465,7 @@ class SpatialDB:
         # If the user specifies the access_mode to be raw, then the system will bypass checking for dirty keys. 
         # This option is only recommended for large quickly scaling ingest jobs. 
         if access_mode == "raw":
+            blog.info("In access_mode {}, bypassing write of dirty keys".format(access_mode))
             blog.debug("Bypassing write check of dirty keys")
             missing_key_idx = []
             cached_key_idx = []
@@ -474,6 +475,7 @@ class SpatialDB:
         # If the user specified either no_cache or cache as the access_mode. Then the system will check for dirty keys. 
         else:
             # Get index of missing keys for cuboids to read
+            blog.info("In access_mode {}, checking for dirty keys".format(access_mode))
             missing_key_idx, cached_key_idx, all_keys = self.kvio.get_missing_read_cache_keys(resource,
                                                                                               cutout_resolution,
                                                                                               time_sample_range,
@@ -510,6 +512,7 @@ class SpatialDB:
 
         # If access_mode is either raw or no_cache, then bypass the cache and load all cuboids directly from S3
         if access_mode == "no_cache" or access_mode == "raw":
+            blog.info("In access_mode {}, bypassing cache".format(access_mode))
             # If not using the cache or raw flags, then consider all keys are missing.
             blog.debug("Bypassing cache; loading all cuboids directly from S3")
             missing_key_idx = [i for i in range(len(all_keys))]
@@ -570,6 +573,7 @@ class SpatialDB:
 
         # Get cubes from the cache database (either already there or freshly paged in)
         if  access_mode =="cache":
+            blog.info("In access_mode {}, using cache".format(access_mode))
             # TODO: Optimize access to cache data and checking for dirty cubes
             if len(s3_key_idx) > 0:
                 blog.debug("Get cubes from cache that were paged in from S3")
