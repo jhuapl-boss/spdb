@@ -357,7 +357,7 @@ class SpatialDB:
             time_sample_range (list((int)):  a range of time samples to get [start, stop). Default is [0,1) if omitted
             filter_ids (optional[list]): Defaults to None. Otherwise, is a list of uint64 ids to filter cutout by.
             iso (bool): Flag indicating if you want to get to the "isotropic" version of a cuboid, if available
-            access_mode (string): Indicates one of three possible modes.
+            access_mode (str): Indicates one of three possible modes.
                 cache = Will use cache and check for dirty keys
                 no_cache = Will skip checking the cache but check for dirty keys
                 raw = Will skip checking the cache and dirty keys
@@ -465,8 +465,7 @@ class SpatialDB:
         # If the user specifies the access_mode to be raw, then the system will bypass checking for dirty keys. 
         # This option is only recommended for large quickly scaling ingest jobs. 
         if access_mode == "raw":
-            blog.info("In access_mode {}, bypassing write of dirty keys".format(access_mode))
-            blog.debug("Bypassing write check of dirty keys")
+            blog.info("In access_mode {}, bypassing write check of dirty keys".format(access_mode))
             missing_key_idx = []
             cached_key_idx = []
             all_keys = self.kvio.generate_cached_cuboid_keys(resource, cutout_resolution,
@@ -514,7 +513,6 @@ class SpatialDB:
         if access_mode == "no_cache" or access_mode == "raw":
             blog.info("In access_mode {}, bypassing cache".format(access_mode))
             # If not using the cache or raw flags, then consider all keys are missing.
-            blog.debug("Bypassing cache; loading all cuboids directly from S3")
             missing_key_idx = [i for i in range(len(all_keys))]
 
         if len(missing_key_idx) > 0:
