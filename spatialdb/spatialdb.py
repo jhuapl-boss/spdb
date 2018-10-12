@@ -625,7 +625,8 @@ class SpatialDB:
 
                     # Sleep a bit so you don't kill the DB
                     time.sleep(0.05)
-
+        if access_mode != "cache" and access_mode != "no_cache" and access_mode != "raw":
+            raise SpdbError('The access_mode "{}" specified is not valid'.format(access_mode), ErrorCodes.SPDB_ERROR)
         #
         # At this point, have all cuboids whether or not the cache was used.
         #
