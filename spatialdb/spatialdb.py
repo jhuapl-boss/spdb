@@ -554,7 +554,7 @@ class SpatialDB:
                         self.kvio.put_cubes(itemgetter(*s3_key_idx)(all_keys), temp_cubes)
 
             if len(zero_key_idx) > 0:
-                if  access_mode == "no_cache" or access_mode == "raw":
+                if  access_mode == "cache":
                     blog.debug("Data missing in cache, but not in S3")
                 else:
                     blog.debug("No data for some keys, making cuboids with zeros")
