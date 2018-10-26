@@ -18,16 +18,7 @@ import numpy as np
 # Cuboid Size
 # TODO: Look into moving this into a data model table and set based on voxel size
 # non-isotropic slices should be 512,512,16. As you downsample move to 64,64,64 past isotropic
-CUBOIDSIZE = [[512, 512, 16],
-              [512, 512, 16],
-              [512, 512, 16],
-              [512, 512, 16],
-              [512, 512, 16],
-              [512, 512, 16],
-              [512, 512, 16],
-              [512, 512, 16],
-              [512, 512, 16],
-              [512, 512, 16]]
+CUBOIDSIZE = [[512, 512, 16]] * 13
 
 # SuperCube Size
 SUPERCUBESIZE = [1, 1, 1]
@@ -52,5 +43,3 @@ SUPERCUBESIZE = [1, 1, 1]
 PROPAGATED = 2
 UNDER_PROPAGATION = 1
 NOT_PROPAGATED = 0
-
-
