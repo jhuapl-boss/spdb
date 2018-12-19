@@ -725,11 +725,12 @@ class SpatialDB:
                             'The requested resource is locked due to excessive write errors. Contact support.',
                             ErrorCodes.RESOURCE_LOCKED)
 
-        # Check to make sure the user is writing data at the BASE RESOLUTION
+        # TODO LR: This is temporary logic that will be removed after finalizing the current large data ingest. 
+        # Check to make sure the user is writing data at the BASE RESOLUTION or BASE RESOLUTION + 1
         channel = resource.get_channel()
-        if channel.base_resolution != resolution:
+        if channel.base_resolution != resolution and resolution != channel.base_resolution+1:
             raise SpdbError('Resolution Mismatch',
-                            "You can only write data to a channel's base resolution. Base Resolution: {}, Request Resolution: {}".format(channel.base_resolution, resolution),
+                            "You can only write data to a channel's base resolution or one resolution above it. Base Resolution: {}, Request Resolution: {}".format(channel.base_resolution, resolution),
                             ErrorCodes.RESOLUTION_MISMATCH)
 
         # Check if time-series
