@@ -379,3 +379,19 @@ class AWSSetupLayer(object):
         except:
             pass
         print('Done', flush=True)
+
+    @classmethod
+    def clear_flush_queue(cls):
+        """
+        Empty the S3 flush queue.  Should be used during tearDown() of tests that
+        use the cutout service to avoid a failing test from affecting other
+        tests.
+        """
+        sqs = boto3.client('sqs', region_name=get_region())
+        url = cls.object_store_config['s3_flush_queue']
+        while True:
+            resp = sqs.receive_message(QueueUrl=url, MaxNumberOfMessages=10)
+            if 'Messages' not in resp:
+                break
+            msgs = [{'Id': msg['MessageId'], 'ReceiptHandle': msg['ReceiptHandle']} for msg in resp['Messages']]
+            sqs.delete_message_batch(QueueUrl=url, Entries=msgs)
