@@ -705,7 +705,7 @@ class SpatialDB:
 
         Args:
             resource (project.BossResource): Data model info based on the request or target resource
-            corner ((int, int, int)): the xyz location of the corner of the cutout
+            corner ((int, int, int)): the xyz locatiotn of the corner of the cuout
             resolution (int): the resolution level
             cuboid_data (numpy.ndarray): Matrix of data to write as cuboids
             time_sample_start (int): if cuboid_data.ndim == 3, the time sample for the data
