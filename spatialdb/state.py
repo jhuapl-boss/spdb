@@ -180,7 +180,7 @@ class CacheStateDB(object):
         """
         key = "WRITE-LOCK&{}".format(lookup_key)
         if locked:
-            self.status_client.set(key, True)
+            self.status_client.set(key, 'True')
         else:
             self.status_client.delete(key)
 
