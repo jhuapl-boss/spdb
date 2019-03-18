@@ -7,6 +7,18 @@
         {
             "AttributeName": "version-node",
             "AttributeType": "N"
+        },
+        {
+            "AttributeName": "ingest-job-hash",
+            "AttributeType": "S"
+        },
+        {
+            "AttributeName": "ingest-job-range",
+            "AttributeType": "S"
+        },
+        {
+            "AttributeName": "ingest-id-hash",
+            "AttributeType": "S"
         }
     ],
     "KeySchema": [
@@ -17,6 +29,44 @@
         {
             "AttributeName": "version-node",
             "KeyType": "RANGE"
+        }
+    ],
+    "GlobalSecondaryIndexes": [
+        {
+            "IndexName": "ingest-job-index",
+            "KeySchema": [
+                {
+                    "AttributeName": "ingest-job-hash",
+                    "KeyType": "HASH"
+                },
+                {
+                    "AttributeName": "ingest-job-range",
+                    "KeyType": "RANGE"
+                }
+            ],
+            "Projection": {
+                "ProjectionType": "KEYS_ONLY"
+            },
+            "ProvisionedThroughput": {
+                "ReadCapacityUnits": 15,
+                "WriteCapacityUnits": 15
+            }
+        },
+        {
+            "IndexName": "ingest-id-index",
+            "KeySchema": [
+                {
+                    "AttributeName": "ingest-id-hash",
+                    "KeyType": "HASH"
+                }
+            ],
+            "Projection": {
+                "ProjectionType": "KEYS_ONLY"
+            },
+            "ProvisionedThroughput": {
+                "ReadCapacityUnits": 15,
+                "WriteCapacityUnits": 15
+            }
         }
     ],
     "ProvisionedThroughput": {
