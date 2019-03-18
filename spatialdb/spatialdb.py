@@ -340,7 +340,7 @@ class SpatialDB:
         return result_tuple(effcorner, effdim, None, None)
 
     # Main Interface Methods
-    def cutout(self, resource, corner, extent, resolution, time_sample_range=None, filter_ids=None, iso=False, no_cache=False):
+    def cutout(self, resource, corner, extent, resolution, time_sample_range=None, filter_ids=None, iso=False, access_mode="cache"):
         """Extract a cube of arbitrary size. Need not be aligned to cuboid boundaries.
 
         corner represents the location of the cutout and extent the size.  As an example in 1D, if asking for
@@ -357,7 +357,10 @@ class SpatialDB:
             time_sample_range (list((int)):  a range of time samples to get [start, stop). Default is [0,1) if omitted
             filter_ids (optional[list]): Defaults to None. Otherwise, is a list of uint64 ids to filter cutout by.
             iso (bool): Flag indicating if you want to get to the "isotropic" version of a cuboid, if available
-            no_cache (bool): True to read directly from S3 and bypass the cache.
+            access_mode (str): Indicates one of three possible modes.
+                cache = Will use cache and check for dirty keys
+                no_cache = Will skip checking the cache but check for dirty keys
+                raw = Will skip checking the cache and dirty keys
 
         Returns:
             cube.Cube: The cutout data stored in a Cube instance
@@ -459,21 +462,19 @@ class SpatialDB:
         # xyz offset stored for later use
         lowxyz = ndlib.MortonXYZ(list_of_idxs[0])
 
-        if no_cache:
-            # TODO SH As 10/3/18 the boss get_cutout is not scaling. This is a quick hack to get us back up and running at scale.
-            #      Ideally we want to have two options:
-            #      1) no-cache which would skip the cache for reads but would still check for dirty keys
-            #      2) We will also add a "raw" option which would skip both.
-            #      Since the system is not scaling now we are switching the only option "no-cache" to avoid checking
-            #      for writes as well.  This means it would be possible for someone to retreive stale data.
-            #
-            blog.debug("Bypassing write check of dirty keys")
+        # If the user specifies the access_mode to be raw, then the system will bypass checking for dirty keys. 
+        # This option is only recommended for large quickly scaling ingest jobs. 
+        if access_mode == "raw":
+            blog.info("In access_mode {}, bypassing write check of dirty keys".format(access_mode))
             missing_key_idx = []
             cached_key_idx = []
             all_keys = self.kvio.generate_cached_cuboid_keys(resource, cutout_resolution,
                                                              list(range(*time_sample_range)), list_of_idxs, iso=iso)
+
+        # If the user specified either no_cache or cache as the access_mode. Then the system will check for dirty keys. 
         else:
             # Get index of missing keys for cuboids to read
+            blog.info("In access_mode {}, checking for dirty keys".format(access_mode))
             missing_key_idx, cached_key_idx, all_keys = self.kvio.get_missing_read_cache_keys(resource,
                                                                                               cutout_resolution,
                                                                                               time_sample_range,
@@ -508,9 +509,10 @@ class SpatialDB:
         s3_cuboids = []
         zero_cuboids = []
 
-        if no_cache:
-            # If not using the cache, then consider all keys are missing.
-            blog.debug("Bypassing cache; loading all cuboids directly from S3")
+        # If access_mode is either raw or no_cache, then bypass the cache and load all cuboids directly from S3
+        if access_mode == "no_cache" or access_mode == "raw":
+            blog.info("In access_mode {}, bypassing cache".format(access_mode))
+            # If not using the cache or raw flags, then consider all keys are missing.
             missing_key_idx = [i for i in range(len(all_keys))]
 
         if len(missing_key_idx) > 0:
@@ -519,7 +521,7 @@ class SpatialDB:
             s3_key_idx, zero_key_idx = self.objectio.cuboids_exist(all_keys, missing_key_idx)
 
             if len(s3_key_idx) > 0:
-                if no_cache:
+                if access_mode == "no_cache" or access_mode == "raw":
                     temp_keys = self.objectio.cached_cuboid_to_object_keys(itemgetter(*s3_key_idx)(all_keys))
 
                     # Get objects
@@ -552,7 +554,7 @@ class SpatialDB:
                         self.kvio.put_cubes(itemgetter(*s3_key_idx)(all_keys), temp_cubes)
 
             if len(zero_key_idx) > 0:
-                if not no_cache:
+                if  access_mode == "cache":
                     blog.debug("Data missing in cache, but not in S3")
                 else:
                     blog.debug("No data for some keys, making cuboids with zeros")
@@ -568,7 +570,8 @@ class SpatialDB:
                     zero_cuboids.append(temp_cube)
 
         # Get cubes from the cache database (either already there or freshly paged in)
-        if not no_cache:
+        if  access_mode =="cache":
+            blog.info("In access_mode {}, using cache".format(access_mode))
             # TODO: Optimize access to cache data and checking for dirty cubes
             if len(s3_key_idx) > 0:
                 blog.debug("Get cubes from cache that were paged in from S3")
@@ -622,7 +625,8 @@ class SpatialDB:
 
                     # Sleep a bit so you don't kill the DB
                     time.sleep(0.05)
-
+        if access_mode != "cache" and access_mode != "no_cache" and access_mode != "raw":
+            raise SpdbError('The access_mode "{}" specified is not valid'.format(access_mode), ErrorCodes.SPDB_ERROR)
         #
         # At this point, have all cuboids whether or not the cache was used.
         #
