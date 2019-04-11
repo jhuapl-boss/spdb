@@ -143,7 +143,7 @@ class SpatialDB:
         Returns:
             list(cube.Cube): The cuboid data with time-series support, packed into Cube instances, sorted by morton id
         """
-        # Group by morton
+        # Group by morton, time sample
         cuboids = sorted(cuboids, key=lambda element: (element[0], element[1]))
 
         # Unpack to lists
@@ -172,7 +172,7 @@ class SpatialDB:
             if not_time_series:
                 temp_cube.from_blosc(cube_bytes[start:end], [time_sample[start], time_sample[start] + 1])
             else:
-                temp_cube.from_blosc(cube_bytes[start:end], [time_sample[start], time_sample[end - 1] + 1])
+                temp_cube.from_blosc(cube_bytes[start:end], [time_sample[start], time_sample[end - 1] + 1], self.mark_missing_time_steps(time_sample, start, end))
 
             # Save for output
             output_cubes.append(temp_cube)
@@ -180,6 +180,20 @@ class SpatialDB:
             start = end
 
         return output_cubes
+
+    def mark_missing_time_steps(self, samples, start, end):
+        """
+        Get a list of any missing time steps between samples[start] and samples[end-1].
+
+        Args:
+            samples (list[int]): A list of time steps in ascending order.
+            start (int): Index into samples.
+            end (int): Index of stopping index into samples (exclusive).
+
+        Returns:
+            (list[int]): List of time steps that are not present in samples.
+        """
+        return list(set(samples[start:end]).symmetric_difference(range(samples[start], samples[end-1]+1)))
 
     # Lambda Page In Methods
     def page_in_cubes(self, key_list, timeout=60):

@@ -26,8 +26,11 @@ import numpy as np
 
 from spdb.spatialdb.test.setup import SetupTests
 
+import spdb.spatialdb.object
+
 
 @patch('spdb.spatialdb.object.get_region', autospec=True, return_value='us-east-1')
+
 class SpatialDBImageDataTestMixin(object):
 
     cuboid_size = CUBOIDSIZE[0]
@@ -168,6 +171,42 @@ class SpatialDBImageDataTestMixin(object):
         np.testing.assert_array_equal(cube1.data, cube_read[0].data)
         np.testing.assert_array_equal(cube2.data, cube_read[1].data)
 
+    def test_get_cubes_missing_time_step(self):
+        """Test get_cubes() when not supplying keys for all time steps in a 
+        time range.
+        """
+        EXTENTS = [self.x_dim, self.y_dim, self.z_dim]
+        FIRST_T_RNG = (0, 4)
+        cube1 = Cube.create_cube(self.resource, EXTENTS, FIRST_T_RNG)
+        cube1.random()
+        cube1.morton_id = 70
+
+        # Note, no data for time steps 4 and 5 provided.
+
+        SECOND_T_RNG = (6, 9)
+        cube2 = Cube.create_cube(self.resource, EXTENTS, SECOND_T_RNG)
+        cube2.random()
+        cube2.morton_id = 70
+
+        TOTAL_T_RNG = (0, 9)
+        exp_cube = Cube.create_cube(self.resource, EXTENTS, TOTAL_T_RNG)
+        exp_cube.zeros()
+        exp_cube.morton_id = 70
+        exp_cube.overwrite(cube1.data, FIRST_T_RNG)
+        exp_cube.overwrite(cube2.data, SECOND_T_RNG)
+            
+
+        db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        # populate dummy data
+        keys = self.write_test_cube(db, self.resource, 0, cube1, cache=True, s3=False)
+        keys.extend(self.write_test_cube(db, self.resource, 0, cube2, cache=True, s3=False))
+
+        # Method under test.
+        cube_read = db.get_cubes(self.resource, keys)
+
+        np.testing.assert_array_equal(exp_cube.data, cube_read[0].data)
+
     def test_cutout_no_time_single_aligned_zero(self, fake_get_region):
         """Test the get_cubes method - no time - single"""
         db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
@@ -229,14 +268,34 @@ class SpatialDBImageDataTestMixin(object):
         with self.assertRaises(SpdbError):
             db.write_cuboid(self.resource, (0, 0, 0), 5, cube1.data, time_sample_start=0)
 
+    def test_mark_missing_time_steps_none(self):
+        samples = [0, 1, 2, 3, 4, 5, 6]
+
+        db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        actual = db.mark_missing_time_steps(samples, 2, 5)
+
+        self.assertEqual([], actual)
+
+    def test_mark_missing_time_steps(self):
+        samples = [0, 1, 3, 5, 6, 7]
+
+        db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        actual = db.mark_missing_time_steps(samples, 1, 4)
+
+        self.assertEqual([2, 4], actual)
+
 
 @patch('redis.StrictRedis', mock_strict_redis_client)
 class TestSpatialDBImage8Data(SpatialDBImageDataTestMixin, unittest.TestCase):
 
+    @patch('spdb.spatialdb.test.setup.get_region')
     @patch('redis.StrictRedis', mock_strict_redis_client)
-    def setUp(self):
+    def setUp(self, fake_get_region):
         """ Set everything up for testing """
         # setup resources
+        fake_get_region.return_value = 'us-east-1'
         self.setup_helper = SetupTests()
         self.setup_helper.mock = True
 
@@ -280,10 +339,13 @@ class TestSpatialDBImage8Data(SpatialDBImageDataTestMixin, unittest.TestCase):
 @patch('redis.StrictRedis', mock_strict_redis_client)
 class TestSpatialDBImage16Data(SpatialDBImageDataTestMixin, unittest.TestCase):
 
+
+    @patch('spdb.spatialdb.test.setup.get_region')
     @patch('redis.StrictRedis', mock_strict_redis_client)
-    def setUp(self):
+    def setUp(self, fake_get_region):
         """ Set everything up for testing """
         # setup resources
+        fake_get_region.return_value = 'us-east-1'
         self.setup_helper = SetupTests()
         self.setup_helper.mock = True
 
