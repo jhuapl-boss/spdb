@@ -24,7 +24,7 @@ from bossutils import configuration
 from spdb.spatialdb.test.setup import SetupTests
 
 import boto3
-#from bossutils.aws import get_region
+from unittest.mock import patch
 
 
 @patch('spdb.spatialdb.object.get_region', autospec=True, return_value='us-east-1')

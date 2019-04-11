@@ -70,7 +70,7 @@ def get_test_configuration():
 
     object_store_config = {"s3_flush_queue": "https://queue.amazonaws.com/{}/{}".format(get_account_id(),
                                                                                         s3_flush_queue_name),
-                           "cuboid_bucket": "intTest.{}.{}".format(account_id, config['aws']['cuboid_bucket']),
+                           "cuboid_bucket": "inttest.{}.{}".format(account_id, config['aws']['cuboid_bucket']),
                            "page_in_lambda_function": config['lambda']['page_in_function'],
                            "page_out_lambda_function": config['lambda']['flush_function'],
                            "s3_index_table": "intTest.{}".format(config['aws']['s3-index-table']),

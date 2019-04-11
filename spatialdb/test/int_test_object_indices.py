@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from spdb.spatialdb import AWSObjectStore
 from spdb.spatialdb.object_indices import ObjectIndices
 from spdb.c_lib.ndlib import XYZMorton
 from spdb.c_lib.ndtype import CUBOIDSIZE
@@ -65,6 +66,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
 
         self.obj_store = AWSObjectStore(self.object_store_config)
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_update_id_indices_new_entry_in_cuboid_index(self):
         """
         Test adding ids to new cuboids in the s3 cuboid index.
@@ -95,6 +97,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         self.assertIn('NS', response['Item']['id-set'])
         self.assertCountEqual(expected, response['Item']['id-set']['NS'])
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_update_id_indices_replaces_existing_entry_in_cuboid_index(self):
         """
         Test calling update_id_indices() replaces existing id set in the s3 cuboid index.
@@ -139,6 +142,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         expected = ['55', '1000', '4444']
         self.assertCountEqual(expected, response['Item']['id-set']['NS'])
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_update_id_indices_new_entry_for_id_index(self):
         """
         Test adding new ids to the id index.
@@ -155,7 +159,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         resolution = 1
         time_sample = 0
         morton_id = 20
-        object_key = self.obj_store.generate_object_key(
+        object_key = AWSObjectStore.generate_object_key(
             resource, resolution, time_sample, morton_id)
 
         # Method under test.
@@ -176,6 +180,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
             self.assertIn('SS', response['Item']['cuboid-set'])
             self.assertIn(object_key.split("&")[-1], response['Item']['cuboid-set']['SS'])
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_update_id_indices_add_new_cuboids_to_existing_ids(self):
         """
         Test that new cuboid object keys are added to the cuboid-set attributes of pre-existing ids.
@@ -192,7 +197,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         resolution = 1
         time_sample = 0
         morton_id = 20
-        object_key = self.obj_store.generate_object_key(
+        object_key = AWSObjectStore.generate_object_key(
             resource, resolution, time_sample, morton_id)
 
         self.obj_ind.update_id_indices(resource, resolution, [object_key], [bytes], version)
@@ -203,7 +208,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         new_bytes[3] = 55       # Pre-existing id.
 
         new_morton_id = 90
-        new_object_key = self.obj_store.generate_object_key(
+        new_object_key = AWSObjectStore.generate_object_key(
             resource, resolution, time_sample, new_morton_id)
 
         # Method under test.
@@ -241,6 +246,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         self.assertIn(object_key.split("&")[-1], response2['Item']['cuboid-set']['SS'])
         self.assertIn(new_object_key.split("&")[-1], response2['Item']['cuboid-set']['SS'])
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_too_many_ids_in_cuboid(self):
         """
         Test error handling when a cuboid has more unique ids than DynamoDB
@@ -251,13 +257,14 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         time_sample = 0
         resource = BossResourceBasic(data=get_anno_dict())
         mortonid = XYZMorton([0, 0, 0])
-        obj_keys = [self.obj_store.generate_object_key(resource, resolution, time_sample, mortonid)]
+        obj_keys = [AWSObjectStore.generate_object_key(resource, resolution, time_sample, mortonid)]
         cubes = [np.random.randint(2000000, size=(16, 512, 512), dtype='uint64')]
 
         # If too many ids, the index is skipped, logged, and False is returned to the caller.
         result = self.obj_ind.update_id_indices(resource, resolution, obj_keys, cubes, version)
         self.assertFalse(result)
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_legacy_cuboids_in_id_index(self):
         """Tet to verify that legacy and "new" cuboid indices in the ID index table both work
 
@@ -275,7 +282,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         resolution = 1
         time_sample = 0
         morton_id = 2000
-        object_key = self.obj_store.generate_object_key(
+        object_key = AWSObjectStore.generate_object_key(
             resource, resolution, time_sample, morton_id)
 
         # Write a legacy index
@@ -317,7 +324,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
 
         for x in range(0, 7651):
             mortonid = XYZMorton([x, y, z])
-            obj_keys.append(self.obj_store.generate_object_key(
+            obj_keys.append(AWSObjectStore.generate_object_key(
                 resource, resolution, time_sample, mortonid))
             # Just need one non-zero number to represent each cuboid.
             cubes.append(np.ones(1, dtype='uint64'))
@@ -327,19 +334,20 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
                 resource, resolution, obj_keys, cubes, version)
         self.assertEqual(ErrorCodes.OBJECT_STORE_ERROR, ex.exception.error_code)
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_get_cuboids(self):
         resource = BossResourceBasic(data=get_anno_dict())
         id = 22222
         bytes = np.zeros(10, dtype='uint64')
         bytes[1] = id
         resolution = 1
-        key = self.obj_store.generate_object_key(resource, resolution, 0, 56)
+        key = AWSObjectStore.generate_object_key(resource, resolution, 0, 56)
         version = 0
         resource = BossResourceBasic(data=get_anno_dict())
 
         new_bytes = np.zeros(4, dtype='uint64')
         new_bytes[0] = id     # Pre-existing id.
-        new_key = self.obj_store.generate_object_key(resource, resolution, 0, 59)
+        new_key = AWSObjectStore.generate_object_key(resource, resolution, 0, 59)
 
         self.obj_ind.update_id_indices(
             resource, resolution, [key, new_key], [bytes, new_bytes], version)
@@ -350,6 +358,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         expected = [key, new_key]
         self.assertCountEqual(expected, actual)
 
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_get_loose_bounding_box(self):
         id = 33333
         resolution = 0
@@ -363,7 +372,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         pos0 = [x_cube_dim, 2*y_cube_dim, 3*z_cube_dim]
         pos_ind0 = [pos0[0]/x_cube_dim, pos0[1]/y_cube_dim, pos0[2]/z_cube_dim]
         morton_id0 = XYZMorton(pos_ind0)
-        key0 = self.obj_store.generate_object_key(
+        key0 = AWSObjectStore.generate_object_key(
             self.resource, resolution, time_sample, morton_id0)
 
         bytes1 = np.zeros(4, dtype='uint64')
@@ -371,7 +380,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         pos1 = [3*x_cube_dim, 5*y_cube_dim, 6*z_cube_dim]
         pos_ind1 = [pos1[0]/x_cube_dim, pos1[1]/y_cube_dim, pos1[2]/z_cube_dim]
         morton_id1 = XYZMorton(pos_ind1)
-        key1 = self.obj_store.generate_object_key(
+        key1 = AWSObjectStore.generate_object_key(
             self.resource, resolution, time_sample, morton_id1)
 
         self.obj_ind.update_id_indices(

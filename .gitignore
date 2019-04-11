@@ -66,3 +66,7 @@ target/
 addData.o
 c_lib/c_version/*.o
 c_lib/c_version/makefile
+
+# Vim files
+*.swp
+

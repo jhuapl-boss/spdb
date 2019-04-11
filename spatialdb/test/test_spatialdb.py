@@ -29,10 +29,8 @@ from spdb.spatialdb.test.setup import SetupTests
 import spdb.spatialdb.object
 
 
-def get_region_east_1():
-    return 'us-east-1'
+@patch('spdb.spatialdb.object.get_region', autospec=True, return_value='us-east-1')
 
-@patch('spdb.spatialdb.object.get_region', get_region_east_1)
 class SpatialDBImageDataTestMixin(object):
 
     cuboid_size = CUBOIDSIZE[0]
@@ -79,7 +77,7 @@ class SpatialDBImageDataTestMixin(object):
 
         return keys
 
-    def test_resource_locked(self):
+    def test_resource_locked(self, fake_get_region):
         """Method to test if the resource is locked"""
         sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
@@ -93,7 +91,7 @@ class SpatialDBImageDataTestMixin(object):
         sp.cache_state.set_project_lock(self.resource.get_lookup_key(), False)
         assert not sp.resource_locked(self.resource.get_lookup_key())
 
-    def test_get_cubes_no_time_single(self):
+    def test_get_cubes_no_time_single(self, fake_get_region):
         """Test the get_cubes method - no time - single"""
         # Generate random data
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
@@ -109,7 +107,7 @@ class SpatialDBImageDataTestMixin(object):
 
         np.testing.assert_array_equal(cube1.data, cube2[0].data)
 
-    def test_get_cubes_no_time_multiple(self):
+    def test_get_cubes_no_time_multiple(self, fake_get_region):
         """Test the get_cubes method - no time - multiple cubes"""
         # Generate random data
 
@@ -136,7 +134,7 @@ class SpatialDBImageDataTestMixin(object):
         np.testing.assert_array_equal(cube2.data, cube_read[1].data)
         np.testing.assert_array_equal(cube3.data, cube_read[2].data)
 
-    def test_get_cubes_time_single(self):
+    def test_get_cubes_time_single(self, fake_get_region):
         """Test the get_cubes method - time - single"""
         # Generate random data
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim], [0, 2])
@@ -152,7 +150,7 @@ class SpatialDBImageDataTestMixin(object):
 
         np.testing.assert_array_equal(cube1.data, cube2[0].data)
 
-    def test_get_cubes_time_multiple(self):
+    def test_get_cubes_time_multiple(self, fake_get_region):
         """Test the get_cubes method - time - multiple"""
         # Generate random data
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim], [0, 4])
@@ -209,7 +207,7 @@ class SpatialDBImageDataTestMixin(object):
 
         np.testing.assert_array_equal(exp_cube.data, cube_read[0].data)
 
-    def test_cutout_no_time_single_aligned_zero(self):
+    def test_cutout_no_time_single_aligned_zero(self, fake_get_region):
         """Test the get_cubes method - no time - single"""
         db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
@@ -217,7 +215,7 @@ class SpatialDBImageDataTestMixin(object):
 
         np.testing.assert_array_equal(np.sum(cube.data), 0)
 
-    def test_cutout_no_time_single_aligned_zero_no_cache(self):
+    def test_cutout_no_time_single_aligned_zero_no_cache(self, fake_get_region):
         """Test the get_cubes method - no time - single - bypass cache"""
         db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
@@ -225,7 +223,7 @@ class SpatialDBImageDataTestMixin(object):
 
         np.testing.assert_array_equal(np.sum(cube.data), 0)
 
-    def test_cutout_no_time_single_aligned_hit(self):
+    def test_cutout_no_time_single_aligned_hit(self, fake_get_region):
         """Test the get_cubes method - no time - single"""
         # Generate random data
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
@@ -241,7 +239,7 @@ class SpatialDBImageDataTestMixin(object):
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
 
-    def test_cutout_no_time_single_aligned_miss(self):
+    def test_cutout_no_time_single_aligned_miss(self, fake_get_region):
         """Test the get_cubes method - no time - single"""
         # Generate random data
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
@@ -257,7 +255,7 @@ class SpatialDBImageDataTestMixin(object):
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
 
-    def test_write_cuboid_off_base_res(self):
+    def test_write_cuboid_off_base_res(self, fake_get_region):
         """Test writing a cuboid to not the base resolution"""
         # Generate random data
         cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
@@ -328,8 +326,10 @@ class TestSpatialDBImage8Data(SpatialDBImageDataTestMixin, unittest.TestCase):
 
         # Create AWS Resources needed for tests
         self.setup_helper.start_mocking()
-        self.setup_helper.create_index_table(self.object_store_config["s3_index_table"], self.setup_helper.DYNAMODB_SCHEMA)
-        self.setup_helper.create_cuboid_bucket(self.object_store_config["cuboid_bucket"])
+        with patch('spdb.spatialdb.test.setup.get_region') as fake_get_region:
+            fake_get_region.return_value = 'us-east-1'
+            self.setup_helper.create_index_table(self.object_store_config["s3_index_table"], self.setup_helper.DYNAMODB_SCHEMA)
+            self.setup_helper.create_cuboid_bucket(self.object_store_config["cuboid_bucket"])
 
     def tearDown(self):
         # Stop mocking
@@ -376,8 +376,10 @@ class TestSpatialDBImage16Data(SpatialDBImageDataTestMixin, unittest.TestCase):
 
         # Create AWS Resources needed for tests
         self.setup_helper.start_mocking()
-        self.setup_helper.create_index_table(self.object_store_config["s3_index_table"], self.setup_helper.DYNAMODB_SCHEMA)
-        self.setup_helper.create_cuboid_bucket(self.object_store_config["cuboid_bucket"])
+        with patch('spdb.spatialdb.test.setup.get_region') as fake_get_region:
+            fake_get_region.return_value = 'us-east-1'
+            self.setup_helper.create_index_table(self.object_store_config["s3_index_table"], self.setup_helper.DYNAMODB_SCHEMA)
+            self.setup_helper.create_cuboid_bucket(self.object_store_config["cuboid_bucket"])
 
     def tearDown(self):
         # Stop mocking

@@ -473,30 +473,45 @@ class SpatialDB:
         # xyz offset stored for later use
         lowxyz = ndlib.MortonXYZ(list_of_idxs[0])
 
-        # Get index of missing keys for cuboids to read
-        missing_key_idx, cached_key_idx, all_keys = self.kvio.get_missing_read_cache_keys(resource,
-                                                                                          cutout_resolution,
-                                                                                          time_sample_range,
-                                                                                          list_of_idxs,
-                                                                                          iso=iso)
-        # Wait for cuboids that are currently being written to finish
-        start_time = datetime.now()
-        dirty_keys = all_keys
-        blog.debug("Waiting for {} writes to finish before read can complete".format(len(dirty_keys)))
-        while dirty_keys:
-            dirty_flags = self.kvio.is_dirty(dirty_keys)
-            dirty_keys_temp, clean_keys = [], []
-            for key, flag in zip(dirty_keys, dirty_flags):
-                (dirty_keys_temp if flag else clean_keys).append(key)
-            dirty_keys = dirty_keys_temp
+        if no_cache:
+            # TODO SH As 10/3/18 the boss get_cutout is not scaling. This is a quick hack to get us back up and running at scale.
+            #      Ideally we want to have two options:
+            #      1) no-cache which would skip the cache for reads but would still check for dirty keys
+            #      2) We will also add a "raw" option which would skip both.
+            #      Since the system is not scaling now we are switching the only option "no-cache" to avoid checking
+            #      for writes as well.  This means it would be possible for someone to retreive stale data.
+            #
+            blog.debug("Bypassing write check of dirty keys")
+            missing_key_idx = []
+            cached_key_idx = []
+            all_keys = self.kvio.generate_cached_cuboid_keys(resource, cutout_resolution,
+                                                             list(range(*time_sample_range)), list_of_idxs, iso=iso)
+        else:
+            # Get index of missing keys for cuboids to read
+            missing_key_idx, cached_key_idx, all_keys = self.kvio.get_missing_read_cache_keys(resource,
+                                                                                              cutout_resolution,
+                                                                                              time_sample_range,
+                                                                                              list_of_idxs,
+                                                                                              iso=iso)
+            # Wait for cuboids that are currently being written to finish
+            start_time = datetime.now()
+            dirty_keys = all_keys
+            blog.debug("Waiting for {} writes to finish before read can complete".format(len(dirty_keys)))
+            while dirty_keys:
+                dirty_flags = self.kvio.is_dirty(dirty_keys)
+                dirty_keys_temp, clean_keys = [], []
+                for key, flag in zip(dirty_keys, dirty_flags):
+                    (dirty_keys_temp if flag else clean_keys).append(key)
+                dirty_keys = dirty_keys_temp
 
-            if (datetime.now() - start_time).seconds > self.dirty_read_timeout:
-                # Took too long! Something must have crashed
-                raise SpdbError('{} second timeout reached while waiting for dirty cubes to be flushed.'.format(
-                    self.dirty_read_timeout),
-                                ErrorCodes.ASYNC_ERROR)
-            # Sleep a bit so you don't kill the DB
-            time.sleep(0.05)
+                if (datetime.now() - start_time).seconds > self.dirty_read_timeout:
+                    # Took too long! Something must have crashed
+                    raise SpdbError('{} second timeout reached while waiting for dirty cubes to be flushed.'.format(
+                        self.dirty_read_timeout),
+                                    ErrorCodes.ASYNC_ERROR)
+                # Sleep a bit so you don't kill the DB
+                time.sleep(0.05)
+
 
         #
         # All dirty cubes flushed, can begin reading.
