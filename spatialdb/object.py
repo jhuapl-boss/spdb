@@ -20,7 +20,7 @@ import hashlib
 import numpy as np
 from .error import SpdbError, ErrorCodes
 from .region import Region
-from random import randrange
+from random import randrange, randint
 from spdb.c_lib.ndlib import XYZMorton
 import traceback
 
@@ -40,6 +40,13 @@ NEVER decreased unless every instance in the table is rewritten to be within
 the smaller range.
 """
 LOOKUP_KEY_MAX_N = 100
+
+"""
+Max integer suffix appended to ingest-id attribute in the DynamoDB s3 index
+table.  This attribute is the key of the ingest-id-index.  This GSI is used
+during deletion of a channel.
+"""
+INGEST_ID_MAX_N = 100
 
 class ObjectStore(metaclass=ABCMeta):
     def __init__(self, object_store_conf):
@@ -282,6 +289,26 @@ class AWSObjectStore(ObjectStore):
                         resolution=resolution, time_sample=time_sample, morton_id=morton_id, is_iso=is_iso)
 
     @staticmethod
+    def get_ingest_id_hash(coll_id, exp_id, chan_id, res, job_id, i):
+        """
+        Generate the key used to represent a particular ingest job.  This should
+        match the ingest-id-hash attribute in the s3 index.
+
+        Args:
+            coll_id (int): Collection id.
+            exp_id (int): Experiment id.
+            chan_id (int): Channel id.
+            res (int): Resolution.
+            job_id (int): Ingest job id.
+            i (int): Suffix used to prevent hot partitions during ingest (<= INGEST_ID_MAX_N).
+
+        Returns:
+            (str):
+        """
+        key = '{}&{}&{}&{}&{}#{}'.format(coll_id, exp_id, chan_id, res, job_id, i) 
+        return key
+
+    @staticmethod
     def generate_object_key(resource, resolution, time_sample, morton_id, iso=False):
         """Generate Key for an object stored in the S3 cuboid bucket
 
@@ -391,9 +418,6 @@ class AWSObjectStore(ObjectStore):
         # Get lookup key and resolution from object key
         parts = self.get_object_key_parts(object_key)
 
-        # range key is exp&ch&res&task
-        ingest_job_range = "{}&{}&{}&{}".format(parts.experiment_id, parts.channel_id, parts.resolution, ingest_job)
-
         # Partial lookup key stored so we can use a Dynamo query to find all cuboids
         # tha belong to a channel.
         lookup_key = self.generate_lookup_key(
@@ -406,12 +430,14 @@ class AWSObjectStore(ObjectStore):
                 Item={
                     'object-key': {'S': object_key},
                       'version-node': {'N': "{}".format(version)},
-                      'ingest-job-hash': {'S': "{}".format(parts.collection_id)},
-                      'ingest-job-range': {'S': ingest_job_range},
+                      'ingest-id-hash': {'S': AWSObjectStore.get_ingest_id_hash(
+                          parts.collection_id, parts.experiment_id,
+                          parts.channel_id, parts.resolution,
+                          ingest_job, randint(0, INGEST_ID_MAX_N))},
                       'lookup-key': {'S': lookup_key}
-                },
+                      },
                 ReturnConsumedCapacity='NONE',
-                ReturnItemCollectionMetrics='NONE',
+                ReturnItemCollectionMetrics='NONE'
             )
         except Exception as ex:
             traceback.print_exc()

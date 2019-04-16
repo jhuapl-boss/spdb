@@ -56,7 +56,7 @@ class ObjectIndicesTestMixin(object):
         actual = self.obj_ind._make_ids_strings(arr)
         self.assertEqual(expected, actual)
 
-    @unittest.skip('Method under test will be replaced')
+    @unittest.skip('Skipping - currently indexing disabled')
     def test_update_id_indices_ignores_zeros(self):
         """
         Never send id 0 to the DynamoDB id index or cuboid index!  Since

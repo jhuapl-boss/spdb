@@ -171,7 +171,7 @@ class SpatialDBImageDataTestMixin(object):
         np.testing.assert_array_equal(cube1.data, cube_read[0].data)
         np.testing.assert_array_equal(cube2.data, cube_read[1].data)
 
-    def test_get_cubes_missing_time_step(self):
+    def test_get_cubes_missing_time_step(self, fake_get_region):
         """Test get_cubes() when not supplying keys for all time steps in a 
         time range.
         """
@@ -215,13 +215,36 @@ class SpatialDBImageDataTestMixin(object):
 
         np.testing.assert_array_equal(np.sum(cube.data), 0)
 
-    def test_cutout_no_time_single_aligned_zero_no_cache(self, fake_get_region):
+    def test_cutout_no_time_single_aligned_zero_access_mode_no_cache(self, fake_get_region):
         """Test the get_cubes method - no time - single - bypass cache"""
         db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
 
-        cube = db.cutout(self.resource, (7, 88, 243), (self.x_dim, self.y_dim, self.z_dim), 0, no_cache=True)
+        cube = db.cutout(self.resource, (7, 88, 243), (self.x_dim, self.y_dim, self.z_dim), 0, access_mode="no_cache")
 
         np.testing.assert_array_equal(np.sum(cube.data), 0)
+
+    def test_cutout_no_time_single_aligned_zero_access_mode_raw(self, fake_get_region):
+        """Test the get_cubes method - no time - single - bypass cache and bypass dirty key check"""
+        db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        cube = db.cutout(self.resource, (7, 88, 243), (self.x_dim, self.y_dim, self.z_dim), 0, access_mode="raw")
+
+        np.testing.assert_array_equal(np.sum(cube.data), 0)
+
+    def test_cutout_no_time_single_aligned_zero_access_mode_cache(self, fake_get_region):
+        """Test the get_cubes method - no time - single - DO NOT bypass cache"""
+        db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        cube = db.cutout(self.resource, (7, 88, 243), (self.x_dim, self.y_dim, self.z_dim), 0, access_mode="cache")
+
+        np.testing.assert_array_equal(np.sum(cube.data), 0)
+
+    def test_cutout_no_time_single_aligned_zero_access_mode_invalid(self, fake_get_region):
+        """Test the get_cubes method - no time - single - Raise error due to invalid access_mode"""
+        db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        with self.assertRaises(SpdbError):
+            db.cutout(self.resource, (7, 88, 243), (self.x_dim, self.y_dim, self.z_dim), 0, access_mode="wrong")
 
     def test_cutout_no_time_single_aligned_hit(self, fake_get_region):
         """Test the get_cubes method - no time - single"""
@@ -268,7 +291,7 @@ class SpatialDBImageDataTestMixin(object):
         with self.assertRaises(SpdbError):
             db.write_cuboid(self.resource, (0, 0, 0), 5, cube1.data, time_sample_start=0)
 
-    def test_mark_missing_time_steps_none(self):
+    def test_mark_missing_time_steps_none(self, fake_get_region):
         samples = [0, 1, 2, 3, 4, 5, 6]
 
         db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
@@ -277,7 +300,7 @@ class SpatialDBImageDataTestMixin(object):
 
         self.assertEqual([], actual)
 
-    def test_mark_missing_time_steps(self):
+    def test_mark_missing_time_steps(self, fake_get_region):
         samples = [0, 1, 3, 5, 6, 7]
 
         db = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)

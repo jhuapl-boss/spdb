@@ -11,6 +11,10 @@
         {
             "AttributeName": "lookup-key",
             "AttributeType": "S"
+        },
+        {
+            "AttributeName": "ingest-id-hash",
+            "AttributeType": "S"
         }
     ],
     "KeySchema": [
@@ -29,6 +33,22 @@
             "KeySchema": [
                 {
                     "AttributeName": "lookup-key",
+                    "KeyType": "HASH"
+                }
+            ],
+            "Projection": {
+                "ProjectionType": "KEYS_ONLY"
+            },
+            "ProvisionedThroughput": {
+                "ReadCapacityUnits": 15,
+                "WriteCapacityUnits": 15
+            }
+        },
+        {
+            "IndexName": "ingest-id-index",
+            "KeySchema": [
+                {
+                    "AttributeName": "ingest-id-hash",
                     "KeyType": "HASH"
                 }
             ],
