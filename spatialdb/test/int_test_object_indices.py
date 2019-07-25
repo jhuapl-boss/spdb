@@ -24,8 +24,7 @@ import boto3
 import numpy as np
 import os
 import unittest
-from spdb.spatialdb.test.setup import AWSSetupLayer, SetupTests
-from spdb.spatialdb.object import AWSObjectStore
+from spdb.spatialdb.test.setup import AWSSetupLayer
 import random
 
 
@@ -61,6 +60,7 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         self.obj_ind = ObjectIndices(self.object_store_config["s3_index_table"],
                                      self.object_store_config["id_index_table"],
                                      self.object_store_config["id_count_table"],
+                                     self.object_store_config["cuboid_bucket"],
                                      self.region,
                                      self.endpoint_url)
 
