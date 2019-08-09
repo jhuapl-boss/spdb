@@ -9,15 +9,7 @@
             "AttributeType": "N"
         },
         {
-            "AttributeName": "ingest-job-hash",
-            "AttributeType": "S"
-        },
-        {
-            "AttributeName": "ingest-job-range",
-            "AttributeType": "S"
-        },
-        {
-            "AttributeName": "ingest-id-hash",
+            "AttributeName": "lookup-key",
             "AttributeType": "S"
         }
     ],
@@ -33,30 +25,10 @@
     ],
     "GlobalSecondaryIndexes": [
         {
-            "IndexName": "ingest-job-index",
+            "IndexName": "lookup-key-index",
             "KeySchema": [
                 {
-                    "AttributeName": "ingest-job-hash",
-                    "KeyType": "HASH"
-                },
-                {
-                    "AttributeName": "ingest-job-range",
-                    "KeyType": "RANGE"
-                }
-            ],
-            "Projection": {
-                "ProjectionType": "KEYS_ONLY"
-            },
-            "ProvisionedThroughput": {
-                "ReadCapacityUnits": 15,
-                "WriteCapacityUnits": 15
-            }
-        },
-        {
-            "IndexName": "ingest-id-index",
-            "KeySchema": [
-                {
-                    "AttributeName": "ingest-id-hash",
+                    "AttributeName": "lookup-key",
                     "KeyType": "HASH"
                 }
             ],

@@ -50,7 +50,25 @@ class SpatialDBImageDataIntegrationTestMixin(object):
         # Cutout using cache to make sure cube finished writing to S3 first.
         sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
 
-        cube2 = sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0, no_cache=True)
+        cube2 = sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0, access_mode="no_cache")
+
+        np.testing.assert_array_equal(cube1.data, cube2.data)
+
+    def test_cutout_no_time_single_raw(self):
+        """Test the get_cubes method - no time - single - raw mode"""
+        # Generate random data
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube1.random()
+        cube1.morton_id = 0
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data)
+
+        # Cutout using cache to make sure cube finished writing to S3 first.
+        sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
+
+        cube2 = sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0, access_mode="raw")
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
 
@@ -158,7 +176,7 @@ class SpatialDBImageDataIntegrationTestMixin(object):
         # Cutout using cache to make sure cube finished writing to S3 first.
         sp.cutout(self.resource, (self.x_dim, self.y_dim, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
 
-        cube2 = sp.cutout(self.resource, (self.x_dim, self.y_dim, 0), (self.x_dim, self.y_dim, self.z_dim), 0, no_cache=True)
+        cube2 = sp.cutout(self.resource, (self.x_dim, self.y_dim, 0), (self.x_dim, self.y_dim, self.z_dim), 0, access_mode="no_cache")
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
 
@@ -176,7 +194,7 @@ class SpatialDBImageDataIntegrationTestMixin(object):
         # Cutout using cache to make sure cube finished writing to S3 first.
         sp.cutout(self.resource, (600, 0, 0), (self.x_dim, self.y_dim, 16), 0)
 
-        cube2 = sp.cutout(self.resource, (600, 0, 0), (self.x_dim, self.y_dim, 16), 0, no_cache=True)
+        cube2 = sp.cutout(self.resource, (600, 0, 0), (self.x_dim, self.y_dim, 16), 0, access_mode="no_cache")
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
 
@@ -210,7 +228,7 @@ class SpatialDBImageDataIntegrationTestMixin(object):
         sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0, time_sample_range=[0, 5])
 
         cube2 = sp.cutout(
-            self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0, time_sample_range=[0, 5], no_cache=True)
+            self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0, time_sample_range=[0, 5], access_mode="no_cache")
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
 
@@ -244,7 +262,7 @@ class SpatialDBImageDataIntegrationTestMixin(object):
         sp.cutout(self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0, time_sample_range=[6, 9])
 
         cube2 = sp.cutout(
-            self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0, time_sample_range=[6, 9], no_cache=True)
+            self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0, time_sample_range=[6, 9], access_mode="no_cache")
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
 
@@ -277,7 +295,7 @@ class SpatialDBImageDataIntegrationTestMixin(object):
         # Cutout using cache to make sure cube finished writing to S3 first.
         sp.cutout(self.resource, (200, 600, 3), (400, 400, 8), 0)
 
-        cube2 = sp.cutout(self.resource, (200, 600, 3), (400, 400, 8), 0, no_cache=True)
+        cube2 = sp.cutout(self.resource, (200, 600, 3), (400, 400, 8), 0, access_mode="no_cache")
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
 

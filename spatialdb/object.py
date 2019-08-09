@@ -19,15 +19,27 @@ import json
 import hashlib
 import numpy as np
 from .error import SpdbError, ErrorCodes
-from .object_indices import ObjectIndices
 from .region import Region
-from random import randint
+from random import randrange, randint
 from spdb.c_lib.ndlib import XYZMorton
 import traceback
 
 from bossutils.aws import get_region
 
 import boto3
+
+# Note there are additional imports at the bottom of the file.
+
+"""
+Append a number between 0 and LOOKUP_KEY_MAX_N when generating a lookup_key.
+Because lookup-key-index uses lookup_key as its key, this needs to spread over
+multiple keys to avoid DynamoDB throttling during ingest.
+
+If this value is updated after use in production, it may be increased but
+NEVER decreased unless every instance in the table is rewritten to be within
+the smaller range.
+"""
+LOOKUP_KEY_MAX_N = 100
 
 """
 Max integer suffix appended to ingest-id attribute in the DynamoDB s3 index
@@ -232,7 +244,9 @@ class AWSObjectStore(ObjectStore):
         # call the base class constructor
         ObjectStore.__init__(self, conf)
         self.obj_ind = ObjectIndices(
-            conf['s3_index_table'], conf['id_index_table'], conf['id_count_table'], get_region())
+            conf['s3_index_table'], conf['id_index_table'], 
+            conf['id_count_table'], conf['cuboid_bucket'], 
+            get_region())
 
     @staticmethod
     def object_key_chunks(object_keys, chunk_size):
@@ -294,7 +308,8 @@ class AWSObjectStore(ObjectStore):
         key = '{}&{}&{}&{}&{}#{}'.format(coll_id, exp_id, chan_id, res, job_id, i) 
         return key
 
-    def generate_object_key(self, resource, resolution, time_sample, morton_id, iso=False):
+    @staticmethod
+    def generate_object_key(resource, resolution, time_sample, morton_id, iso=False):
         """Generate Key for an object stored in the S3 cuboid bucket
 
             hash&{lookup_key}&resolution&time_sample&morton_id
@@ -320,6 +335,24 @@ class AWSObjectStore(ObjectStore):
         hash_str = hashlib.md5(base_key.encode()).hexdigest()
 
         return "{}&{}".format(hash_str, base_key)
+
+    @staticmethod
+    def generate_lookup_key(collection_id, experiment_id, channel_id, resolution):
+        """
+        Generate the lookup key for storing as an attribute in the S3 index table.
+
+        This value will be the key of a global secondary index that allows
+        finding all the cuboids belonging to a particular channel in an 
+        efficient manner.
+
+        Note that the cuboids for a channel are spread over 
+        LOOKUP_KEY_MAX_N + 1 keys to avoid hot spots and throttling during
+        ingest.
+        """
+        lookup_key = '{}&{}&{}&{}#{}'.format(
+            collection_id, experiment_id, channel_id, resolution, 
+            randrange(LOOKUP_KEY_MAX_N))
+        return lookup_key
 
     def cuboids_exist(self, key_list, cache_miss_key_idx=None, version=0):
         """
@@ -385,15 +418,24 @@ class AWSObjectStore(ObjectStore):
         # Get lookup key and resolution from object key
         parts = self.get_object_key_parts(object_key)
 
+        # Partial lookup key stored so we can use a Dynamo query to find all cuboids
+        # tha belong to a channel.
+        lookup_key = self.generate_lookup_key(
+            parts.collection_id, parts.experiment_id, parts.channel_id,
+            parts.resolution)
+
         try:
             dynamodb.put_item(
                 TableName=self.config['s3_index_table'],
-                Item={'object-key': {'S': object_key},
+                Item={
+                    'object-key': {'S': object_key},
                       'version-node': {'N': "{}".format(version)},
                       'ingest-id-hash': {'S': AWSObjectStore.get_ingest_id_hash(
                           parts.collection_id, parts.experiment_id,
                           parts.channel_id, parts.resolution,
-                          ingest_job, randint(0, INGEST_ID_MAX_N))}},
+                          ingest_job, randint(0, INGEST_ID_MAX_N))},
+                      'lookup-key': {'S': lookup_key}
+                      },
                 ReturnConsumedCapacity='NONE',
                 ReturnItemCollectionMetrics='NONE'
             )
@@ -806,7 +848,14 @@ class AWSObjectStore(ObjectStore):
                 for z in cuboid_bounds.z_cuboids:
                     morton = XYZMorton([x, y, z])
                     for t in range(t_range[0], t_range[1]):
-                        key_list.append(self.generate_object_key(
+                        key_list.append(AWSObjectStore.generate_object_key(
                             resource, resolution, t, morton))
 
         return key_list
+
+
+
+# Import statement at the bottom to avoid problems with circular imports.
+# http://effbot.org/zone/import-confusion.htm
+from .object_indices import ObjectIndices
+
