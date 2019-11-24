@@ -26,14 +26,16 @@ import uuid
 from spdb.c_lib import ndlib
 from spdb.c_lib.ndtype import CUBOIDSIZE
 
-from bossutils.logger import BossLogger
-
 from .error import SpdbError, ErrorCodes
 from .rediskvio import RedisKVIO
 from .cube import Cube
 from .object import AWSObjectStore
 from .state import CacheStateDB
 from .region import Region
+
+
+def logger(who):
+    return logging.getLogger(__name__).getChild(who)
 
 
 class SpatialDB:
@@ -382,9 +384,7 @@ class SpatialDB:
         Raises:
             (SPDBError):
         """
-        boss_logger = BossLogger()
-        boss_logger.setLevel("info")
-        blog = boss_logger.logger
+        log = logger('SpatialDB.cutout')
 
         if not time_sample_range:
             # If not time sample list defined, used default of 0
@@ -479,7 +479,7 @@ class SpatialDB:
         # If the user specifies the access_mode to be raw, then the system will bypass checking for dirty keys. 
         # This option is only recommended for large quickly scaling ingest jobs. 
         if access_mode == "raw":
-            blog.info("In access_mode {}, bypassing write check of dirty keys".format(access_mode))
+            log.info("In access_mode {}, bypassing write check of dirty keys".format(access_mode))
             missing_key_idx = []
             cached_key_idx = []
             all_keys = self.kvio.generate_cached_cuboid_keys(resource, cutout_resolution,
@@ -488,7 +488,7 @@ class SpatialDB:
         # If the user specified either no_cache or cache as the access_mode. Then the system will check for dirty keys. 
         else:
             # Get index of missing keys for cuboids to read
-            blog.info("In access_mode {}, checking for dirty keys".format(access_mode))
+            log.info("In access_mode {}, checking for dirty keys".format(access_mode))
             missing_key_idx, cached_key_idx, all_keys = self.kvio.get_missing_read_cache_keys(resource,
                                                                                               cutout_resolution,
                                                                                               time_sample_range,
@@ -497,7 +497,7 @@ class SpatialDB:
             # Wait for cuboids that are currently being written to finish
             start_time = datetime.now()
             dirty_keys = all_keys
-            blog.debug("Waiting for {} writes to finish before read can complete".format(len(dirty_keys)))
+            log.debug("Waiting for {} writes to finish before read can complete".format(len(dirty_keys)))
             while dirty_keys:
                 dirty_flags = self.kvio.is_dirty(dirty_keys)
                 dirty_keys_temp, clean_keys = [], []
@@ -525,7 +525,7 @@ class SpatialDB:
 
         # If access_mode is either raw or no_cache, then bypass the cache and load all cuboids directly from S3
         if access_mode == "no_cache" or access_mode == "raw":
-            blog.info("In access_mode {}, bypassing cache".format(access_mode))
+            log.info("In access_mode {}, bypassing cache".format(access_mode))
             # If not using the cache or raw flags, then consider all keys are missing.
             missing_key_idx = [i for i in range(len(all_keys))]
 
@@ -548,30 +548,30 @@ class SpatialDB:
                     s3_cuboids = self.sort_cubes(resource, keys_and_cubes)
                 else:
                     # Load data into cache.
-                    blog.debug("Data missing from cache, but present in S3")
+                    log.debug("Data missing from cache, but present in S3")
 
                     if len(s3_key_idx) > self.read_lambda_threshold:
                         # Trigger page-in of available blocks from object store and wait for completion
-                        blog.debug("Triggering Lambda Page-in")
+                        log.debug("Triggering Lambda Page-in")
                         self.page_in_cubes(itemgetter(*s3_key_idx)(all_keys))
                     else:
                         # Read cuboids from S3 into cache directly
                         # Convert cuboid-cache keys to object keys
-                        blog.debug("Paging-in Keys Directly")
+                        log.debug("Paging-in Keys Directly")
                         temp_keys = self.objectio.cached_cuboid_to_object_keys(itemgetter(*s3_key_idx)(all_keys))
 
                         # Get objects
                         temp_cubes = self.objectio.get_objects(temp_keys)
 
                         # write to cache
-                        blog.debug("put keys on direct page in: {}".format(itemgetter(*s3_key_idx)(all_keys)))
+                        log.debug("put keys on direct page in: {}".format(itemgetter(*s3_key_idx)(all_keys)))
                         self.kvio.put_cubes(itemgetter(*s3_key_idx)(all_keys), temp_cubes)
 
             if len(zero_key_idx) > 0:
                 if  access_mode == "cache":
-                    blog.debug("Data missing in cache, but not in S3")
+                    log.debug("Data missing in cache, but not in S3")
                 else:
-                    blog.debug("No data for some keys, making cuboids with zeros")
+                    log.debug("No data for some keys, making cuboids with zeros")
 
                 # Keys that don't exist in object store render as zeros
                 [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
@@ -585,11 +585,11 @@ class SpatialDB:
 
         # Get cubes from the cache database (either already there or freshly paged in)
         if  access_mode =="cache":
-            blog.info("In access_mode {}, using cache".format(access_mode))
+            log.info("In access_mode {}, using cache".format(access_mode))
             # TODO: Optimize access to cache data and checking for dirty cubes
             if len(s3_key_idx) > 0:
-                blog.debug("Get cubes from cache that were paged in from S3")
-                blog.debug(itemgetter(*s3_key_idx)(all_keys))
+                log.debug("Get cubes from cache that were paged in from S3")
+                log.debug(itemgetter(*s3_key_idx)(all_keys))
 
                 s3_cuboids = self.get_cubes(resource, itemgetter(*s3_key_idx)(all_keys))
 
@@ -598,7 +598,7 @@ class SpatialDB:
 
             # Get previously cached cubes, waiting for dirty cubes to be updated if needed
             if len(cached_key_idx) > 0:
-                blog.debug("Get cubes that were already present in the cache")
+                log.debug("Get cubes that were already present in the cache")
 
                 # Get the cached keys once in list form
                 cached_keys_list = itemgetter(*cached_key_idx)(all_keys)
@@ -733,9 +733,7 @@ class SpatialDB:
         Returns:
             None
         """
-        boss_logger = BossLogger()
-        boss_logger.setLevel("info")
-        blog = boss_logger.logger
+        log = logger('SpatialDB.write_cuboid')
 
         # Check if the resource is locked
         if self.resource_locked(resource.get_lookup_key()):
@@ -794,7 +792,7 @@ class SpatialDB:
         else:
             base_write_cuboid_key = "WRITE-CUBOID&{}&{}".format(resource.get_lookup_key(), resolution)
 
-        blog.info("Writing Cuboid - Base Key: {}".format(base_write_cuboid_key))
+        log.info("Writing Cuboid - Base Key: {}".format(base_write_cuboid_key))
 
         # Get current cube from db, merge with new cube, write back to the to db
         # TODO: Move splitting up data and computing morton into c-lib as single method
@@ -824,7 +822,7 @@ class SpatialDB:
                         # Check for page out
                         if self.cache_state.in_page_out(temp_page_out_key, resource.get_lookup_key(),
                                                         resolution, morton_idx, t):
-                            blog.info("Writing Cuboid - Delayed Write: {}".format(write_cuboid_key))
+                            log.info("Writing Cuboid - Delayed Write: {}".format(write_cuboid_key))
                             # Delay Write!
                             self.cache_state.add_to_delayed_write(write_cuboid_key,
                                                                   resource.get_lookup_key(),
@@ -852,13 +850,13 @@ class SpatialDB:
                                 # All done. continue.
                             else:
                                 # Ended up in page out during transaction. Make delayed write.
-                                blog.info("Writing Cuboid - Delayed Write: {}".format(write_cuboid_key))
+                                log.info("Writing Cuboid - Delayed Write: {}".format(write_cuboid_key))
                                 self.cache_state.add_to_delayed_write(write_cuboid_key,
                                                                       resource.get_lookup_key(),
                                                                       resolution,
                                                                       morton_idx,
                                                                       t, resource.to_json())
-        blog.info("Triggered {} Page Out Operations".format(page_out_cnt))
+        log.info("Triggered {} Page Out Operations".format(page_out_cnt))
 
     def get_bounding_box(self, resource, resolution, id, bb_type='loose'):
         """

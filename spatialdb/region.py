@@ -16,8 +16,6 @@ from collections import namedtuple
 from spdb.c_lib import ndlib
 from spdb.c_lib.ndtype import CUBOIDSIZE
 
-from bossutils.logger import BossLogger
-
 class Region:
     """
     Class that helps calculate cuboid aligned and non-cuboid aligned

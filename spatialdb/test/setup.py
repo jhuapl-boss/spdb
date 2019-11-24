@@ -15,8 +15,6 @@
 from pkg_resources import resource_filename
 import json
 
-from bossutils.aws import get_region
-
 from moto import mock_s3
 from moto import mock_dynamodb2
 from moto import mock_sqs
@@ -26,9 +24,9 @@ from botocore.exceptions import ClientError
 import time
 from spdb.project.test.resource_setup import get_image_dict, get_anno_dict
 from spdb.project import BossResourceBasic
+from spdb.spatialdb.object get_region
 
 from bossutils import configuration
-from bossutils.aws import get_region
 
 import random
 import os

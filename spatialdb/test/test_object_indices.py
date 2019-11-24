@@ -14,7 +14,6 @@
 
 from spdb.spatialdb.object_indices import (ObjectIndices, LAST_PARTITION_KEY, 
     REV_ID)
-from bossutils.aws import get_region
 import botocore
 import numpy as np
 import os
@@ -957,7 +956,6 @@ class TestObjectIndices(ObjectIndicesTestMixin, unittest.TestCase):
         cls.resource = BossResourceBasic(cls.data)
 
         # Load config
-        cls.config = configuration.BossConfig()
         cls.object_store_config = {"s3_flush_queue": 'https://mytestqueue.com',
                                    "cuboid_bucket": "test_bucket",
                                    "page_in_lambda_function": "page_in.test.boss",
