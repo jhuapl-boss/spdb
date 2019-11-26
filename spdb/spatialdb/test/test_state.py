@@ -21,7 +21,6 @@ from spdb.spatialdb import CacheStateDB
 
 import redis
 
-from bossutils import configuration
 from spdb.project.test.resource_setup import get_image_dict
 
 
@@ -237,9 +236,7 @@ class TestCacheStateDB(CacheStateDBTestMixin, unittest.TestCase):
         cls.data = get_image_dict()
         cls.resource = BossResourceBasic(cls.data)
 
-        cls.config = configuration.BossConfig()
-
-        cls.state_client = redis.StrictRedis(host=cls.config["aws"]["cache-state"], port=6379, db=1,
+        cls.state_client = redis.StrictRedis(host='localhost', port=6379, db=1,
                                              decode_responses=False)
 
         cls.config_data = {"state_client": cls.state_client}

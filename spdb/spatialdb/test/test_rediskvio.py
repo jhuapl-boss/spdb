@@ -24,7 +24,6 @@ import redis
 import numpy as np
 import blosc
 
-from bossutils import configuration
 from spdb.project.test.resource_setup import get_image_dict
 
 
@@ -282,9 +281,7 @@ class TestRedisKVIOImageData(RedisKVIOTestMixin, unittest.TestCase):
         cls.data = get_image_dict()
         cls.resource = BossResourceBasic(cls.data)
 
-        cls.config = configuration.BossConfig()
-
-        cls.cache_client = redis.StrictRedis(host=cls.config["aws"]["cache"], port=6379, db=1,
+        cls.cache_client = redis.StrictRedis(host='localhost', port=6379, db=1,
                                              decode_responses=False)
 
         cls.config_data = {"cache_client": cls.cache_client, "read_timeout": 86400}

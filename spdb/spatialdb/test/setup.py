@@ -24,9 +24,9 @@ from botocore.exceptions import ClientError
 import time
 from spdb.project.test.resource_setup import get_image_dict, get_anno_dict
 from spdb.project import BossResourceBasic
-from spdb.spatialdb.object get_region
+from spdb.spatialdb.object import get_region
 
-from bossutils import configuration
+#from bossutils import configuration
 
 import random
 import os
@@ -46,7 +46,7 @@ def get_test_configuration():
     Returns:
         (dict, dict, dict): A tuple of dictionaries (kvio_config, state_config, object_store_config, s3_flush_queue_name)
     """
-    config = configuration.BossConfig()
+    config = {}#configuration.BossConfig()
 
     # Get domain info
     parts = config['aws']['cache'].split('.')

@@ -28,8 +28,6 @@ import unittest
 from unittest.mock import patch, DEFAULT, ANY
 import random
 
-from bossutils import configuration
-
 from spdb.project import BossResourceBasic
 from spdb.spatialdb.test.setup import SetupTests
 from spdb.spatialdb.error import SpdbError
