@@ -20,12 +20,10 @@
 __version__ = '1.0.5'
 
 import os
+import glob
 
-try:
-    from setuptools import setup
-except ImportError:
-    # Fallback and try to Python provided ability
-    from distutils.core import setup
+#from distutils.core import setup, Extension
+from setuptools import setup, Extension
 
 here = os.path.abspath(os.path.dirname(__file__))
 def read(filename):
@@ -33,26 +31,62 @@ def read(filename):
         return fh.read()
 
 def test_suite():
+    # Make sure tests will use mocked environment, in case credentials are available
+    # via another mechanism
+    os.environ['AWS_ACCESS_KEY_ID'] = 'testing'
+    os.environ['AWS_SECRET_ACCESS_KEY'] = 'testing'
+    os.environ['AWS_SECURITY_TOKEN'] = 'testing'
+    os.environ['AWS_SESSION_TOKEN'] = 'testing'
+
     import unittest
     loader = unittest.TestLoader()
     suites = [
-        loader.discover('spatialdb/test/', 'int_test_*.py'),
-        loader.discover('spatialdb/test/', 'test_*.py'),
-        loader.discover('project/test/', 'test_*.py'),
+        #loader.discover('spdb/spatialdb/test/', 'int_test_*.py'),
+        loader.discover('spdb/spatialdb/test/', 'test_*.py'),
+        #loader.discover('spdb/project/test/', 'test_*.py'),
     ]
     all_suite = unittest.TestSuite(suites)
     return all_suite
 
+# DP NOTE: Cannot use glob as there are multiple C files that are not used and
+#          have compiler errors
+#ndlib_files = glob.glob('spdb/c_lib/c_version/*.c')
+ndlib_files = [
+    'spdb/c_lib/c_version/filterCutout.c',
+    'spdb/c_lib/c_version/filterCutoutOMP.c',
+    'spdb/c_lib/c_version/locateCube.c',
+    'spdb/c_lib/c_version/annotateCube.c',
+    'spdb/c_lib/c_version/shaveCube.c',
+    'spdb/c_lib/c_version/mergeCube.c',
+    'spdb/c_lib/c_version/annotateEntityDense.c',
+    'spdb/c_lib/c_version/shaveDense.c',
+    'spdb/c_lib/c_version/exceptionDense.c',
+    'spdb/c_lib/c_version/overwriteDense.c',
+    'spdb/c_lib/c_version/zindex.c',
+    'spdb/c_lib/c_version/recolorCube.c',
+    'spdb/c_lib/c_version/zoomData.c',
+    'spdb/c_lib/c_version/quicksort.c',
+    'spdb/c_lib/c_version/isotropicBuild.c',
+    'spdb/c_lib/c_version/addData.c',
+    'spdb/c_lib/c_version/unique.c',
+]
+ndlib = Extension('spdb.c_lib.c_version.ndlib',
+                  extra_link_args=['-lgomp'],
+                  extra_compile_args=['-fopenmp'],
+                  include_dirs=['spdb/c_lib/c_version'],
+                  sources=ndlib_files)
+
 setup(
     name='spdb',
     version=__version__,
-    #packages=[''],
+    packages=['spdb'],
     url='https://github.com/jhuapl-boss/spdb',
     license="Apache Software License 2.0",
     long_description=read('README.md'),
     long_description_content_type='text/markdown',
     tests_require=read('requirements-test.txt').split('\n'),
     install_requires=read('requirements.txt').split('\n'),
+    ext_modules = [ndlib],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'License :: OSI Approved :: Apache Software License',
