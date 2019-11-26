@@ -42,8 +42,8 @@ def test_suite():
     loader = unittest.TestLoader()
     suites = [
         #loader.discover('spdb/spatialdb/test/', 'int_test_*.py'),
-        loader.discover('spdb/spatialdb/test/', 'test_*.py'),
-        #loader.discover('spdb/project/test/', 'test_*.py'),
+        #loader.discover('spdb/spatialdb/test/', 'test_*.py'),
+        loader.discover('spdb/project/test/', 'test_*.py'),
     ]
     all_suite = unittest.TestSuite(suites)
     return all_suite
