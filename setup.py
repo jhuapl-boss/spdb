@@ -39,11 +39,11 @@ def test_suite():
     os.environ['AWS_SESSION_TOKEN'] = 'testing'
 
     import unittest
-    loader = unittest.TestLoader()
+    discover = lambda d,f: unittest.TestLoader().discover(d, f)
     suites = [
-        #loader.discover('spdb/spatialdb/test/', 'int_test_*.py'),
-        loader.discover('spdb/spatialdb/test/', 'test_*.py'),
-        #loader.discover('spdb/project/test/', 'test_*.py'),
+        #discover('spdb/spatialdb/test/', 'int_test_*.py'),
+        discover('spdb/spatialdb/test/', 'test_*.py'),
+        discover('spdb/project/test/', 'test_*.py'),
     ]
     all_suite = unittest.TestSuite(suites)
     return all_suite
@@ -71,7 +71,7 @@ ndlib_files = [
     'spdb/c_lib/c_version/unique.c',
 ]
 ndlib = Extension('spdb.c_lib.c_version.ndlib',
-                  extra_link_args=['-lgomp'],
+                  extra_link_args=['-fopenmp'],
                   extra_compile_args=['-fopenmp'],
                   include_dirs=['spdb/c_lib/c_version'],
                   sources=ndlib_files)
