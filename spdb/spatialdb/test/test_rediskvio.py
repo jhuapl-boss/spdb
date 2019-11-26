@@ -14,7 +14,7 @@
 
 import unittest
 from unittest.mock import patch
-from mockredis import mock_strict_redis_client
+from fakeredis import FakeStrictRedis
 
 from spdb.project import BossResourceBasic
 from spdb.spatialdb import RedisKVIO
@@ -272,11 +272,11 @@ class RedisKVIOTestMixin(object):
         assert data_packed == data_rx
 
 
-@patch('redis.StrictRedis', mock_strict_redis_client)
+@patch('redis.StrictRedis', FakeStrictRedis)
 class TestRedisKVIOImageData(RedisKVIOTestMixin, unittest.TestCase):
 
     @classmethod
-    @patch('redis.StrictRedis', mock_strict_redis_client)
+    @patch('redis.StrictRedis', FakeStrictRedis)
     def setUpClass(cls):
         """Setup the redis client at the start of the test"""
         cls.data = get_image_dict()
@@ -291,7 +291,7 @@ class TestRedisKVIOImageData(RedisKVIOTestMixin, unittest.TestCase):
 
     def setUp(self):
         """Clean out the cache DB between tests"""
-        self.patcher = patch('redis.StrictRedis', mock_strict_redis_client)
+        self.patcher = patch('redis.StrictRedis', FakeStrictRedis)
         self.mock_tests = self.patcher.start()
 
         self.cache_client.flushdb()
