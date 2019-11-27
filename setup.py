@@ -24,13 +24,14 @@ import glob
 
 #from distutils.core import setup, Extension
 from setuptools import setup, Extension
+from setuptools.command.test import test
 
 here = os.path.abspath(os.path.dirname(__file__))
 def read(filename):
     with open(os.path.join(here, filename), 'r') as fh:
         return fh.read()
 
-def test_suite():
+def test_suite(integration_tests = False):
     # Make sure tests will use mocked environment, in case credentials are available
     # via another mechanism
     os.environ['AWS_ACCESS_KEY_ID'] = 'testing'
@@ -40,13 +41,39 @@ def test_suite():
 
     import unittest
     discover = lambda d,f: unittest.TestLoader().discover(d, f)
-    suites = [
-        #discover('spdb/spatialdb/test/', 'int_test_*.py'),
-        discover('spdb/spatialdb/test/', 'test_*.py'),
-        discover('spdb/project/test/', 'test_*.py'),
+    if integration_tests:
+        suite = discover('spdb/spatialdb/test/', 'int_test_*.py')
+    else:
+        suites = [
+            discover('spdb/spatialdb/test/', 'test_*.py'),
+            discover('spdb/project/test/', 'test_*.py'),
+        ]
+        suite = unittest.TestSuite(suites)
+
+    return suite
+
+class TestCommand(test):
+    user_options = [
+        ('integration-tests', 'i', 'Run the integration tests'),
     ]
-    all_suite = unittest.TestSuite(suites)
-    return all_suite
+
+    def initialize_options(self):
+        super(TestCommand, self).initialize_options()
+        self.integration_tests = 0
+
+    def run_tests(self):
+        import unittest
+        import coverage
+        cov = coverage.Coverage(source=['spdb'],
+                                omit=['*/test_*.py', '*/int_test_*.py'])
+        cov.start()
+
+        suite = test_suite(self.integration_tests == 1)
+        runner = unittest.TextTestRunner()
+        runner.run(suite)
+
+        cov.stop()
+        cov.report()
 
 # DP NOTE: Cannot use glob as there are multiple C files that are not used and
 #          have compiler errors
@@ -96,5 +123,6 @@ setup(
         'boss',
         'microns',
     ],
-    test_suite='setup.test_suite'
+    #test_suite='setup.test_suite'
+    cmdclass = {'test': TestCommand},
 )
