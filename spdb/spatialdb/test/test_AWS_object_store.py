@@ -19,8 +19,6 @@ from spdb.project import BossResourceBasic
 from spdb.spatialdb import AWSObjectStore
 from spdb.spatialdb import Region
 
-from bossutils import configuration
-
 from spdb.spatialdb.test.setup import SetupTests
 
 import boto3

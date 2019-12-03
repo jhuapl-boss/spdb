@@ -14,6 +14,7 @@
 
 from pkg_resources import resource_filename
 import json
+import os
 
 from moto import mock_s3
 from moto import mock_dynamodb2
@@ -24,9 +25,7 @@ from botocore.exceptions import ClientError
 import time
 from spdb.project.test.resource_setup import get_image_dict, get_anno_dict
 from spdb.project import BossResourceBasic
-from spdb.spatialdb.object get_region
-
-from bossutils import configuration
+from spdb.spatialdb.object import get_region
 
 import random
 import os
@@ -39,6 +38,25 @@ def get_account_id():
     """
     return boto3.client('sts').get_caller_identity()['Account']
 
+def load_test_config_file():
+    """Load the ini file with the integration test environment
+
+    If no SPDB_TEST_CONFIG is not defined then the Boss configuration file
+    is attempted to be loaded
+
+    Returns:
+        (ConfigParser)
+    """
+    config_file = os.environ.get('SPDB_TEST_CONFIG', '/etc/boss/boss.config')
+    if not os.path.exists(config_file):
+        raise RuntimeError("SPDB_TEST_CONFIG '{}' doesn't exist".format(config_file))
+
+    import configparser
+    config = configparser.ConfigParser()
+    config.optionxform = str # perserves the case of the keys
+    config.read(config_file)
+
+    return config
 
 def get_test_configuration():
     """Method to get the integration test configuration info for spdb
@@ -46,7 +64,7 @@ def get_test_configuration():
     Returns:
         (dict, dict, dict): A tuple of dictionaries (kvio_config, state_config, object_store_config, s3_flush_queue_name)
     """
-    config = configuration.BossConfig()
+    config = load_test_config_file()
 
     # Get domain info
     parts = config['aws']['cache'].split('.')

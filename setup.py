@@ -21,16 +21,20 @@ __version__ = '1.0.5'
 
 import os
 import glob
+import shutil
 
-#from distutils.core import setup, Extension
-from setuptools import setup, Extension
+from setuptools import setup, find_packages, Extension, Command
+from setuptools.command.test import test
 
 here = os.path.abspath(os.path.dirname(__file__))
 def read(filename):
     with open(os.path.join(here, filename), 'r') as fh:
         return fh.read()
 
-def test_suite():
+def read_list(filename):
+    return [l for l in read(filename).split('\n') if l.strip() != '' and not l.startswith('#')]
+
+def test_suite(integration_tests = False):
     # Make sure tests will use mocked environment, in case credentials are available
     # via another mechanism
     os.environ['AWS_ACCESS_KEY_ID'] = 'testing'
@@ -39,14 +43,64 @@ def test_suite():
     os.environ['AWS_SESSION_TOKEN'] = 'testing'
 
     import unittest
-    loader = unittest.TestLoader()
-    suites = [
-        #loader.discover('spdb/spatialdb/test/', 'int_test_*.py'),
-        #loader.discover('spdb/spatialdb/test/', 'test_*.py'),
-        loader.discover('spdb/project/test/', 'test_*.py'),
+    discover = lambda d,f: unittest.TestLoader().discover(d, f)
+    if integration_tests:
+        suite = discover('spdb/spatialdb/test/', 'int_test_*.py')
+    else:
+        suites = [
+            discover('spdb/spatialdb/test/', 'test_*.py'),
+            discover('spdb/project/test/', 'test_*.py'),
+        ]
+        suite = unittest.TestSuite(suites)
+
+    return suite
+
+class TestCommand(test):
+    user_options = [
+        ('integration-tests', 'i', 'Run the integration tests'),
     ]
-    all_suite = unittest.TestSuite(suites)
-    return all_suite
+
+    def initialize_options(self):
+        super(TestCommand, self).initialize_options()
+        self.integration_tests = 0
+
+    def run_tests(self):
+        import unittest
+        import coverage
+        cov = coverage.Coverage(source=['spdb'],
+                                omit=['*/test_*.py', '*/int_test_*.py'])
+        cov.start()
+
+        suite = test_suite(self.integration_tests == 1)
+        runner = unittest.TextTestRunner()
+        runner.run(suite)
+
+        cov.stop()
+        cov.report()
+
+class CopyCommand(Command):
+    user_options = [
+    ]
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+        # DP NOTE: Assume that the externsion was already compiled
+        # DP NOTE: Only works for Linux / Mac
+        cur_dir = os.path.dirname(__file__)
+        lib_dir = glob.glob(os.path.join(cur_dir, 'build', 'lib.*'))[0]
+        for dp, dns, fns in os.walk(lib_dir):
+            for fn in fns:
+                if fn.endswith('.so'):
+                    src = "{}/{}".format(dp, fn)
+                    dst = "{}/".format(dp[len(lib_dir)+1:])
+
+                    print("{} -> {}".format(src, dst))
+                    shutil.copy(src, dst)
 
 # DP NOTE: Cannot use glob as there are multiple C files that are not used and
 #          have compiler errors
@@ -71,7 +125,7 @@ ndlib_files = [
     'spdb/c_lib/c_version/unique.c',
 ]
 ndlib = Extension('spdb.c_lib.c_version.ndlib',
-                  extra_link_args=['-lgomp'],
+                  extra_link_args=['-fopenmp'],
                   extra_compile_args=['-fopenmp'],
                   include_dirs=['spdb/c_lib/c_version'],
                   sources=ndlib_files)
@@ -79,13 +133,16 @@ ndlib = Extension('spdb.c_lib.c_version.ndlib',
 setup(
     name='spdb',
     version=__version__,
-    packages=['spdb'],
+    packages=find_packages(),
     url='https://github.com/jhuapl-boss/spdb',
     license="Apache Software License 2.0",
     long_description=read('README.md'),
     long_description_content_type='text/markdown',
-    tests_require=read('requirements-test.txt').split('\n'),
-    install_requires=read('requirements.txt').split('\n'),
+    setup_requires=['wheel'],
+    tests_require=read_list('requirements-test.txt'),
+    install_requires=read_list('requirements.txt'),
+    # DP NOTE: Not using libraries=[], for building a clib as it doesn't seem
+    #          to support passing compile/link time libraries
     ext_modules = [ndlib],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
@@ -96,5 +153,7 @@ setup(
         'boss',
         'microns',
     ],
-    test_suite='setup.test_suite'
+    #test_suite='setup.test_suite'
+    cmdclass = {'test': TestCommand,
+                'copy_ext': CopyCommand},
 )
