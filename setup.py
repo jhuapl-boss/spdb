@@ -21,15 +21,18 @@ __version__ = '1.0.5'
 
 import os
 import glob
+import shutil
 
-#from distutils.core import setup, Extension
-from setuptools import setup, Extension
+from setuptools import setup, find_packages, Extension, Command
 from setuptools.command.test import test
 
 here = os.path.abspath(os.path.dirname(__file__))
 def read(filename):
     with open(os.path.join(here, filename), 'r') as fh:
         return fh.read()
+
+def read_list(filename):
+    return [l for l in read(filename).split('\n') if l.strip() != '' and not l.startswith('#')]
 
 def test_suite(integration_tests = False):
     # Make sure tests will use mocked environment, in case credentials are available
@@ -75,6 +78,30 @@ class TestCommand(test):
         cov.stop()
         cov.report()
 
+class CopyCommand(Command):
+    user_options = [
+    ]
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+        # DP NOTE: Assume that the externsion was already compiled
+        # DP NOTE: Only works for Linux / Mac
+        cur_dir = os.path.dirname(__file__)
+        lib_dir = glob.glob(os.path.join(cur_dir, 'build', 'lib.*'))[0]
+        for dp, dns, fns in os.walk(lib_dir):
+            for fn in fns:
+                if fn.endswith('.so'):
+                    src = "{}/{}".format(dp, fn)
+                    dst = "{}/".format(dp[len(lib_dir)+1:])
+
+                    print("{} -> {}".format(src, dst))
+                    shutil.copy(src, dst)
+
 # DP NOTE: Cannot use glob as there are multiple C files that are not used and
 #          have compiler errors
 #ndlib_files = glob.glob('spdb/c_lib/c_version/*.c')
@@ -106,13 +133,16 @@ ndlib = Extension('spdb.c_lib.c_version.ndlib',
 setup(
     name='spdb',
     version=__version__,
-    packages=['spdb'],
+    packages=find_packages(),
     url='https://github.com/jhuapl-boss/spdb',
     license="Apache Software License 2.0",
     long_description=read('README.md'),
     long_description_content_type='text/markdown',
-    tests_require=read('requirements-test.txt').split('\n'),
-    install_requires=read('requirements.txt').split('\n'),
+    setup_requires=['wheel'],
+    tests_require=read_list('requirements-test.txt'),
+    install_requires=read_list('requirements.txt'),
+    # DP NOTE: Not using libraries=[], for building a clib as it doesn't seem
+    #          to support passing compile/link time libraries
     ext_modules = [ndlib],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
@@ -124,5 +154,6 @@ setup(
         'microns',
     ],
     #test_suite='setup.test_suite'
-    cmdclass = {'test': TestCommand},
+    cmdclass = {'test': TestCommand,
+                'copy_ext': CopyCommand},
 )

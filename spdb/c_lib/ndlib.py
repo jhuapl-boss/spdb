@@ -27,9 +27,13 @@ from spdb.c_lib import rgbColor
 # Load the shared C library using ctype mechanism and the directory path is always local
 # Need to calculate the full name of the library as building with setup.py will
 #    include a more detailed library name
-BASE_PATH = os.path.dirname(__file__)
-LIB_NAME = glob.glob(os.path.join(BASE_PATH, 'c_version', 'ndlib*.so'))[0].rsplit('/', 1)[-1]
-ndlib_ctypes = npct.load_library(LIB_NAME, BASE_PATH + "/c_version")
+try:
+    BASE_PATH = os.path.dirname(__file__)
+    LIB_NAME = glob.glob(os.path.join(BASE_PATH, 'c_version', 'ndlib*.so'))[0].rsplit('/', 1)[-1]
+    ndlib_ctypes = npct.load_library(LIB_NAME, BASE_PATH + "/c_version")
+except IndexError:
+    # Assume zero files given by glob
+    raise ImportError("Cannot import ndlib.so extension")
 
 # Defining numpy array times for C
 array_1d_uint8 = npct.ndpointer(dtype=np.uint8, ndim=1, flags='C_CONTIGUOUS')

@@ -15,7 +15,7 @@
 import unittest
 
 from spdb.spatialdb import AWSObjectStore
-from .test_AWS_object_store import AWSObjectStoreTestMixin
+from spdb.spatialdb.test.test_AWS_object_store import AWSObjectStoreTestMixin
 
 from spdb.spatialdb.test.setup import AWSSetupLayer
 from spdb.project import BossResourceBasic
