@@ -8,6 +8,7 @@ legacy_tox_ini = """
 envlist = py36
 
 [testenv]
+platform = linux|darwin
 deps = -rrequirements-test.txt
 setenv =
     # Make sure tests will use mocked environment, in case credentials are
