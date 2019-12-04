@@ -23,8 +23,7 @@ import os
 import glob
 import shutil
 
-from setuptools import setup, find_packages, Extension, Command
-from setuptools.command.test import test
+from setuptools import setup, find_packages, Extension
 
 here = os.path.abspath(os.path.dirname(__file__))
 def read(filename):
@@ -32,75 +31,8 @@ def read(filename):
         return fh.read()
 
 def read_list(filename):
-    return [l for l in read(filename).split('\n') if l.strip() != '' and not l.startswith('#')]
-
-def test_suite(integration_tests = False):
-    # Make sure tests will use mocked environment, in case credentials are available
-    # via another mechanism
-    os.environ['AWS_ACCESS_KEY_ID'] = 'testing'
-    os.environ['AWS_SECRET_ACCESS_KEY'] = 'testing'
-    os.environ['AWS_SECURITY_TOKEN'] = 'testing'
-    os.environ['AWS_SESSION_TOKEN'] = 'testing'
-
-    import unittest
-    discover = lambda d,f: unittest.TestLoader().discover(d, f)
-    if integration_tests:
-        suite = discover('spdb/spatialdb/test/', 'int_test_*.py')
-    else:
-        suites = [
-            discover('spdb/spatialdb/test/', 'test_*.py'),
-            discover('spdb/project/test/', 'test_*.py'),
-        ]
-        suite = unittest.TestSuite(suites)
-
-    return suite
-
-class TestCommand(test):
-    user_options = [
-        ('integration-tests', 'i', 'Run the integration tests'),
-    ]
-
-    def initialize_options(self):
-        super(TestCommand, self).initialize_options()
-        self.integration_tests = 0
-
-    def run_tests(self):
-        import unittest
-        import coverage
-        cov = coverage.Coverage(source=['spdb'],
-                                omit=['*/test_*.py', '*/int_test_*.py'])
-        cov.start()
-
-        suite = test_suite(self.integration_tests == 1)
-        runner = unittest.TextTestRunner()
-        runner.run(suite)
-
-        cov.stop()
-        cov.report()
-
-class CopyCommand(Command):
-    user_options = [
-    ]
-
-    def initialize_options(self):
-        pass
-
-    def finalize_options(self):
-        pass
-
-    def run(self):
-        # DP NOTE: Assume that the externsion was already compiled
-        # DP NOTE: Only works for Linux / Mac
-        cur_dir = os.path.dirname(__file__)
-        lib_dir = glob.glob(os.path.join(cur_dir, 'build', 'lib.*'))[0]
-        for dp, dns, fns in os.walk(lib_dir):
-            for fn in fns:
-                if fn.endswith('.so'):
-                    src = "{}/{}".format(dp, fn)
-                    dst = "{}/".format(dp[len(lib_dir)+1:])
-
-                    print("{} -> {}".format(src, dst))
-                    shutil.copy(src, dst)
+    return [l for l in read(filename).split('\n')
+              if l.strip() != '' and not l.startswith('#')]
 
 # DP NOTE: Cannot use glob as there are multiple C files that are not used and
 #          have compiler errors
@@ -153,7 +85,4 @@ setup(
         'boss',
         'microns',
     ],
-    #test_suite='setup.test_suite'
-    cmdclass = {'test': TestCommand,
-                'copy_ext': CopyCommand},
 )
