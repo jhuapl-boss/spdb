@@ -50,9 +50,9 @@ export AWS_SESSION_TOKEN=testing
 3. `nose2 --config unittest.cfg`
 
 ## Integration Testing
-SPDB also includes a set of integration tests, that take a configuration file to work from and creates AWS resouces and tests using them.
+SPDB also includes a set of integration tests, that take a configuration file to work from and creates AWS resources and tests using them.
 
-Note: This will create AWS resources in the account that you give it credentials for. These resources should be cleanned up after the tests are finished.
+Note: This will create AWS resources in the account that you give it credentials for. These resources should be cleaned up after the tests are finished.
 
 1. Build the C Library using the instructions under *Development*
 2. Make sure the environment variables are setup to allow the tests to connect to AWS
