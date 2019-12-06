@@ -11,6 +11,7 @@ To compile this C library the following system packages need to be available.
 
 ## Installing
 To install SPDB using `pip` from a local directory run `pip install path/to/spdb.git`
+
 To install SPDB using `pip` from Github run `pip install https://github.com/jhuapl-boss/spdb.git`
 
 Either install method will create a source distribution of SPDB, compile the C library, and install the whole package in the Python environment.
