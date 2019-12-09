@@ -19,8 +19,6 @@ from spdb.project import BossResourceBasic
 from spdb.spatialdb import AWSObjectStore
 from spdb.spatialdb import Region
 
-from bossutils import configuration
-
 from spdb.spatialdb.test.setup import SetupTests
 
 import boto3
@@ -295,7 +293,6 @@ class TestAWSObjectStore(AWSObjectStoreTestMixin, unittest.TestCase):
         cls.resource = BossResourceBasic(cls.data)
 
         # Load config
-        cls.config = configuration.BossConfig()
         cls.object_store_config = {"s3_flush_queue": 'https://mytestqueue.com',
                                    "cuboid_bucket": "test_bucket",
                                    "page_in_lambda_function": "page_in.test.boss",

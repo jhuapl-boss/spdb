@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from bossutils.logger import BossLogger
+import logging
 from enum import IntEnum
+
+def logger(who):
+    return logging.getLogger(__name__).getChild(who)
 
 
 class ErrorCodes(IntEnum):
@@ -58,8 +61,8 @@ class SpdbError(Exception):
         # Log
         # TODO: Look into removing boss logger dependency
         if len(args) > 1:
-            blog = BossLogger().logger
-            blog.error("SpdbError - Message: {0} - Code: {1}".format(args[0], args[1]))
+            log = logger('SpdbError')
+            log.error("SpdbError - Message: {0} - Code: {1}".format(args[0], args[1]))
             self.message = args[0]
             self.error_code = args[1]
             return

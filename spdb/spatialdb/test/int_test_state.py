@@ -19,10 +19,10 @@ from spdb.project import BossResourceBasic
 from spdb.spatialdb import CacheStateDB
 from spdb.spatialdb.test import CacheStateDBTestMixin
 from spdb.spatialdb.error import SpdbError
+from spdb.spatialdb.test.setup import load_test_config_file
 
 import redis
 
-from bossutils import configuration
 import time
 from spdb.project.test.resource_setup import get_image_dict
 
@@ -89,7 +89,7 @@ class TestCacheStateDB(CacheStateDBTestMixin, IntegrationCacheStateDBTestMixin, 
         cls.data = get_image_dict()
         cls.resource = BossResourceBasic(cls.data)
 
-        cls.config = configuration.BossConfig()
+        cls.config = load_test_config_file()
 
         cls.state_client = redis.StrictRedis(host=cls.config["aws"]["cache-state"], port=6379, db=1,
                                              decode_responses=False)

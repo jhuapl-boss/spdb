@@ -24,8 +24,6 @@ from random import randrange, randint
 from spdb.c_lib.ndlib import XYZMorton
 import traceback
 
-from bossutils.aws import get_region
-
 import boto3
 
 # Note there are additional imports at the bottom of the file.
@@ -47,6 +45,28 @@ table.  This attribute is the key of the ingest-id-index.  This GSI is used
 during deletion of a channel.
 """
 INGEST_ID_MAX_N = 100
+
+def get_region():
+    """
+    Return the  aws region based on the machine's meta data
+
+    If mocking with moto, metadata is not supported and "us-east-1" is always returned
+
+    Returns: aws region
+
+    """
+    if 'LOCAL_DYNAMODB_URL' in os.environ:
+        # If you get here, you are testing locally
+        return "us-east-1"
+    else:
+        try:
+            region = utils.read_url('http://169.254.169.254/latest/meta-data/placement/availability-zone')[:-1]
+            return region
+        except NotImplementedError:
+            # If you get here, you are mocking and metadata is not supported.
+            return "us-east-1"
+        except URLError:
+            return None
 
 class ObjectStore(metaclass=ABCMeta):
     def __init__(self, object_store_conf):
