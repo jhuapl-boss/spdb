@@ -14,8 +14,9 @@
 
 import unittest
 from unittest.mock import patch
+from fakeredis import FakeStrictRedis
+
 import redis
-from mockredis import mock_strict_redis_client
 import collections
 
 from spdb.project import BossResourceBasic
@@ -310,11 +311,11 @@ class SpatialDBImageDataTestMixin(object):
         self.assertEqual([2, 4], actual)
 
 
-@patch('redis.StrictRedis', mock_strict_redis_client)
+@patch('redis.StrictRedis', FakeStrictRedis)
 class TestSpatialDBImage8Data(SpatialDBImageDataTestMixin, unittest.TestCase):
 
     @patch('spdb.spatialdb.test.setup.get_region')
-    @patch('redis.StrictRedis', mock_strict_redis_client)
+    @patch('redis.StrictRedis', FakeStrictRedis)
     def setUp(self, fake_get_region):
         """ Set everything up for testing """
         # setup resources
@@ -359,12 +360,12 @@ class TestSpatialDBImage8Data(SpatialDBImageDataTestMixin, unittest.TestCase):
         self.setup_helper.stop_mocking()
 
 
-@patch('redis.StrictRedis', mock_strict_redis_client)
+@patch('redis.StrictRedis', FakeStrictRedis)
 class TestSpatialDBImage16Data(SpatialDBImageDataTestMixin, unittest.TestCase):
 
 
     @patch('spdb.spatialdb.test.setup.get_region')
-    @patch('redis.StrictRedis', mock_strict_redis_client)
+    @patch('redis.StrictRedis', FakeStrictRedis)
     def setUp(self, fake_get_region):
         """ Set everything up for testing """
         # setup resources

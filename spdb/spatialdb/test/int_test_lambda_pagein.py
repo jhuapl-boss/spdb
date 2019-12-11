@@ -24,8 +24,6 @@ import redis
 import time
 from botocore.exceptions import ClientError
 
-from bossutils import configuration
-
 
 """
 Test lambda page in function.  Note, tests assume cuboid size is 

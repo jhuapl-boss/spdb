@@ -14,14 +14,13 @@
 
 import unittest
 from unittest.mock import patch
-from mockredis import mock_strict_redis_client
+from fakeredis import FakeStrictRedis
 
 from spdb.project import BossResourceBasic
 from spdb.spatialdb import CacheStateDB
 
 import redis
 
-from bossutils import configuration
 from spdb.project.test.resource_setup import get_image_dict
 
 
@@ -227,26 +226,24 @@ class CacheStateDBTestMixin(object):
         assert resource == "{dummy resource str}"
 
 
-@patch('redis.StrictRedis', mock_strict_redis_client)
+@patch('redis.StrictRedis', FakeStrictRedis)
 class TestCacheStateDB(CacheStateDBTestMixin, unittest.TestCase):
 
     @classmethod
-    @patch('redis.StrictRedis', mock_strict_redis_client)
+    @patch('redis.StrictRedis', FakeStrictRedis)
     def setUpClass(cls):
         """Setup the redis client at the start of the test"""
         cls.data = get_image_dict()
         cls.resource = BossResourceBasic(cls.data)
 
-        cls.config = configuration.BossConfig()
-
-        cls.state_client = redis.StrictRedis(host=cls.config["aws"]["cache-state"], port=6379, db=1,
+        cls.state_client = redis.StrictRedis(host='localhost', port=6379, db=1,
                                              decode_responses=False)
 
         cls.config_data = {"state_client": cls.state_client}
 
     def setUp(self):
         """Clean out the cache DB between tests"""
-        self.patcher = patch('redis.StrictRedis', mock_strict_redis_client)
+        self.patcher = patch('redis.StrictRedis', FakeStrictRedis)
         self.mock_tests = self.patcher.start()
 
         self.state_client.flushdb()
