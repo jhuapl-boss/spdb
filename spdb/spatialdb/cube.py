@@ -292,11 +292,31 @@ class Cube(metaclass=ABCMeta):
         """
         return self._created_from_zeros
 
+    def is_bool(self):
+        return bool(np.array_equal(self.data, self.data.astype(bool)))
+
     @abstractmethod
     def overwrite(self, input_data, time_sample_range=None):
         """ Overwrite data with all non-zero values in the input_data
 
         Function is accelerated via ctypes lib.
+
+        If time_sample_range is provided, data will be inserted at the appropriate time sample
+
+        Args:
+            input_data (numpy.ndarray): Input data matrix to overwrite the current Cube data
+            time_sample_range list(int): The min and max time samples that input_data represents in python convention
+            (start inclusive, stop exclusive)
+
+        Returns:
+            None
+
+        """
+        return NotImplemented
+
+    @abstractmethod
+    def overwrite_to_black(self, input_data, time_sample_range=None):
+        """ Overwrite data with all zero values in the input_data
 
         If time_sample_range is provided, data will be inserted at the appropriate time sample
 
