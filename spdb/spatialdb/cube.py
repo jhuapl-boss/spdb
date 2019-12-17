@@ -293,6 +293,11 @@ class Cube(metaclass=ABCMeta):
         return self._created_from_zeros
 
     def is_bool(self):
+        """Determine if a cube consists solely of 1s and 0s. 
+
+        Returns:
+            bool
+        """
         return bool(np.array_equal(self.data, self.data.astype(bool)))
 
     @abstractmethod

@@ -96,12 +96,10 @@ class ImageCube8(Cube):
     def overwrite_to_black(self, input_data, time_sample_range=None):
         """ Overwrite data with zero values in the input_data
 
-        Function is accelerated via ctypes lib.
-
         If time_sample_range is provided, data will be inserted at the appropriate time sample
 
         Args:
-            input_data (numpy.ndarray): Input data matrix to overwrite the current Cube data
+            input_data (numpy.ndarray): Input mask matrix to overwrite the current Cube data
             time_sample_range list(int): The min and max time samples that input_data represents in python convention
             (start inclusive, stop exclusive)
 
@@ -119,10 +117,10 @@ class ImageCube8(Cube):
 
         if input_data.ndim == 4:
             for t in range(*time_sample_range):
-                self.data[t, :, :, :] = np.where(input_data[t - time_sample_range[0], :, :, :]==1, self.data[t, :, :, :]==0, self.data[t, :, :, :])
+                self.data[t, :, :, :][input_data[t - time_sample_range[0], :, :, :]==1] = 0
         else:
             # Input data doesn't have any time indices
-            self.data[time_sample_range[0], :, :, :] = np.where(input_data[time_sample_range[0], :, :, :]==1, self.data[t, :, :, :]==0, self.data[t, :, :, :])
+            self.data[time_sample_range[0], :, :, :][input_data[time_sample_range[0], :, :, :]==1] = 0
 
     def xy_image(self, z_index=0, t_index=0):
         """Render an image in the XY plane.
@@ -246,11 +244,10 @@ class ImageCube16(Cube):
     def overwrite_to_black(self, input_data, time_sample_range=None):
         """ Overwrite data with zero values in the input_data
 
-
         If time_sample_range is provided, data will be inserted at the appropriate time sample
 
         Args:
-            input_data (numpy.ndarray): Input data matrix to overwrite the current Cube data
+            input_data (numpy.ndarray): Input mask matrix to overwrite the current Cube data
             time_sample_range list(int): The min and max time samples that input_data represents in python convention
             (start inclusive, stop exclusive)
 
@@ -268,10 +265,10 @@ class ImageCube16(Cube):
 
         if input_data.ndim == 4:
             for t in range(*time_sample_range):
-                self.data[t, :, :, :] = np.where(input_data[t - time_sample_range[0], :, :, :]==1, self.data[t, :, :, :]==0, self.data[t, :, :, :])
+                self.data[t, :, :, :][input_data[t - time_sample_range[0], :, :, :]==1] = 0
         else:
             # Input data doesn't have any time indices
-            self.data[time_sample_range[0], :, :, :] = np.where(input_data[time_sample_range[0], :, :, :]==1, self.data[t, :, :, :]==0, self.data[t, :, :, :])
+            self.data[time_sample_range[0], :, :, :][input_data[time_sample_range[0], :, :, :]==1] = 0
 
     def xy_image(self, z_index=0, t_index=0):
         """Render an image in the XY plane.
