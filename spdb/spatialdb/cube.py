@@ -261,6 +261,35 @@ class Cube(metaclass=ABCMeta):
 
         self._created_from_zeros = False
 
+    def overwrite_to_black(self, input_data, time_sample_range=None):
+        """ Overwrite data with zero values in the input_data
+
+        If time_sample_range is provided, data will be inserted at the appropriate time sample
+
+        Args:
+            input_data (numpy.ndarray): Input mask matrix to overwrite the current Cube data
+            time_sample_range list(int): The min and max time samples that input_data represents in python convention
+            (start inclusive, stop exclusive)
+
+        Returns:
+            None
+
+        """
+        if self.data.dtype != input_data.dtype:
+            raise SpdbError("Conflicting data types for overwrite.",
+                            ErrorCodes.DATATYPE_MISMATCH)
+
+        if not time_sample_range:
+            # If no time sample range provided use default of 0
+            time_sample_range = [0, 1]
+
+        if input_data.ndim == 4:
+            for t in range(*time_sample_range):
+                self.data[t, :, :, :][input_data[t - time_sample_range[0], :, :, :]==1] = 0
+        else:
+            # Input data doesn't have any time indices
+            self.data[time_sample_range[0], :, :, :][input_data[time_sample_range[0], :, :, :]==1] = 0
+
     def missing_ts_gen(self, missing_time_samples):
         """
         Generator for tracking which time samples are missing. 
@@ -305,23 +334,6 @@ class Cube(metaclass=ABCMeta):
         """ Overwrite data with all non-zero values in the input_data
 
         Function is accelerated via ctypes lib.
-
-        If time_sample_range is provided, data will be inserted at the appropriate time sample
-
-        Args:
-            input_data (numpy.ndarray): Input data matrix to overwrite the current Cube data
-            time_sample_range list(int): The min and max time samples that input_data represents in python convention
-            (start inclusive, stop exclusive)
-
-        Returns:
-            None
-
-        """
-        return NotImplemented
-
-    @abstractmethod
-    def overwrite_to_black(self, input_data, time_sample_range=None):
-        """ Overwrite data with all zero values in the input_data
 
         If time_sample_range is provided, data will be inserted at the appropriate time sample
 
