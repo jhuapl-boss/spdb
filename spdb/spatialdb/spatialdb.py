@@ -716,7 +716,7 @@ class SpatialDB:
 
         return out_cube
 
-    def write_cuboid(self, resource, corner, resolution, cuboid_data, time_sample_start=0, iso=False):
+    def write_cuboid(self, resource, corner, resolution, cuboid_data, time_sample_start=0, iso=False, to_black=False):
         """ Write a 3D/4D volume to the key-value store. Used by API/cache in consistent mode as it reconciles writes
 
         If cuboid_data.ndim == 4, data in time-series format - assume t,z,y,x
@@ -846,7 +846,8 @@ class SpatialDB:
                                                                 "state_config": self.state_conf,
                                                                 "object_store_config": self.object_store_config},
                                                                write_cuboid_key,
-                                                               resource)
+                                                               resource,
+                                                               to_black)
                                 page_out_cnt += 1
                                 # All done. continue.
                             else:

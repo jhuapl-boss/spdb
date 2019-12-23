@@ -169,7 +169,7 @@ class ObjectStore(metaclass=ABCMeta):
         raise NotImplemented
 
     @abstractmethod
-    def trigger_page_out(self, config_data, write_cuboid_key, resource):
+    def trigger_page_out(self, config_data, write_cuboid_key, resource, is_black):
         """
         Method to trigger an page out to the object storage system
 
@@ -177,6 +177,7 @@ class ObjectStore(metaclass=ABCMeta):
             config_data (dict): Dictionary of configuration information
             write_cuboid_key (str): Unique write-cuboid to be flushed to S3
             resource (spdb.project.resource.BossResource): resource for the given write cuboid key
+            is_black (bool): message flag for black overwrite
 
         Returns:
             None
@@ -726,7 +727,7 @@ class AWSObjectStore(ObjectStore):
         return self.obj_ind.get_tight_bounding_box(
             cutout_fcn, resource, resolution, id, x_rng, y_rng, z_rng, t_rng)
 
-    def trigger_page_out(self, config_data, write_cuboid_key, resource):
+    def trigger_page_out(self, config_data, write_cuboid_key, resource, to_black=False):
         """
         Method to invoke lambda function to page out via data in an SQS message
 
@@ -734,6 +735,7 @@ class AWSObjectStore(ObjectStore):
             config_data (dict): Dictionary of configuration dictionaries
             write_cuboid_key (str): Unique write-cuboid to be flushed to S3
             resource (spdb.project.resource.BossResource): resource for the given write cuboid key
+            is_black (bool): message flag for black overwrite
 
         Returns:
             None
@@ -744,7 +746,9 @@ class AWSObjectStore(ObjectStore):
         msg_data = {"config": config_data,
                     "write_cuboid_key": write_cuboid_key,
                     "lambda-name": "s3_flush",
-                    "resource": resource.to_dict()}
+                    "resource": resource.to_dict(),
+                    "to_black": str(to_black)
+                    }
 
         response = sqs.send_message(QueueUrl=self.config["s3_flush_queue"],
                                     MessageBody=json.dumps(msg_data))
