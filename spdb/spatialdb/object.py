@@ -26,6 +26,10 @@ import traceback
 
 import boto3
 
+import os
+import urllib.request
+from urllib.error import URLError
+
 # Note there are additional imports at the bottom of the file.
 
 """
@@ -60,7 +64,9 @@ def get_region():
         return "us-east-1"
     else:
         try:
-            region = utils.read_url('http://169.254.169.254/latest/meta-data/placement/availability-zone')[:-1]
+            url = 'http://169.254.169.254/latest/meta-data/placement/availability-zone'
+            resp = urllib.request.urlopen(url).read().decode('utf-8')
+            region = resp[:-1]
             return region
         except NotImplementedError:
             # If you get here, you are mocking and metadata is not supported.
