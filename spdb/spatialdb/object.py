@@ -747,7 +747,7 @@ class AWSObjectStore(ObjectStore):
                     "write_cuboid_key": write_cuboid_key,
                     "lambda-name": "s3_flush",
                     "resource": resource.to_dict(),
-                    "to_black": str(to_black).lower()
+                    "to_black": to_black
                     }
 
         response = sqs.send_message(QueueUrl=self.config["s3_flush_queue"],
