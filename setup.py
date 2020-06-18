@@ -17,7 +17,7 @@
 # python setup.py bdist_wheel
 # twine upload --skip-existing dist/*
 
-__version__ = '1.0.5'
+__version__ = '1.0.7'
 
 import os
 import glob
@@ -66,6 +66,7 @@ setup(
     name='spdb',
     version=__version__,
     packages=find_packages(),
+    package_data={'spdb': ['spatialdb/dynamo/*.json']},
     url='https://github.com/jhuapl-boss/spdb',
     license="Apache Software License 2.0",
     long_description=read('README.md'),
