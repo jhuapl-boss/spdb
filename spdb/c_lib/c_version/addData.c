@@ -171,9 +171,9 @@ void addAnnotationData(uint64_t * volume, uint64_t * output, int * cubes, int * 
      * idx * array.strides or
      * (idx_z, idx_y, idx_x) * (1, size_z, size_z * size_y)
      */
-    #define OFFSET(val_z, val_y, val_x) (((cube_z * val_z)) + \
-                                         ((cube_y * val_y) * size_z) + \
-                                         ((cube_x * val_x) * size_z * size_y))
+    #define OFFSET(val_z, val_y, val_x) (((cube_z * val_z) * size_x * size_y) + \
+                                         ((cube_y * val_y) * size_x) + \
+                                         ((cube_x * val_x)))
 
     for(z=0; z<dim_z; z++)
         for(y=0; y<dim_y; y++)
@@ -196,7 +196,7 @@ void addAnnotationData(uint64_t * volume, uint64_t * output, int * cubes, int * 
                 }
 
                 // output_index === zyx
-                int output_index = (z) + (y * dim_z) + (x * dim_y * dim_z);
+                int output_index = (z * dim_y * dim_x) + (y * dim_x) + (x);
                 output[output_index] = annotation;
             }
 }
