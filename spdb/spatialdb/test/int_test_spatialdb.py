@@ -416,7 +416,124 @@ class SpatialDBImageDataIntegrationTestMixin(object):
         cube2 = sp.cutout(self.resource, (200, 600, 3), (400, 400, 8), 0, iso=True)
 
         np.testing.assert_array_equal(cube1.data, cube2.data)
+    
+    def test_cutout_to_black_no_time_single_aligned_no_iso(self):
+        """Test the write_cuboid method - to black - no time - single - aligned - no iso"""
+        # Generate random data
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube1.random()
+        cube1.morton_id = 0
+        
+        cubeb = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cubeb.ones()
+        cubeb.morton_id = 0
 
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        # write data cuboid
+        sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data)
+
+        # write to_black
+        sp.write_cuboid(self.resource, (0, 0, 0), 0, cubeb.data, to_black=True)
+
+        # get cuboid back
+        cube2 = sp.cutout(
+            self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
+
+        # expected result
+        cubez = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cubez.zeros()
+        cubez.morton_id = 0
+
+        np.testing.assert_array_equal(cube2.data, cubez.data)
+    
+    def test_cutout_to_black_no_time_single_unaligned_no_iso(self):
+        """Test the write_cuboid method - to black - no time - single - unaligned - no iso"""
+        # Generate random data
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube1.random()
+        cube1.morton_id = 0
+        
+        cubeb = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim//2])
+        cubeb.ones()
+        cubeb.morton_id = 0
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        # write data cuboid
+        sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data)
+
+        # write to_black
+        sp.write_cuboid(self.resource, (0, 0, 8), 0, cubeb.data, to_black=True)
+
+        # get cuboid back
+        cube2 = sp.cutout(
+            self.resource, (0, 0, 8), (self.x_dim, self.y_dim, self.z_dim), 0)
+
+        # expected result
+        cubez = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim//2])
+        cubez.zeros()
+        cubez.morton_id = 0
+
+        np.testing.assert_array_equal(cube2.data, cubez.data)
+
+    def test_cutout_to_black_no_time_single_aligned_iso(self):
+        """Test the write_cuboid method - to black - no time - single - aligned - iso"""
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cube1.random()
+        cube1.morton_id = 0
+        
+        cubeb = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cubeb.ones()
+        cubeb.morton_id = 0
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        # write data cuboid
+        sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data, iso=True)
+
+        # write to_black
+        sp.write_cuboid(self.resource, (0, 0, 0), 0, cubeb.data, iso=True, to_black=True)
+
+        # get cuboid back
+        cube2 = sp.cutout(
+            self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0, iso=True)
+
+        # expected result
+        cubez = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim])
+        cubez.zeros()
+        cubez.morton_id = 0
+
+        np.testing.assert_array_equal(cube2.data, cubez.data)
+    
+    def test_cutout_to_black_time_single_aligned_no_iso(self):
+        """Test the write_cuboid method - to black - time - single - aligned - no iso"""
+        cube1 = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim], time_range=[0, 3])
+        cube1.random()
+        cube1.morton_id = 0
+        
+        cubeb = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim], time_range=[0, 3])
+        cubeb.ones()
+        cubeb.morton_id = 0
+
+        sp = SpatialDB(self.kvio_config, self.state_config, self.object_store_config)
+
+        # write data cuboid
+        sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data)
+
+        # write to_black
+        sp.write_cuboid(self.resource, (0, 0, 0), 0, cubeb.data, to_black=True)
+
+        # get cuboid back
+        cube2 = sp.cutout(
+            self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0, time_sample_range=[0, 3])
+
+        # expected result
+        cubez = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim], time_range=[0, 3])
+        cubez.zeros()
+        cubez.morton_id = 0
+
+        np.testing.assert_array_equal(cube2.data, cubez.data)
 
 class TestIntegrationSpatialDBImage8Data(SpatialDBImageDataTestMixin,
                                          SpatialDBImageDataIntegrationTestMixin, unittest.TestCase):
