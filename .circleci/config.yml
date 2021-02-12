@@ -22,3 +22,22 @@ commands:
     description: "Test spdb"
     steps:
       - run: python3 -m unittest
+jobs:
+  test_py3_5:
+    docker:
+      - image: circleci/python:3.5
+    environment:
+      AWS_ACCESS_KEY_ID: testing
+      AWS_SECRET_ACCESS_KEY: testing
+      AWS_SECURITY_TOKEN: testing
+      AWS_SESSION_TOKEN: testing
+    steps:
+      - install
+      - build_spdb_clib
+      - test_spdb
+
+workflows:
+  version: 2
+  test:
+    jobs:
+      - test_py3_5
