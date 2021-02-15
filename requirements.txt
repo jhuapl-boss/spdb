@@ -1,5 +1,4 @@
 Pillow>=4.1.1
-opencv-python>=4.5.1.48
 redis>=2.10.5
 
 # blosc 1.7.0 fails intermittently in the lambda environment.  Pinning at
