@@ -730,6 +730,7 @@ class SpatialDB:
             time_sample_start (int): if cuboid_data.ndim == 3, the time sample for the data
                                      if cuboid_data.ndim == 4, the time sample for cuboid_data[0, :, :, :]
             iso (bool): Flag indicating if you want to write to the "isotropic" version of a channel, if available
+            to_black (bool): Flag indicating is this cuboid is a cutout_to_black cuboid. 
 
         Returns:
             None
@@ -789,9 +790,15 @@ class SpatialDB:
         # Get keys ready
         experiment = resource.get_experiment()
         if iso is True and resolution > resource.get_isotropic_level() and experiment.hierarchy_method.lower() == "anisotropic":
-            base_write_cuboid_key = "WRITE-CUBOID&ISO&{}&{}".format(resource.get_lookup_key(), resolution)
+            if to_black:
+                base_write_cuboid_key = "BLACK-CUBOID&ISO&{}&{}".format(resource.get_lookup_key(), resolution)
+            else:
+                base_write_cuboid_key = "WRITE-CUBOID&ISO${}&{}".format(resource.get_lookup_key(), resolution)
         else:
-            base_write_cuboid_key = "WRITE-CUBOID&{}&{}".format(resource.get_lookup_key(), resolution)
+            if to_black:
+                base_write_cuboid_key = "BLACK-CUBOID&{}&{}".format(resource.get_lookup_key(), resolution)
+            else:
+                base_write_cuboid_key = "WRITE-CUBOID&{}&{}".format(resource.get_lookup_key(), resolution)
 
         log.info("Writing Cuboid - Base Key: {}".format(base_write_cuboid_key))
 
@@ -846,8 +853,7 @@ class SpatialDB:
                                                                 "state_config": self.state_conf,
                                                                 "object_store_config": self.object_store_config},
                                                                write_cuboid_key,
-                                                               resource,
-                                                               to_black)
+                                                               resource)
                                 page_out_cnt += 1
                                 # All done. continue.
                             else:

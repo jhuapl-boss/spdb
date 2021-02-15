@@ -362,6 +362,15 @@ class Cube(metaclass=ABCMeta):
             None
         """
         return NotImplemented
+    
+    @abstractmethod
+    def ones(self):
+        """Create a cube of 1s, used primarily in testing
+
+        Returns:
+            None
+        """
+        return NotImplemented
 
     @abstractmethod
     def xy_image(self, z_index=0):

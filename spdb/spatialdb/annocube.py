@@ -59,6 +59,14 @@ class AnnotateCube64(Cube):
                                       size=[self.time_range[1]-self.time_range[0]] + self.cube_size,
                                       dtype=np.uint64)
 
+    def ones(self):
+        """Create a cube of 1s.
+
+        Return:
+            None
+        """
+        self.data = np.ones([self.time_range[1]-self.time_range[0]] + self.cube_size, dtype=np.uint64, order='C')
+
     def overwrite(self, input_data, time_sample_range=None):
         """ Overwrite data with all non-zero values in the input_data
 
