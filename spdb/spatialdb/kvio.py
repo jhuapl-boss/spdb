@@ -108,6 +108,34 @@ class KVIO(metaclass=ABCMeta):
         # Return a list of all keys
         return ['{}&{}&{}&{}'.format(base_key, s[0], s[1], uuid.uuid4().__str__()) for s in key_suffix_list]
 
+    def generate_black_cuboid_keys(self, resource, resolution, time_sample_list, morton_idx_list):
+        """Generate Keys for black cuboids from cutout_to_black that are in the WRITE BUFFER of the 
+        redis cache db
+
+        The keys are ordered by time sample followed by morton ID (e.g. 1&1, 1&2, 1&3, 2&1, 2&2, 2&3)
+
+        The key contains the base lookup key with the time samples and morton ids appended with the format:
+
+            BLACK-CUBOID&{lookup_key}&time_sample&morton_id&UUID
+
+        Args:
+            resource (spdb.project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            morton_idx_list (list[int]): a list of Morton ID of the cuboids to get
+            time_sample_list (list[int]): a list of time samples of the cuboids to get
+
+        Returns:
+            list[str]: A list of keys for each cuboid
+
+        """
+        base_key = 'BLACK-CUBOID&{}&{}'.format(resource.get_lookup_key(), resolution)
+
+        # Get the combinations of time and morton, properly ordered
+        key_suffix_list = itertools.product(time_sample_list, morton_idx_list)
+
+        # Return a list of all keys
+        return ['{}&{}&{}&{}'.format(base_key, s[0], s[1], uuid.uuid4().__str__()) for s in key_suffix_list]
+
     def write_cuboid_key_to_cache_key(self, write_cuboid_key):
         """Converts a write cuboid key to a cache key
 
