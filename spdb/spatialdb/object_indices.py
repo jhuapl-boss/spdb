@@ -1072,6 +1072,41 @@ class ObjectIndices:
             raise SpdbError("Failed to update {} for ID: {}".format(LAST_PARTITION_KEY, key),
                 ErrorCodes.OBJECT_STORE_ERROR)
 
+    def get_cuboids_from_id(self, resource, resolution, id, version=0):
+        """
+        Get a list of cuboid bounds that contains the object labeled with id.
+
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            id (uint64|string): object's id
+            version (optional[int]): Version - reserved for future use.
+        Returns:
+            (dict|None): {'cuboids': [512,512,16]} or None if the id is not found.
+
+        Raises:
+            (SpdbError): Can't talk to id index database or database corrupt.
+        """
+
+        cuboid_list = []
+
+        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
+        obj_keys = self.get_cuboids(resource, resolution, id)
+
+        if len(obj_keys) == 0:
+            return None
+
+        for key in obj_keys:
+            morton = int(key.split('&')[6])
+            xyz = MortonXYZ(morton)
+            x = xyz[0] * x_cube_dim
+            y = xyz[1] * y_cube_dim
+            z = xyz[2] * z_cube_dim
+            cuboid_list.append((x,y,z))
+
+        return {
+            'cuboids': cuboid_list
+        }
 
 
 # Import statement at the bottom to avoid problems with circular imports.
