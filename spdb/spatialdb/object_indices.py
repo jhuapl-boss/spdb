@@ -1082,7 +1082,7 @@ class ObjectIndices:
             id (uint64|string): object's id
             version (optional[int]): Version - reserved for future use.
         Returns:
-            (dict|None): {'cuboids': [512,512,16]} or None if the id is not found.
+           (dict|None) : Corners of cuboids containing ID or None if the id is not found.
 
         Raises:
             (SpdbError): Can't talk to id index database or database corrupt.

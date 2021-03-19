@@ -857,7 +857,7 @@ class AWSObjectStore(ObjectStore):
             version (optional[int]): Reserved for future use.  Defaults to 0
         
         Returns:
-            (dict) : {'cuboids': [(512, 512, 32), (512, 512, 1), (4, 60, 20)]}
+            (dict) : Corners of cuboids containing ID. Ex: {'cuboids': [[512, 512, 64], [0, 512, 32], [512, 512, 32]}
         """
         return self.obj_ind.get_cuboids_from_id(resource, resolution, id, version)
 
