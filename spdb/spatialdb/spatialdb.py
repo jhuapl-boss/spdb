@@ -964,4 +964,16 @@ class SpatialDB:
         """
         return self.objectio.reserve_ids(resource, num_ids, version)
 
+    def get_cuboids_from_id(self, resource, resolution, id, version=0):
+        """Method to get cuboid indicies for a particular ID
 
+        Args:
+            resource (spdb.project.resource.BossResource): Data model info based on the request or target resource.
+            resolution (int): the resolution level
+            id (uint64|string): object's id
+            version (optional[int]): Defaults to zero, reserved for future use.
+
+        Returns:
+            (dict) : Corners of cuboids containing ID. Ex: {'cuboids': [[512, 512, 64], [0, 512, 32], [512, 512, 32]}
+        """
+        return self.objectio.get_cuboids_from_id(resource, resolution, int(id), version)
