@@ -454,6 +454,7 @@ class SpatialDBImageDataIntegrationTestMixin(object):
         cube1.random()
         cube1.morton_id = 0
         
+        # Only blacking out half the cuboid.
         cubeb = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim//2])
         cubeb.ones()
         cubeb.morton_id = 0
@@ -464,18 +465,17 @@ class SpatialDBImageDataIntegrationTestMixin(object):
         sp.write_cuboid(self.resource, (0, 0, 0), 0, cube1.data)
 
         # write to_black
-        sp.write_cuboid(self.resource, (0, 0, 8), 0, cubeb.data, to_black=True)
+        sp.write_cuboid(self.resource, (0, 0, 0), 0, cubeb.data, to_black=True)
 
         # get cuboid back
         cube2 = sp.cutout(
-            self.resource, (0, 0, 8), (self.x_dim, self.y_dim, self.z_dim), 0)
+            self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
 
         # expected result
-        cubez = Cube.create_cube(self.resource, [self.x_dim, self.y_dim, self.z_dim//2])
-        cubez.zeros()
-        cubez.morton_id = 0
+        expected_data = np.copy(cube1.data)
+        expected_data[:, :self.z_dim//2, :, :] = 0
 
-        np.testing.assert_array_equal(cube2.data, cubez.data)
+        np.testing.assert_array_equal(cube2.data, expected_data)
 
     def test_cutout_to_black_no_time_single_aligned_iso(self):
         """Test the write_cuboid method - to black - no time - single - aligned - iso"""

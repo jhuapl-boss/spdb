@@ -259,7 +259,9 @@ class RedisKVIO(KVIO):
 
     def is_dirty(self, cache_key_list):
         """
-        Check if a cuboid is dirty based on its cache key
+        Check if a cuboid is dirty based on its cache key.
+
+        TODO: Is it possible for a black cuboid to get dirty? 
         Args:
             cache_key_list (list(str)): A list of cached-cuboid keys
 
