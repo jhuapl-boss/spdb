@@ -472,7 +472,7 @@ class SpatialDBImageDataIntegrationTestMixin(object):
             self.resource, (0, 0, 0), (self.x_dim, self.y_dim, self.z_dim), 0)
 
         # expected result
-        expected_data = cube1.data
+        expected_data = np.copy(cube1.data)
         expected_data[:, :self.z_dim//2, :, :] = 0
 
         np.testing.assert_array_equal(cube2.data, expected_data)
