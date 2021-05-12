@@ -260,7 +260,11 @@ class ObjectStore(metaclass=ABCMeta):
             version (optional[int]): Reserved for future use.  Defaults to 0
         
         Returns:
-            (dict) : {'cuboids': [(1, 3, 4), (2, 0, 1), (4, 60, 20)]}
+            (dict) : Extents of cuboids containing ID in XYZ order. Example output: 
+            {'cuboids': [
+                [(0, 512), (0, 512), (0,16)], 
+                [(512, 1024), (0, 512), (16,32)]
+            ]}
         """
         raise NotImplemented
 
@@ -857,7 +861,11 @@ class AWSObjectStore(ObjectStore):
             version (optional[int]): Reserved for future use.  Defaults to 0
         
         Returns:
-            (dict) : Corners of cuboids containing ID. Ex: {'cuboids': [[512, 512, 64], [0, 512, 32], [512, 512, 32]}
+            (dict) : Extents of cuboids containing ID in XYZ order. Example output: 
+            {'cuboids': [
+                [(0, 512), (0, 512), (0,16)], 
+                [(512, 1024), (0, 512), (16,32)]
+            ]}
         """
         return self.obj_ind.get_cuboids_from_id(resource, resolution, id, version)
 

@@ -974,6 +974,10 @@ class SpatialDB:
             version (optional[int]): Defaults to zero, reserved for future use.
 
         Returns:
-            (dict) : Corners of cuboids containing ID. Ex: {'cuboids': [[512, 512, 64], [0, 512, 32], [512, 512, 32]}
+            (dict) : Extents of cuboids containing ID in XYZ order. Example output: 
+            {'cuboids': [
+                [(0, 512), (0, 512), (0,16)], 
+                [(512, 1024), (0, 512), (16,32)]
+            ]}
         """
         return self.objectio.get_cuboids_from_id(resource, resolution, int(id), version)

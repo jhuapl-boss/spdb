@@ -1082,7 +1082,7 @@ class ObjectIndices:
             id (uint64|string): object's id
             version (optional[int]): Version - reserved for future use.
         Returns:
-           (dict|None) : Corners of cuboids containing ID or None if the id is not found.
+           (dict|None) : Extents of cuboids in XYZ containing ID or None if the id is not found.
 
         Raises:
             (SpdbError): Can't talk to id index database or database corrupt.
@@ -1102,7 +1102,11 @@ class ObjectIndices:
             x = xyz[0] * x_cube_dim
             y = xyz[1] * y_cube_dim
             z = xyz[2] * z_cube_dim
-            cuboid_list.append((x,y,z))
+            cuboid_list.append([
+                (x, x+x_cube_dim),
+                (y, y+y_cube_dim,
+                (z, z+z_cube_dim))
+            ])
 
         return {
             'cuboids': cuboid_list
