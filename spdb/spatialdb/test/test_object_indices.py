@@ -970,14 +970,14 @@ class ObjectIndicesTestMixin(object):
             expected = {
                 'cuboids': [
                     [
-                        (4*x_cube_dim, 5*x_cube_dim),
-                        (4*y_cube_dim, 5*y_cube_dim),
-                        (4*z_cube_dim, 5*z_cube_dim)
+                        (pos0[0]*x_cube_dim, (pos0[0]+1)*x_cube_dim),
+                        (pos0[1]*y_cube_dim, (pos0[1]+1)*y_cube_dim),
+                        (pos0[2]*z_cube_dim, (pos0[2]+1)*z_cube_dim)
                     ],
                     [
-                        (2*x_cube_dim, 3*x_cube_dim),
-                        (1*y_cube_dim, 2*y_cube_dim),
-                        (3*z_cube_dim, 4*z_cube_dim)
+                        (pos1[0]*x_cube_dim, (pos1[0]+1)*x_cube_dim),
+                        (pos1[1]*y_cube_dim, (pos1[1]+1)*y_cube_dim),
+                        (pos1[2]*z_cube_dim, (pos1[2]+1)*z_cube_dim)
                     ]
                 ]
             }
