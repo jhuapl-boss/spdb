@@ -103,6 +103,56 @@ class TestBasicResource(unittest.TestCase):
         assert channel.default_time_sample == setup_data['channel']['default_time_sample']
         assert channel.downsample_status == setup_data['channel']['downsample_status']
 
+    def test_basic_resource_channel_cloudvolume_uint8(self):
+        """Test basic get channel interface
+
+        Returns:
+            None
+
+        """
+        setup_data = get_image_dict(storage_type='cloudvol')
+        resource = BossResourceBasic(setup_data)
+
+        channel = resource.get_channel()
+        assert channel.is_image() is True
+        assert channel.is_cloudvolume() is True
+        assert channel.name == setup_data['channel']['name']
+        assert channel.description == setup_data['channel']['description']
+        assert channel.datatype == setup_data['channel']['datatype']
+        assert channel.base_resolution == setup_data['channel']['base_resolution']
+        assert channel.sources == setup_data['channel']['sources']
+        assert channel.related == setup_data['channel']['related']
+        assert channel.default_time_sample == setup_data['channel']['default_time_sample']
+        assert channel.downsample_status == setup_data['channel']['downsample_status']
+        assert channel.storage_type == setup_data['channel']['storage_type']
+        assert channel.bucket == setup_data['channel']['bucket']
+        assert channel.cv_path == setup_data['channel']['cv_path']
+
+    def test_basic_resource_channel_cloudvolume_uint16(self):
+        """Test basic get channel interface
+
+        Returns:
+            None
+
+        """
+        setup_data = get_image_dict(datatype="uint16", storage_type='cloudvol')
+        resource = BossResourceBasic(setup_data)
+
+        channel = resource.get_channel()
+        assert channel.is_image() is True
+        assert channel.is_cloudvolume() is True
+        assert channel.name == setup_data['channel']['name']
+        assert channel.description == setup_data['channel']['description']
+        assert channel.datatype == setup_data['channel']['datatype']
+        assert channel.base_resolution == setup_data['channel']['base_resolution']
+        assert channel.sources == setup_data['channel']['sources']
+        assert channel.related == setup_data['channel']['related']
+        assert channel.default_time_sample == setup_data['channel']['default_time_sample']
+        assert channel.downsample_status == setup_data['channel']['downsample_status']
+        assert channel.storage_type == setup_data['channel']['storage_type']
+        assert channel.bucket == setup_data['channel']['bucket']
+        assert channel.cv_path == setup_data['channel']['cv_path']
+
     def test_is_downsampled(self):
         """Test is downsampled method
 
