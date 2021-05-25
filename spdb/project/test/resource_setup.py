@@ -55,12 +55,12 @@ def get_image_dict(datatype="uint8", storage_type="spdb"):
         raise ValueError(f"Invalid storage type {storage_type}. Must be either 'spdb' or 'cloudvol'.")
 
     if datatype == "uint8":
-        data['boss_key'] = 'col1&exp1&ch2'
+        data['boss_key'] = 'col1&exp1&ch1'
         data['lookup_key'] = '4&3&2'
         data['channel']['name'] = 'ch1'
         data['channel']['datatype'] = 'uint8'
     elif datatype == "uint16":
-        data['boss_key'] = 'col1&exp1&ch3'
+        data['boss_key'] = 'col1&exp1&ch2'
         data['lookup_key'] = '4&3&3'
         data['channel']['name'] = 'ch2'
         data['channel']['datatype'] = 'uint16'
@@ -69,7 +69,7 @@ def get_image_dict(datatype="uint8", storage_type="spdb"):
     return data
 
 
-def get_anno_dict(boss_key='col1&exp1&ch2', lookup_key='4&3&345', storage_type='spdb'):
+def get_anno_dict(boss_key='col1&exp1&ch3', lookup_key='4&3&345', storage_type='spdb'):
     """Method to generate an initial set of parameters to use to instantiate a basic resource for an ANNOTATION dataset
 
     Args:
