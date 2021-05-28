@@ -244,7 +244,7 @@ class Channel:
 
     """
     def __init__(self, name, description, ch_type, datatype, base_resolution, sources, related,
-                 default_time_sample, downsample_status, storage_type, bucket, cv_path):
+                 default_time_sample, downsample_status, storage_type='spdb', bucket=None, cv_path=None):
         self.name = name
         self.description = description
         self.type = ch_type
