@@ -54,6 +54,26 @@ class RedisKVIOTestMixin(object):
         assert keys[5].rsplit("&", 1)[0] == "WRITE-CUBOID&4&3&2&2&1&36"
         assert keys[8].rsplit("&", 1)[0] == "WRITE-CUBOID&4&3&2&2&2&36"
 
+    def test_generate_black_cuboid_keys(self):
+        """Test if black-cuboid keys are formatted properly"""
+        rkv = RedisKVIO(self.config_data)
+        keys = rkv.generate_black_cuboid_keys(self.resource, 2, [0, 1, 2], [34, 35, 36])
+        assert len(keys) == 9
+        uuids = []
+        for key in keys:
+            uuids.append(key.rsplit("&", 1)[1])
+        assert len(set(uuids)) == 9
+
+        assert keys[0].rsplit("&", 1)[0] == "BLACK-CUBOID&4&3&2&2&0&34"
+        assert keys[1].rsplit("&", 1)[0] == "BLACK-CUBOID&4&3&2&2&0&35"
+        assert keys[2].rsplit("&", 1)[0] == "BLACK-CUBOID&4&3&2&2&0&36"
+        assert keys[3].rsplit("&", 1)[0] == "BLACK-CUBOID&4&3&2&2&1&34"
+        assert keys[4].rsplit("&", 1)[0] == "BLACK-CUBOID&4&3&2&2&1&35"
+        assert keys[5].rsplit("&", 1)[0] == "BLACK-CUBOID&4&3&2&2&1&36"
+        assert keys[6].rsplit("&", 1)[0] == "BLACK-CUBOID&4&3&2&2&2&34"
+        assert keys[7].rsplit("&", 1)[0] == "BLACK-CUBOID&4&3&2&2&2&35"
+        assert keys[8].rsplit("&", 1)[0] == "BLACK-CUBOID&4&3&2&2&2&36"
+
     def test_get_missing_read_cache_keys(self):
         """Test for querying for keys missing in the cache"""
         # Put some keys in the cache
