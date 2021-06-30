@@ -112,7 +112,10 @@ class BossResourceDjango(BossResource):
                                 sources,
                                 related,
                                 self.boss_request.channel.default_time_sample,
-                                self.boss_request.channel.downsample_status)
+                                self.boss_request.channel.downsample_status,
+                                self.boss_request.channel.storage_type,
+                                self.boss_request.channel.bucket,
+                                self.boss_request.channel.cv_path)
 
     def populate_boss_key(self):
         """

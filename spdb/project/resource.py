@@ -244,7 +244,7 @@ class Channel:
 
     """
     def __init__(self, name, description, ch_type, datatype, base_resolution, sources, related,
-                 default_time_sample, downsample_status):
+                 default_time_sample, downsample_status, storage_type='spdb', bucket=None, cv_path=None):
         self.name = name
         self.description = description
         self.type = ch_type
@@ -254,6 +254,9 @@ class Channel:
         self.related = related
         self.default_time_sample = default_time_sample
         self.downsample_status = downsample_status
+        self.storage_type = storage_type
+        self.bucket = bucket
+        self.cv_path = cv_path
 
     def is_image(self):
         """
@@ -266,6 +269,15 @@ class Channel:
             return True
         else:
             return False
+    
+    def is_cloudvolume(self):
+        """
+        Check if channel is a cloudvolume layer.
+
+        Returns:
+            (bool): True if channel is cloudvolume. 
+        """
+        return self.storage_type == "cloudvol" and len(self.cv_path) > 0
 
 
 class BossResource(metaclass=ABCMeta):
