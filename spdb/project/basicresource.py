@@ -115,7 +115,7 @@ class BossResourceBasic(BossResource):
                                 self.data['channel']['downsample_status'],
                                 self.data['channel'].get('storage_type', 'spdb'),
                                 self.data['channel'].get('bucket'),
-                                self.data['channel'].get('cv_path')
+                                self.data['channel'].get('cv_path'))
 
     def populate_boss_key(self):
         """
