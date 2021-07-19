@@ -1,3 +1,5 @@
+# Pillow is pinned here because 8.3.0 had an error that caused tile_ingest_lambda to fail
+# https://pillow.readthedocs.io/en/stable/releasenotes/8.3.1.html#fixed-regression-converting-to-numpy-arrays
 Pillow>=8.3.1
 redis>=2.10.5
 
