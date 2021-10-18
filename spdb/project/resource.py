@@ -34,7 +34,7 @@ def get_isotropic_level(hierarchy_method, x_voxel_size, y_voxel_size, z_voxel_si
             return 0
         else:
             if x_voxel_size != y_voxel_size:
-                raise Exception("X voxel size != Y voxel size. Currently unable to determine isotropic level")
+                raise ValueError("X voxel size != Y voxel size. Currently unable to determine isotropic level")
 
             aspect_ratios = [float(z_voxel_size) / (x_voxel_size * 2 ** r) for r in range(0, 30)]
             resolution = (np.abs(np.array(aspect_ratios)-1)).argmin()
