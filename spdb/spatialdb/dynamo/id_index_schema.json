@@ -34,15 +34,8 @@
             ],
             "Projection": {
                 "ProjectionType": "KEYS_ONLY"
-            },
-            "ProvisionedThroughput": {
-                "ReadCapacityUnits": 15,
-                "WriteCapacityUnits": 15
             }
         }
     ],
-    "ProvisionedThroughput":{
-        "ReadCapacityUnits": 15,
-        "WriteCapacityUnits": 15
-    }
+    "BillingMode": "PAY_PER_REQUEST"
 }
