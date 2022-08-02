@@ -1097,8 +1097,8 @@ class ObjectIndices:
             return None
 
         for key in obj_keys:
-            morton = int(key.split('&')[6])
-            xyz = MortonXYZ(morton)
+            key_parts = AWSObjectStore.get_object_key_parts(key)
+            xyz = MortonXYZ(key_parts.morton_id)
             x = xyz[0] * x_cube_dim
             y = xyz[1] * y_cube_dim
             z = xyz[2] * z_cube_dim
