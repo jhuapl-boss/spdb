@@ -9,4 +9,4 @@ blosc==1.5.0
 numpy>=1.11.1
 
 boto3
-hvac>=0.8.1
+hvac==0.11.2
