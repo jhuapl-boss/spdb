@@ -17,7 +17,7 @@ import json
 import os
 
 from moto import mock_s3
-from moto import mock_dynamodb
+from moto import mock_dynamodb2
 from moto import mock_sqs
 import boto3
 from botocore.exceptions import ClientError
@@ -114,7 +114,7 @@ class SetupTests(object):
         """Method to start mocking"""
         self.mock = True
         self.mock_s3 = mock_s3()
-        self.mock_dynamodb = mock_dynamodb()
+        self.mock_dynamodb = mock_dynamodb2()
         self.mock_sqs = mock_sqs()
         self.mock_s3.start()
         self.mock_dynamodb.start()
@@ -148,7 +148,7 @@ class SetupTests(object):
     def create_index_table(self, table_name, schema_file):
         """Method to create DynamoDB index table"""
         if self.mock:
-            mock_dynamodb(self._create_index_table(table_name, schema_file))
+            mock_dynamodb2(self._create_index_table(table_name, schema_file))
         else:
             waiter = self._create_index_table(table_name, schema_file)
 
@@ -168,7 +168,7 @@ class SetupTests(object):
     def delete_index_table(self, table_name):
         """Method to create the S3 index table"""
         if self.mock:
-            mock_dynamodb(self._delete_index_table(table_name))
+            mock_dynamodb2(self._delete_index_table(table_name))
         else:
             self._delete_index_table(table_name)
 
