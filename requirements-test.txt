@@ -2,5 +2,4 @@ fakeredis
 nose2
 
 # updating to moto 1.3.16 fixed several tests that were failing. 
-# version 4.0.0 removes dynamodb2, and our schemas no longer work.
-moto[s3, sqs, dynamodb]>=1.3.16, <4.0.0
+moto[s3, sqs, dynamodb]==1.3.16
