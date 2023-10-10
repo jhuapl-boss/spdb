@@ -1,3 +1,8 @@
-fakeredis
-#nose2
+# Cache miss tests fail with newer versions of fakeredis.  The code path
+# copies data read from S3 into Redis.  Possible that fakeredis defaults to
+# emulating a Redis 7.x server is the breaking change.  It looks non-trivial to
+# make the tests and code under test instantiate a fakeredis that emulates a
+# Redis 6.x server.
+fakeredis==1.10.1
+nose2
 moto==4.2.5
