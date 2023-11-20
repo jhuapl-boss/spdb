@@ -395,6 +395,50 @@ class TestObjectIndicesWithDynamoDb(unittest.TestCase):
         }
         self.assertEqual(expected, actual)
 
+    @unittest.skip('Skipping - currently indexing disabled')
+    def test_cuboids_from_id(self):
+        id = 33333
+        resolution = 0
+        time_sample = 0
+        version = 0
+
+        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
+
+        pos0 = [4, 4, 4]
+        pos1 = [2, 1, 3]
+
+        bytes0 = np.zeros(10, dtype='uint64')
+        bytes0[1] = id
+        morton_id0 = XYZMorton(pos0)
+        key0 = AWSObjectStore.generate_object_key(
+            self.resource, resolution, time_sample, morton_id0)
+
+        bytes1 = np.zeros(4, dtype='uint64')
+        bytes1[0] = id     # Pre-existing id.
+        morton_id1 = XYZMorton(pos1)
+        key1 = AWSObjectStore.generate_object_key(
+            self.resource, resolution, time_sample, morton_id1)
+
+        self.obj_ind.update_id_indices(
+            self.resource, resolution, [key0, key1], [bytes0, bytes1], version)
+
+        actual = self.obj_ind.cuboids_from_id(self.resource, resolution, id)
+        expected = {
+            'cuboids': [
+                [
+                    (pos0[0]*x_cube_dim, (pos0[0]+1)*x_cube_dim),
+                    (pos0[1]*y_cube_dim, (pos0[1]+1)*y_cube_dim),
+                    (pos0[2]*z_cube_dim, (pos0[2]+1)*z_cube_dim)
+                ],
+                [
+                    (pos1[0]*x_cube_dim, (pos1[0]+1)*x_cube_dim),
+                    (pos1[1]*y_cube_dim, (pos1[1]+1)*y_cube_dim),
+                    (pos1[2]*z_cube_dim, (pos1[2]+1)*z_cube_dim)
+                ]
+            ]
+        }
+        self.assertEqual(expected, actual)
+
     def test_reserve_id_init(self):
         start_id = self.obj_ind.reserve_ids(self.resource, 10)
         self.assertEqual(start_id, 1)

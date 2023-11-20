@@ -943,6 +943,61 @@ class ObjectIndicesTestMixin(object):
         self.obj_ind.write_cuboid_dynamo(
             morton, chan_key, rev_id, lookup_key, version)
 
+    def test_cuboids_from_id(self):
+        resolution = 0
+        time_sample = 0
+
+        [x_cube_dim, y_cube_dim, z_cube_dim] = CUBOIDSIZE[resolution]
+
+        pos0 = [4, 4, 4]
+        pos1 = [2, 1, 3]
+
+        mort0 = XYZMorton(pos0)
+        mort1 = XYZMorton(pos1)
+
+
+        key0 = AWSObjectStore.generate_object_key(self.resource, resolution, time_sample, mort0)
+        key1 = AWSObjectStore.generate_object_key(self.resource, resolution, time_sample, mort1)
+
+        id = 2234
+
+        with patch.object(self.obj_ind, 'get_cuboids') as fake_get_cuboids:
+            fake_get_cuboids.return_value = [key0, key1]
+
+            # Method under test.
+            actual = self.obj_ind.cuboids_from_id(self.resource, resolution, id)
+
+            expected = {
+                'cuboids': [
+                    [
+                        (pos0[0]*x_cube_dim, (pos0[0]+1)*x_cube_dim),
+                        (pos0[1]*y_cube_dim, (pos0[1]+1)*y_cube_dim),
+                        (pos0[2]*z_cube_dim, (pos0[2]+1)*z_cube_dim)
+                    ],
+                    [
+                        (pos1[0]*x_cube_dim, (pos1[0]+1)*x_cube_dim),
+                        (pos1[1]*y_cube_dim, (pos1[1]+1)*y_cube_dim),
+                        (pos1[2]*z_cube_dim, (pos1[2]+1)*z_cube_dim)
+                    ]
+                ]
+            }
+            self.assertEqual(expected, actual)
+
+    def test_cuboids_from_id_not_found(self):
+        """Make sure None returned if id is not in channel."""
+        resolution = 0
+        time_sample = 0
+        id = 2234
+
+        with patch.object(self.obj_ind, 'get_cuboids') as fake_get_cuboids:
+            fake_get_cuboids.return_value = []
+
+            actual = self.obj_ind.cuboids_from_id(
+                self.resource, resolution, id)
+
+            expected = None
+            self.assertEqual(expected, actual)
+
 
 class TestObjectIndices(ObjectIndicesTestMixin, unittest.TestCase):
     @classmethod

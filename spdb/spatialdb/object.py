@@ -248,6 +248,26 @@ class ObjectStore(metaclass=ABCMeta):
         """
         raise NotImplemented
 
+    @abstractmethod
+    def get_cuboids_from_id(self, resource, resolution, id, version=0):
+        """
+        Method to get cuboids that belong to a particular ID.
+
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            id (int): id of interest.
+            version (optional[int]): Reserved for future use.  Defaults to 0
+        
+        Returns:
+            (dict) : Extents of cuboids containing ID in XYZ order. Example output: 
+            {'cuboids': [
+                [(0, 512), (0, 512), (0,16)], 
+                [(512, 1024), (0, 512), (16,32)]
+            ]}
+        """
+        raise NotImplemented
+
 
 class AWSObjectStore(ObjectStore):
     def __init__(self, conf):
@@ -829,6 +849,25 @@ class AWSObjectStore(ObjectStore):
         ids_as_str = ['%d' % n for n in id_set]
 
         return { 'ids': ids_as_str }
+    
+    def get_cuboids_from_id(self, resource, resolution, id, version=0):
+        """
+        Method to get cuboids that belong to a particular ID.
+
+        Args:
+            resource (project.BossResource): Data model info based on the request or target resource
+            resolution (int): the resolution level
+            id (int): id of interest.
+            version (optional[int]): Reserved for future use.  Defaults to 0
+        
+        Returns:
+            (dict) : Extents of cuboids containing ID in XYZ order. Example output: 
+            {'cuboids': [
+                [(0, 512), (0, 512), (0,16)], 
+                [(512, 1024), (0, 512), (16,32)]
+            ]}
+        """
+        return self.obj_ind.get_cuboids_from_id(resource, resolution, id, version)
 
     def _get_ids_from_cutout(
             self, cutout_fcn, resource, resolution, corner, extent,
