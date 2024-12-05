@@ -6,7 +6,7 @@ redis>=2.10.5
 # blosc 1.7.0 fails intermittently in the lambda environment.  Pinning at
 # 1.5.0 for now.
 blosc==1.5.0
-numpy>=1.11.1
+numpy>=1.11.1, <2.0
 
 boto3
 # hvac 1.0 incompatible b/c they removed the auth_ec2 function
