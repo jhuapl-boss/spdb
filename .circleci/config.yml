@@ -25,7 +25,20 @@ commands:
 jobs:
   test_py3_8:
     docker:
-      - image: circleci/python:3.8
+      - image: cimg/python:3.8
+    environment:
+      AWS_ACCESS_KEY_ID: testing
+      AWS_SECRET_ACCESS_KEY: testing
+      AWS_SECURITY_TOKEN: testing
+      AWS_SESSION_TOKEN: testing
+    steps:
+      - install
+      - build_spdb_clib
+      - test_spdb
+
+  test_py3_9:
+    docker:
+      - image: cimg/python:3.9
     environment:
       AWS_ACCESS_KEY_ID: testing
       AWS_SECRET_ACCESS_KEY: testing
@@ -41,3 +54,4 @@ workflows:
   test:
     jobs:
       - test_py3_8
+      - test_py3_9
